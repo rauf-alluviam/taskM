@@ -1,9 +1,11 @@
 import axios from 'axios';
 
 const API_BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000/api';
+const API_TIMEOUT = (import.meta as any).env.VITE_API_TIMEOUT || 10000;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: API_TIMEOUT,
 });
 
 // Request interceptor to add auth token

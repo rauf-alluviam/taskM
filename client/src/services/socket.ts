@@ -4,13 +4,16 @@ class SocketService {
   private socket: Socket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-
   connect(token?: string) {
-    const serverUrl = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001';
+    const serverUrl = (import.meta as any).env.VITE_SOCKET_URL || 'http://localhost:5000';
     
     this.socket = io(serverUrl, {
       auth: token ? { token } : undefined,
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: 1000,
+      timeout: 20000,
     });
 
     this.socket.on('connect', () => {
@@ -18,8 +21,12 @@ class SocketService {
       this.reconnectAttempts = 0;
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    this.socket.on('disconnect', (reason) => {
+      console.log('Disconnected from server:', reason);
+      if (reason === 'io server disconnect') {
+        // Server forcefully disconnected, try to reconnect
+        this.socket?.connect();
+      }
     });
 
     this.socket.on('connect_error', (error) => {
