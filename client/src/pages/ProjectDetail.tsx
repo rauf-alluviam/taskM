@@ -13,19 +13,9 @@ import { useTask, Task, Project } from '../contexts/TaskContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { projectAPI, taskAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
-import Modal from '../components/UI/Modal';
-import { useForm } from 'react-hook-form';
+import EditTaskModal from '../components/Tasks/EditTaskModal';
+import CreateTaskModal from '../components/Tasks/CreateTaskModal';
 import KanbanBoard from '../components/Tasks/KanbanBoard';
-
-interface TaskForm {
-  title: string;
-  description: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  startDate?: string;
-  endDate?: string;
-  tags: string;
-  status: string;
-}
 
 const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,8 +29,6 @@ const ProjectDetail: React.FC = () => {
   const [selectedColumn, setSelectedColumn] = useState('');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskForm>();
 
   useEffect(() => {
     if (id) {
@@ -76,19 +64,22 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
-  const onCreateTask = async (data: TaskForm) => {
+  const onCreateTask = async (data: any) => {
     setCreating(true);
     try {
       const taskData = {
-        ...data,
-        tags: data.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+        title: data.title,
+        description: data.description,
+        priority: data.priority,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        tags: Array.isArray(data.tags) ? data.tags : [],
         projectId: id,
         status: selectedColumn,
       };
       
       const newTask = await taskAPI.createTask(taskData);
       dispatch({ type: 'ADD_TASK', payload: newTask });
-      reset();
       setShowTaskModal(false);
     } catch (error) {
       console.error('Failed to create task:', error);
@@ -134,17 +125,6 @@ const ProjectDetail: React.FC = () => {
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
     setShowEditModal(true);
-    
-    // Populate the form with existing task data
-    reset({
-      title: task.title,
-      description: task.description || '',
-      priority: task.priority,
-      status: task.status,
-      tags: task.tags?.join(', ') || '',
-      startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
-      endDate: task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : ''
-    });
   };
 
   const handleUpdateTask = async (data: any) => {
@@ -153,8 +133,13 @@ const ProjectDetail: React.FC = () => {
     setUpdating(true);
     try {
       const taskData = {
-        ...data,
-        tags: data.tags || [],
+        title: data.title,
+        description: data.description,
+        priority: data.priority,
+        status: data.status,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        tags: Array.isArray(data.tags) ? data.tags : data.tags?.split(',').map((tag: string) => tag.trim()).filter(Boolean) || [],
         projectId: id // Ensure the task stays in this project
       };
 
@@ -163,7 +148,6 @@ const ProjectDetail: React.FC = () => {
       
       setShowEditModal(false);
       setSelectedTask(null);
-      reset(); // Clear the form
       
       addNotification({
         type: 'success',
@@ -282,231 +266,28 @@ const ProjectDetail: React.FC = () => {
       />
 
       {/* Create Task Modal */}
-      <Modal
+      <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
-        title={`Create Task in ${selectedColumn}`}
-        size="md"
-      >
-        <form onSubmit={handleSubmit(onCreateTask)} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Task Title *
-            </label>
-            <input
-              {...register('title', { required: 'Title is required' })}
-              className="input w-full"
-              placeholder="Enter task title..."
-            />
-            {errors.title && (
-              <p className="mt-1 text-sm text-error-600">{errors.title.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Description
-            </label>
-            <textarea
-              {...register('description')}
-              className="textarea w-full"
-              placeholder="Describe the task..."
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                <Flag className="w-4 h-4 inline mr-1" />
-                Priority
-              </label>
-              <select {...register('priority')} className="input w-full">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Tags
-              </label>
-              <input
-                {...register('tags')}
-                className="input w-full"
-                placeholder="urgent, frontend, bug"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                Start Date
-              </label>
-              <input
-                {...register('startDate')}
-                type="date"
-                className="input w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                End Date
-              </label>
-              <input
-                {...register('endDate')}
-                type="date"
-                className="input w-full"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => setShowTaskModal(false)}
-              className="btn-outline btn-md"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={creating}
-              className="btn-primary btn-md"
-            >
-              {creating ? 'Creating...' : 'Create Task'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        onSubmit={onCreateTask}
+        loading={creating}
+        initialStatus={selectedColumn}
+        availableStatuses={project?.kanbanColumns?.map(col => ({ id: col.name, title: col.name })) || []}
+      />
 
       {/* Edit Task Modal */}
-      <Modal
+      <EditTaskModal
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);
           setSelectedTask(null);
         }}
-        title={`Edit Task`}
-        size="md"
-      >
-        <form onSubmit={handleSubmit(handleUpdateTask)} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Task Title *
-            </label>
-            <input
-              {...register('title', { required: 'Title is required' })}
-              className="input w-full"
-              placeholder="Enter task title..."
-            />
-            {errors.title && (
-              <p className="mt-1 text-sm text-error-600">{errors.title.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Description
-            </label>
-            <textarea
-              {...register('description')}
-              className="textarea w-full"
-              placeholder="Describe the task..."
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                <Flag className="w-4 h-4 inline mr-1" />
-                Priority
-              </label>
-              <select {...register('priority')} className="input w-full">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Tags
-              </label>
-              <input
-                {...register('tags')}
-                className="input w-full"
-                placeholder="urgent, frontend, bug"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                Start Date
-              </label>
-              <input
-                {...register('startDate')}
-                type="date"
-                className="input w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                End Date
-              </label>
-              <input
-                {...register('endDate')}
-                type="date"
-                className="input w-full"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Status
-            </label>
-            <select {...register('status')} className="input w-full">
-              {project?.kanbanColumns?.map(column => (
-                <option key={column.name} value={column.name}>{column.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => {
-                setShowEditModal(false);
-                setSelectedTask(null);
-              }}
-              className="btn-outline btn-md"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={updating}
-              className="btn-primary btn-md"
-            >
-              {updating ? 'Updating...' : 'Update Task'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        onSubmit={handleUpdateTask}
+        onDelete={() => selectedTask && handleDeleteTask(selectedTask)}
+        task={selectedTask}
+        loading={updating}
+        availableStatuses={project?.kanbanColumns?.map(col => ({ id: col.name, title: col.name })) || []}
+      />
     </div>
   );
 };
