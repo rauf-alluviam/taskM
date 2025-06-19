@@ -1,0 +1,175 @@
+import React, { useState } from 'react';
+import { X, Plus, Check } from 'lucide-react';
+import Modal from '../UI/Modal';
+
+interface ColumnManagerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  columns: Array<{ id: string; title: string; color: string }>;
+  onAddColumn: (column: { id: string; title: string; color: string }) => void;
+  onRemoveColumn: (columnId: string) => void;
+}
+
+const ColumnManager: React.FC<ColumnManagerProps> = ({
+  isOpen,
+  onClose,
+  columns,
+  onAddColumn,
+  onRemoveColumn,
+}) => {
+  const [newColumnTitle, setNewColumnTitle] = useState('');
+  const [selectedColor, setSelectedColor] = useState('bg-gray-100');
+
+  const colorOptions = [
+    { value: 'bg-gray-100', label: 'Gray', preview: 'bg-gray-100 border-gray-300' },
+    { value: 'bg-blue-100', label: 'Blue', preview: 'bg-blue-100 border-blue-300' },
+    { value: 'bg-green-100', label: 'Green', preview: 'bg-green-100 border-green-300' },
+    { value: 'bg-yellow-100', label: 'Yellow', preview: 'bg-yellow-100 border-yellow-300' },
+    { value: 'bg-purple-100', label: 'Purple', preview: 'bg-purple-100 border-purple-300' },
+    { value: 'bg-pink-100', label: 'Pink', preview: 'bg-pink-100 border-pink-300' },
+    { value: 'bg-indigo-100', label: 'Indigo', preview: 'bg-indigo-100 border-indigo-300' },
+    { value: 'bg-red-100', label: 'Red', preview: 'bg-red-100 border-red-300' },
+  ];
+
+  const defaultColumns = ['todo', 'in-progress', 'review', 'done'];
+
+  const handleAddColumn = () => {
+    if (!newColumnTitle.trim()) return;
+
+    const columnId = newColumnTitle.toLowerCase().replace(/\s+/g, '-');
+    
+    onAddColumn({
+      id: columnId,
+      title: newColumnTitle.trim(),
+      color: selectedColor,
+    });
+
+    setNewColumnTitle('');
+    setSelectedColor('bg-gray-100');
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAddColumn();
+    }
+  };
+
+  const canRemoveColumn = (columnId: string) => {
+    return !defaultColumns.includes(columnId);
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Columns">
+      <div className="space-y-6">
+        {/* Current Columns */}
+        <div>
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Current Columns</h3>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {columns.map((column) => (
+              <div
+                key={column.id}
+                className="flex items-center justify-between p-3 border border-gray-200 rounded-md"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`w-4 h-4 rounded ${column.color.replace('bg-', 'bg-')} border`} />
+                  <span className="font-medium text-gray-900">{column.title}</span>
+                  <span className="text-xs text-gray-500">({column.id})</span>
+                </div>
+                
+                {canRemoveColumn(column.id) ? (
+                  <button
+                    onClick={() => onRemoveColumn(column.id)}
+                    className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                    Default
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Add New Column */}
+        <div>
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Add New Column</h3>
+          
+          <div className="space-y-4">
+            {/* Column Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Column Name
+              </label>
+              <input
+                type="text"
+                value={newColumnTitle}
+                onChange={(e) => setNewColumnTitle(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="input w-full"
+                placeholder="e.g., Testing, Blocked, Deployed..."
+              />
+            </div>
+
+            {/* Color Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Column Color
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {colorOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setSelectedColor(option.value)}
+                    className={`
+                      flex items-center justify-center p-3 rounded-md border-2 transition-colors
+                      ${option.preview}
+                      ${selectedColor === option.value ? 'ring-2 ring-blue-500' : ''}
+                    `}
+                  >
+                    {selectedColor === option.value && (
+                      <Check className="w-4 h-4 text-blue-600" />
+                    )}
+                    <span className="sr-only">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Selected: {colorOptions.find(c => c.value === selectedColor)?.label}
+              </p>
+            </div>
+
+            {/* Add Button */}
+            <button
+              onClick={handleAddColumn}
+              disabled={!newColumnTitle.trim()}
+              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Column
+            </button>
+          </div>
+        </div>
+
+        {/* Note */}
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+          <p className="text-sm text-blue-700">
+            <strong>Note:</strong> Default columns (To Do, In Progress, Review, Done) cannot be removed. 
+            Custom columns can be added and removed as needed.
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end pt-4 border-t border-gray-200">
+          <button onClick={onClose} className="btn-outline">
+            Done
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+export default ColumnManager;
