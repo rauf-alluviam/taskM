@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2, CheckSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2, CheckSquare, ExternalLink } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
 
 interface KanbanTaskCardProps {
@@ -12,6 +13,7 @@ interface KanbanTaskCardProps {
 
 const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete }) => {
   const [showDropdown, setShowDropdown] = useState(false);
+  const navigate = useNavigate();
   
   useEffect(() => {
     const handleCloseDropdowns = () => setShowDropdown(false);
@@ -103,19 +105,25 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete 
     e.stopPropagation();
     setShowDropdown(!showDropdown);
   };
-
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowDropdown(false);
     onEdit?.(task);
   };
+
+  const handleEditPage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDropdown(false);
+    navigate(`/tasks/${task._id}/edit`);
+  };
+  
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowDropdown(false);
     if (confirm(`Are you sure you want to delete "${task.title}"? This action cannot be undone.`)) {
       onDelete?.(task);
     }
-  };  return (
+  };return (
     <div
       ref={setNodeRef}
       style={style}
@@ -145,15 +153,21 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete 
             >
               <MoreVertical className="w-3 h-3" />
             </button>
-            
-            {showDropdown && (
-              <div className="absolute right-0 top-6 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[120px]">
+              {showDropdown && (
+              <div className="absolute right-0 top-6 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[140px]">
                 <button
                   onClick={handleEdit}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                 >
                   <Edit className="w-3 h-3" />
-                  <span>Edit</span>
+                  <span>Quick Edit</span>
+                </button>
+                <button
+                  onClick={handleEditPage}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Full Editor</span>
                 </button>
                 <button
                   onClick={handleDelete}

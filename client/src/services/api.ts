@@ -150,6 +150,14 @@ export const taskAPI = {
       return response.data;
     });
   },
+  getTaskHistory: async (taskId: string, page = 1, limit = 50) => {
+    return withRetry(async () => {
+      const response = await api.get(`/tasks/${taskId}/history`, {
+        params: { page, limit }
+      });
+      return response.data;
+    });
+  },
 };
 
 export const projectAPI = {

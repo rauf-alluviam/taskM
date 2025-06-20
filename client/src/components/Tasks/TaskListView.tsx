@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2, CheckSquare, FolderOpen } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2, CheckSquare, FolderOpen, ExternalLink } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
 
 interface TaskListViewProps {
@@ -15,6 +16,7 @@ const TaskListView: React.FC<TaskListViewProps> = ({
   onDeleteTask,
   onTaskUpdate 
 }) => {
+  const navigate = useNavigate();
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'title' | 'priority' | 'status' | 'dueDate'>('title');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -390,8 +392,7 @@ const TaskListView: React.FC<TaskListViewProps> = ({
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
-                    
-                    {showDropdown === task._id && (
+                      {showDropdown === task._id && (
                       <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[120px]">
                         <button
                           onClick={(e) => {
@@ -402,6 +403,17 @@ const TaskListView: React.FC<TaskListViewProps> = ({
                         >
                           <Edit className="w-3 h-3" />
                           <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDropdown(null);
+                            navigate(`/tasks/${task._id}/edit`);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Full Editor</span>
                         </button>
                         <button
                           onClick={(e) => {

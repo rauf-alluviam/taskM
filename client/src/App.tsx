@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import TasksKanban from './pages/TasksKanban';
+import EditTaskPage from './pages/EditTaskPage';
 import Documents from './pages/Documents';
 import DocumentEditor from './pages/DocumentEditor';
 import Users from './pages/Users';
@@ -44,6 +45,7 @@ function App() {
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/tasks" element={<TasksKanban />} />
+          <Route path="/tasks/:id/edit" element={<EditTaskPage />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/documents/:id" element={<DocumentEditor />} />
           <Route path="/users" element={<Users />} />

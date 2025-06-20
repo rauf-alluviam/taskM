@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import Task from '../models/Task.js';
+import TaskHistory from '../models/TaskHistory.js';
 import Project from '../models/Project.js';
 import { authenticate } from '../middleware/auth.js';
 
@@ -124,6 +125,12 @@ router.post('/', authenticate, [
     });
 
     await task.save();
+    
+    // Log task creation
+    await logTaskChange(task._id, 'created', {
+      details: `Task "${task.title}" created`
+    }, req.user._id, req.user.name);
+    
     await task.populate('createdBy', 'name email');
     await task.populate('assignedUsers', 'name email');
     await task.populate('projectId', 'name');
@@ -158,14 +165,16 @@ router.put('/:id', authenticate, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const task = await Task.findById(req.params.id);
+    const task = await Task.findById(req.params.id)
+      .populate('assignedUsers', 'name email');
+    
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
     }
 
     // Check if user has permission to update this task
     const canUpdate = task.createdBy.equals(req.user._id) ||
-                     task.assignedUsers.includes(req.user._id) ||
+                     task.assignedUsers.some(user => user._id.equals(req.user._id)) ||
                      req.user.role === 'admin';
 
     if (!canUpdate) {
@@ -173,8 +182,130 @@ router.put('/:id', authenticate, [
     }
 
     const updates = req.body;
+    const userName = req.user.name;
+    const userId = req.user._id;
+    
     console.log('🔄 Server: Updating task', req.params.id, 'with data:', updates);
     
+    // Log changes for each field
+    for (const [field, newValue] of Object.entries(updates)) {
+      const oldValue = task[field];
+      
+      // Skip if value hasn't changed
+      if (JSON.stringify(oldValue) === JSON.stringify(newValue)) continue;
+      
+      switch (field) {
+        case 'title':
+          if (oldValue !== newValue) {
+            await logTaskChange(task._id, 'title_updated', {
+              field,
+              oldValue,
+              newValue
+            }, userId, userName);
+          }
+          break;
+          
+        case 'description':
+          if (oldValue !== newValue) {
+            await logTaskChange(task._id, 'description_updated', {
+              field,
+              oldValue: oldValue ? 'Previous description' : 'No description',
+              newValue: newValue ? 'Updated description' : 'Removed description'
+            }, userId, userName);
+          }
+          break;
+          
+        case 'status':
+          if (oldValue !== newValue) {
+            await logTaskChange(task._id, 'status_changed', {
+              field,
+              oldValue,
+              newValue
+            }, userId, userName);
+          }
+          break;
+          
+        case 'priority':
+          if (oldValue !== newValue) {
+            await logTaskChange(task._id, 'priority_changed', {
+              field,
+              oldValue,
+              newValue
+            }, userId, userName);
+          }
+          break;
+          
+        case 'endDate':
+          if (oldValue?.getTime() !== new Date(newValue)?.getTime()) {
+            await logTaskChange(task._id, 'due_date_changed', {
+              field,
+              oldValue,
+              newValue: new Date(newValue)
+            }, userId, userName);
+          }
+          break;
+          
+        case 'startDate':
+          if (oldValue?.getTime() !== new Date(newValue)?.getTime()) {
+            await logTaskChange(task._id, 'start_date_changed', {
+              field,
+              oldValue,
+              newValue: new Date(newValue)
+            }, userId, userName);
+          }
+          break;
+          
+        case 'assignedUsers':
+          // Handle assignment changes
+          const oldAssignedIds = (oldValue || []).map(id => id.toString());
+          const newAssignedIds = (newValue || []).map(id => id.toString());
+          
+          // Find newly assigned users
+          const newlyAssigned = newAssignedIds.filter(id => !oldAssignedIds.includes(id));
+          // Find unassigned users
+          const unassigned = oldAssignedIds.filter(id => !newAssignedIds.includes(id));
+          
+          for (const userId of newlyAssigned) {
+            await logTaskChange(task._id, 'assigned', {
+              field,
+              newValue: userId // Will be populated with user name in history view
+            }, req.user._id, userName);
+          }
+          
+          for (const userId of unassigned) {
+            await logTaskChange(task._id, 'unassigned', {
+              field,
+              oldValue: userId // Will be populated with user name in history view
+            }, req.user._id, userName);
+          }
+          break;
+          
+        case 'tags':
+          // Handle tag changes
+          const oldTags = oldValue || [];
+          const newTags = newValue || [];
+          
+          const addedTags = newTags.filter(tag => !oldTags.includes(tag));
+          const removedTags = oldTags.filter(tag => !newTags.includes(tag));
+          
+          for (const tag of addedTags) {
+            await logTaskChange(task._id, 'tag_added', {
+              field,
+              newValue: tag
+            }, userId, userName);
+          }
+          
+          for (const tag of removedTags) {
+            await logTaskChange(task._id, 'tag_removed', {
+              field,
+              oldValue: tag
+            }, userId, userName);
+          }
+          break;
+      }
+    }
+    
+    // Apply date conversions
     if (updates.startDate) updates.startDate = new Date(updates.startDate);
     if (updates.endDate) updates.endDate = new Date(updates.endDate);
 
@@ -370,5 +501,65 @@ router.delete('/:id/subtasks/:subtaskId', authenticate, async (req, res) => {
     res.status(500).json({ message: 'Failed to delete subtask', error: error.message });
   }
 });
+
+// Get task history
+router.get('/:id/history', authenticate, async (req, res) => {
+  try {
+    const { id: taskId } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+
+    // Verify user has access to this task
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    // Check if user has access to this task
+    const hasAccess = task.createdBy.equals(req.user._id) || 
+                     task.assignedUsers.some(userId => userId.equals(req.user._id));
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const history = await TaskHistory.find({ taskId })
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await TaskHistory.countDocuments({ taskId });
+
+    // Format history entries with descriptions
+    const formattedHistory = history.map(entry => ({
+      ...entry.toObject(),
+      formattedDescription: entry.getFormattedDescription(),
+    }));
+
+    res.json({
+      history: formattedHistory,
+      pagination: {
+        current: parseInt(page),
+        total: Math.ceil(total / parseInt(limit)),
+        count: total,
+      },
+    });
+  } catch (error) {
+    console.error('Get task history error:', error);
+    res.status(500).json({ message: 'Server error while fetching task history' });
+  }
+});
+
+// Helper function to log task changes
+async function logTaskChange(taskId, action, data, userId, userName) {
+  try {
+    await TaskHistory.logChange(taskId, action, data, userId, userName);
+  } catch (error) {
+    console.error('Error logging task change:', error);
+    // Don't throw error to prevent breaking the main operation
+  }
+}
 
 export default router;
