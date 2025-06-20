@@ -187,7 +187,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     } finally {      setTimeout(() => setIsUpdating(false), 500); // Prevent rapid successive calls
     }
   };
-
   return (
     <div className="h-full">
       <DndContext
@@ -197,7 +196,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-6 pb-6 overflow-x-auto min-h-0">          {columns.map((column) => (            <KanbanColumn
+        <div className="flex gap-3 pb-3 overflow-x-auto min-h-0">
+          {columns.map((column) => (
+            <KanbanColumn
               key={column.id}
               id={column.id}
               title={column.title}
@@ -208,7 +209,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDeleteTask={onDeleteTask}
             />
           ))}
-        </div>        <DragOverlay>
+        </div>
+        <DragOverlay>
           {activeTask ? (
             <div className="rotate-2 scale-105">
               <KanbanTaskCardCompact task={activeTask} />

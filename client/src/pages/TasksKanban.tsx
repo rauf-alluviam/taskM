@@ -8,6 +8,7 @@ import { socketService } from '../services/socket';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Breadcrumb from '../components/UI/Breadcrumb';
 import KanbanBoard from '../components/Tasks/KanbanBoard';
+import TaskListView from '../components/Tasks/TaskListView';
 import CreateTaskModal from '../components/Tasks/CreateTaskModal';
 import EditTaskModal from '../components/Tasks/EditTaskModal';
 import ColumnManager from '../components/Tasks/ColumnManager';
@@ -32,7 +33,7 @@ const TasksPage: React.FC = () => {
   const projectIdFromUrl = searchParams.get('project');
     const { tasks, dispatch } = useTask();
   const { addNotification } = useNotification();
-  const socketEmitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const socketEmitTimeoutRef = useRef<number | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [columnsLoading, setColumnsLoading] = useState(false);
@@ -403,187 +404,180 @@ const TasksPage: React.FC = () => {
         <LoadingSpinner size="lg" />
       </div>
     );
-  }
-  return (
+  }  return (
     <div className="h-full flex flex-col">
-      {/* Breadcrumb */}
-      <Breadcrumb items={breadcrumbItems} />
+      {/* Compact Breadcrumb */}
+      <div className="pb-2">
+        <Breadcrumb items={breadcrumbItems} />
+      </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">          <div>
-            <div className="flex items-center space-x-2">
-              <h1 className="text-2xl font-bold text-gray-100">Tasks</h1>
-              {currentProjectId && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                  <FolderOpen className="w-4 h-4 mr-1" />
-                  {projects.find(p => p._id === currentProjectId)?.name || 'Project'}
-                </span>
-              )}
-            </div>
-            <p className="text-gray-600">
-              {currentProjectId 
-                ? 'Manage and track tasks for this project' 
-                : 'Manage and track your tasks with Kanban boards'
-              }
-            </p>
+      {/* Compact Header with Controls in Single Row */}
+      <div className="flex items-center justify-between py-2 mb-3">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl font-semibold text-gray-100">Tasks</h1>
+            {currentProjectId && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <FolderOpen className="w-3 h-3 mr-1" />
+                {projects.find(p => p._id === currentProjectId)?.name || 'Project'}
+              </span>
+            )}
           </div>
-         
+        </div>
+        
+        <div className="flex items-center space-x-2">
           {currentProjectId && (
             <Link
               to={`/projects/${currentProjectId}`}
-              className="btn-outline btn-sm"
+              className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 transition-colors"
             >
-              <FolderOpen className="w-4 h-4 mr-2" />
+              <FolderOpen className="w-3 h-3 mr-1" />
               View Project
             </Link>
           )}
 
-          {/* View Toggle */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          {/* Compact View Toggle */}
+          <div className="flex bg-gray-100 rounded p-0.5">
             <button
-              onClick={() => setViewMode('kanban')}              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              onClick={() => setViewMode('kanban')}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                 viewMode === 'kanban'
-                  ? 'bg-gray-700 text-gray-100 shadow-sm border border-gray-600'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700'
+                  ? 'bg-gray-700 text-gray-100 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Layout className="w-4 h-4 mr-1.5 inline" />
+              <Layout className="w-3 h-3 mr-1 inline" />
               Kanban
             </button>
             <button
-              onClick={() => setViewMode('list')}              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              onClick={() => setViewMode('list')}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-gray-700 text-gray-100 shadow-sm border border-gray-600'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700'
+                  ? 'bg-gray-700 text-gray-100 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <List className="w-4 h-4 mr-1.5 inline" />
+              <List className="w-3 h-3 mr-1 inline" />
               List
             </button>
           </div>
 
-          {/* Column Management */}
+          {/* Compact Column Management */}
           <button
             onClick={() => setShowColumnManager(true)}
-            className="btn-outline"
+            className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 transition-colors"
           >
-            <Settings className="w-4 h-4 mr-2" />
+            <Settings className="w-3 h-3 mr-1" />
             Columns
-          </button>          <button
-            onClick={() => handleAddTask('todo')}
-            className="btn-primary"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {currentProjectId ? 'Add Task to Project' : 'Add Task'}
           </button>
-        </div>      </div>
 
-      {/* Project Summary */}
+          <button
+            onClick={() => handleAddTask('todo')}
+            className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-blue-600 border border-transparent rounded hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Add Task
+          </button>
+        </div>
+      </div>
+
+      {/* Compact Project Summary */}
       {currentProject && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                <FolderOpen className="w-5 h-5 text-white" />
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-indigo-500 rounded flex items-center justify-center">
+                <FolderOpen className="w-3 h-3 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-100">{currentProject.name}</h3>
-                <p className="text-sm text-gray-600">{currentProject.department}</p>
+                <h3 className="text-sm font-semibold text-gray-900">{currentProject.name}</h3>
+                <p className="text-xs text-gray-600">{currentProject.department}</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-600">Tasks in this project</p>
-              <p className="text-2xl font-bold text-blue-600">{filteredTasks.length}</p>
+              <p className="text-xs text-gray-500">Tasks: <span className="font-semibold text-blue-600">{filteredTasks.length}</span></p>
             </div>
           </div>
         </div>
-      )}      {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-4">        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-900">Filters</h3>
+      )}      {/* Compact Filters */}
+      <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-medium text-gray-700 uppercase tracking-wide">Filters</h3>
           <button
             onClick={() => setFilters({ search: '', priority: 'all', assignedUser: 'all', tags: [], project: 'all' })}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-xs text-gray-500 hover:text-gray-700"
           >
             Clear all
           </button>
         </div>
 
-        {/* Project Filter */}
-        <div className="flex items-center space-x-2">
-          <FolderOpen className="w-4 h-4 text-gray-500" />          <select
-            value={currentProjectId || 'all'}
-            onChange={async (e) => {              const newProjectId = e.target.value === 'all' ? undefined : e.target.value;
-              
-              console.log('🔄 Project dropdown changed:', {
-                selectedValue: e.target.value,
-                newProjectId,
-                previousProjectId: currentProjectId
-              });
-              
-              // Leave current project room if connected
-              if (currentProjectId && socketService.isConnected) {
-                socketService.leaveProject(currentProjectId);
-              }
-                setCurrentProjectId(newProjectId);
-              if (newProjectId) {
-                setSearchParams({ project: newProjectId });
-                // When selecting a specific project, reset filter.project since API handles filtering
-                setFilters(prev => ({ ...prev, project: 'all' }));
-                console.log('✅ Set filters.project to "all" for API filtering');
-              } else {
-                setSearchParams({});
-                // When selecting "All Projects", keep the dropdown value in filters for potential frontend filtering
-                setFilters(prev => ({ ...prev, project: e.target.value }));
-                console.log('✅ Set filters.project to:', e.target.value);
-              }
-              
-              // Join new project room if connected
-              if (newProjectId && socketService.isConnected) {
-                socketService.joinProject(newProjectId);
-              }
-              
-              // Reload tasks for the new project
-              console.log('🔄 About to reload tasks...');
-              await loadTasks();
-              console.log('✅ Tasks reloaded');
-            }}
-            className="input text-sm min-w-[160px]"
-          >
-            <option value="all">All Projects</option>
-            {projects.map(project => (
-              <option key={project._id} value={project._id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search tasks..."
-                className="input pl-10 w-full"
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              />
+        {/* Single Row Layout for Main Filters */}
+        <div className="grid grid-cols-12 gap-2 items-end mb-2">
+          {/* Project Filter - Compact */}
+          <div className="col-span-3">
+            <div className="flex items-center space-x-1 mb-1">
+              <FolderOpen className="w-3 h-3 text-gray-400" />
+              <label className="text-xs font-medium text-gray-600">Project</label>
             </div>
+            <select
+              value={currentProjectId || 'all'}
+              onChange={async (e) => {
+                const newProjectId = e.target.value === 'all' ? undefined : e.target.value;
+                
+                console.log('🔄 Project dropdown changed:', {
+                  selectedValue: e.target.value,
+                  newProjectId,
+                  previousProjectId: currentProjectId
+                });
+                
+                // Leave current project room if connected
+                if (currentProjectId && socketService.isConnected) {
+                  socketService.leaveProject(currentProjectId);
+                }
+                
+                setCurrentProjectId(newProjectId);
+                if (newProjectId) {
+                  setSearchParams({ project: newProjectId });
+                  // When selecting a specific project, reset filter.project since API handles filtering
+                  setFilters(prev => ({ ...prev, project: 'all' }));
+                  console.log('✅ Set filters.project to "all" for API filtering');
+                } else {
+                  setSearchParams({});
+                  // When selecting "All Projects", keep the dropdown value in filters for potential frontend filtering
+                  setFilters(prev => ({ ...prev, project: e.target.value }));
+                  console.log('✅ Set filters.project to:', e.target.value);
+                }
+                
+                // Join new project room if connected
+                if (newProjectId && socketService.isConnected) {
+                  socketService.joinProject(newProjectId);
+                }
+                
+                // Reload tasks for the new project
+                console.log('🔄 About to reload tasks...');
+                await loadTasks();
+                console.log('✅ Tasks reloaded');
+              }}
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Projects</option>
+              {projects.map(project => (
+                <option key={project._id} value={project._id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Priority Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+          {/* Priority Filter - Compact */}
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Priority</label>
             <select
-              className="input w-full"
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               value={filters.priority}
               onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
             >
-              <option value="all">All Priorities</option>
+              <option value="all">All</option>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -591,33 +585,48 @@ const TasksPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Stats */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Statistics</label>
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
-              <span>Total: {filteredTasks.length}</span>
+          {/* Search - Compact */}
+          <div className="col-span-4">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search tasks..."
+                className="w-full pl-6 pr-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {/* Statistics - Right Aligned */}
+          <div className="col-span-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Statistics</label>
+            <div className="flex items-center justify-end space-x-3 text-xs text-gray-600 py-1">
+              <span className="font-medium">Total: {filteredTasks.length}</span>
               <span>•</span>
               <span>Categories: {allTags.length}</span>
             </div>
           </div>
         </div>
 
-        {/* Category Filters */}
+        {/* Compact Category Filters */}
         {allTags.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Tag className="w-4 h-4 inline mr-1" />
-              Categories
-            </label>
-            <div className="flex flex-wrap gap-2">
+          <div className="border-t border-gray-100 pt-2">
+            <div className="flex items-center space-x-1 mb-1">
+              <Tag className="w-3 h-3 text-gray-400" />
+              <label className="text-xs font-medium text-gray-600">Categories</label>
+            </div>
+            <div className="flex flex-wrap gap-1">
               {allTags.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => toggleTagFilter(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
                     filters.tags.includes(tag)
-                      ? 'bg-blue-100 text-blue-800 border-blue-200'
-                      : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-700'
+                      ? 'bg-blue-100 text-blue-700 border-blue-200'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50 hover:text-blue-600'
                   }`}
                 >
                   {tag}
@@ -626,10 +635,10 @@ const TasksPage: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 min-h-0">        {viewMode === 'kanban' ? (          <KanbanBoard
+      </div>      {/* Main Content */}
+      <div className="flex-1 min-h-0">
+        {viewMode === 'kanban' ? (
+          <KanbanBoard
             tasks={filteredTasks}
             onTaskUpdate={handleTaskUpdate}
             onAddTask={handleAddTask}
@@ -637,11 +646,15 @@ const TasksPage: React.FC = () => {
             onDeleteTask={handleDeleteTask}
             columns={columns}
           />
-        ) : (          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-            <p className="text-gray-400 text-center">List view coming soon...</p>
-          </div>
+        ) : (
+          <TaskListView
+            tasks={filteredTasks}
+            onEditTask={handleEditTask}
+            onDeleteTask={handleDeleteTask}
+            onTaskUpdate={handleTaskUpdate}
+          />
         )}
-      </div>      {/* Create Task Modal */}
+      </div>{/* Create Task Modal */}
       <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}

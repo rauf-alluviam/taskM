@@ -45,39 +45,38 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   };
 
   const getColumnColor = () => columnColors[id as keyof typeof columnColors] || 'bg-gray-100 border-gray-300';
-  const getHeaderColor = () => headerColors[id as keyof typeof headerColors] || 'text-gray-700';
-  return (
-    <div className={`w-72 rounded-lg border-2 transition-colors ${getColumnColor()} ${isOver ? 'border-blue-400 bg-blue-50' : ''}`}>
-      {/* Column Header */}
-      <div className="p-4 border-b border-gray-200">
+  const getHeaderColor = () => headerColors[id as keyof typeof headerColors] || 'text-gray-700';  return (
+    <div className={`w-72 rounded-lg border transition-colors ${getColumnColor()} ${isOver ? 'border-blue-400 bg-blue-50' : ''}`}>
+      {/* Compact Column Header */}
+      <div className="px-3 py-2 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <h3 className={`font-semibold text-sm ${getHeaderColor()}`}>
+            <h3 className={`font-medium text-sm ${getHeaderColor()}`}>
               {title}
             </h3>
-            <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-medium text-gray-600 bg-white rounded-full border border-gray-300">
+            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-gray-600 bg-white rounded-full border border-gray-300">
               {tasks.length}
             </span>
           </div>
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-0.5">
             <button
               onClick={onAddTask}
               className="p-1 text-gray-400 hover:text-gray-600 hover:bg-white rounded transition-colors"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3 h-3" />
             </button>
             <button className="p-1 text-gray-400 hover:text-gray-600 hover:bg-white rounded transition-colors">
-              <MoreHorizontal className="w-4 h-4" />
+              <MoreHorizontal className="w-3 h-3" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Tasks Container */}
+      {/* Compact Tasks Container */}
       <div
         ref={setNodeRef}
-        className="p-4 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto scrollbar-thin"
-      >        <SortableContext items={tasks.map(task => task._id)} strategy={verticalListSortingStrategy}>
+        className="p-2 min-h-[200px] max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-thin"
+      ><SortableContext items={tasks.map(task => task._id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <KanbanTaskCardCompact 
               key={task._id} 
@@ -86,14 +85,12 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
               onDelete={onDeleteTask}
             />
           ))}
-        </SortableContext>
-
-        {tasks.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-            <div className="w-8 h-8 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center mb-2">
-              <Plus className="w-4 h-4" />
+        </SortableContext>        {tasks.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-24 text-gray-400">
+            <div className="w-6 h-6 rounded-full border border-dashed border-gray-300 flex items-center justify-center mb-1">
+              <Plus className="w-3 h-3" />
             </div>
-            <p className="text-sm">Drop tasks here</p>
+            <p className="text-xs">Drop tasks here</p>
           </div>
         )}
       </div>
