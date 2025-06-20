@@ -479,27 +479,7 @@ const TasksPage: React.FC = () => {
             Add Task
           </button>
         </div>
-      </div>
-
-      {/* Compact Project Summary */}
-      {currentProject && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-indigo-500 rounded flex items-center justify-center">
-                <FolderOpen className="w-3 h-3 text-white" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">{currentProject.name}</h3>
-                <p className="text-xs text-gray-600">{currentProject.department}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500">Tasks: <span className="font-semibold text-blue-600">{filteredTasks.length}</span></p>
-            </div>
-          </div>
-        </div>
-      )}      {/* Compact Filters */}
+      </div>{/* Compact Filters */}
       <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 mb-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium text-gray-700 uppercase tracking-wide">Filters</h3>

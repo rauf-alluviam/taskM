@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FileText, Plus, Search, Calendar, User, FolderOpen, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Search, Calendar, User, FolderOpen, AlertCircle, Trash2 } from 'lucide-react';
 import { documentAPI, projectAPI } from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
@@ -41,6 +41,8 @@ const Documents: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<DocumentForm>();
 
@@ -62,8 +64,20 @@ const Documents: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // If no projectId is specified, we should either:
+      // 1. Redirect to projects page, or
+      // 2. Only show user's personal documents (not project documents)
+      // For now, let's show user's personal documents only
+      
+      console.log('Loading documents with projectId:', projectId);
       const data = await documentAPI.getDocuments(projectId || undefined);
-      setDocuments(data);
+      
+      // If no projectId specified, filter out project documents on client side as extra safety
+      const filteredData = projectId ? data : data.filter(doc => !doc.projectId);
+      
+      console.log('Documents received:', data.length, 'Filtered:', filteredData.length);
+      setDocuments(filteredData);
     } catch (error: any) {
       console.error('Failed to load documents:', error);
       const errorMessage = error.response?.data?.message || 'Failed to load documents';
@@ -81,12 +95,18 @@ const Documents: React.FC = () => {
   const onCreateDocument = async (data: DocumentForm) => {
     setCreating(true);
     try {
-      const documentData = {
-        ...data,
-        projectId: projectId || data.projectId,
+      const documentData: any = {
+        title: data.title,
         content: '',
       };
       
+      // Only include projectId if it's provided
+      const finalProjectId = projectId || data.projectId;
+      if (finalProjectId) {
+        documentData.projectId = finalProjectId;
+      }
+      
+      console.log('Creating document with data:', documentData);
       const newDoc = await documentAPI.createDocument(documentData);
       setDocuments([newDoc, ...documents]);
       reset();
@@ -109,6 +129,30 @@ const Documents: React.FC = () => {
     }
   };
 
+  const onDeleteDocument = async (documentId: string) => {
+    setDeleting(true);
+    try {
+      await documentAPI.deleteDocument(documentId);
+      setDocuments(documents.filter(doc => doc._id !== documentId));
+      setDeleteConfirmId(null);
+      addNotification({
+        type: 'success',
+        title: 'Document Deleted',
+        message: 'Document has been deleted successfully',
+      });
+    } catch (error: any) {
+      console.error('Failed to delete document:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to delete document';
+      addNotification({
+        type: 'error',
+        title: 'Error Deleting Document',
+        message: errorMessage,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const filteredDocuments = documents.filter(doc =>
     doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     doc.projectName?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -128,21 +172,29 @@ const Documents: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {projectId ? 'Project Documents' : 'Documents'}
+            {projectId ? 'Project Documents' : 'Personal Documents'}
           </h1>
           <p className="text-gray-600 mt-1">
             {projectId 
               ? 'Manage documents for this project'
-              : 'Create and manage your project documents'
+              : 'Manage your personal documents (not associated with any project)'
             }
           </p>
+          {!projectId && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-700">
+                💡 <strong>Tip:</strong> To view project documents, navigate to a specific project first. 
+                Project documents are only accessible to project members.
+              </p>
+            </div>
+          )}
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary btn-md mt-4 sm:mt-0"
         >
           <Plus className="w-4 h-4 mr-2" />
-          New Document
+          {projectId ? 'New Project Document' : 'New Personal Document'}
         </button>
       </div>
 
@@ -185,9 +237,23 @@ const Documents: React.FC = () => {
                   <div className="w-12 h-12 bg-gradient-to-r from-accent-400 to-accent-600 rounded-lg flex items-center justify-center">
                     <FileText className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-xs text-gray-500">
-                    {new Date(doc.updatedAt).toLocaleDateString()}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">
+                      {new Date(doc.updatedAt).toLocaleDateString()}
+                    </span>
+                    <div className="relative group">
+                      <button
+                        className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-gray-100"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setDeleteConfirmId(doc._id);
+                        }}
+                        title="Delete document"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <Link to={`/documents/${doc._id}`} className="block">
@@ -284,13 +350,24 @@ const Documents: React.FC = () => {
                 Project (Optional)
               </label>
               <select {...register('projectId')} className="input w-full">
-                <option value="">No Project</option>
+                <option value="">Personal Document (No Project)</option>
                 {projects.map((project) => (
                   <option key={project._id} value={project._id}>
                     {project.name} ({project.department})
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Documents created within a project are only accessible to project members.
+              </p>
+            </div>
+          )}
+
+          {projectId && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-700">
+                📁 This document will be created in the current project and will only be accessible to project members.
+              </p>
             </div>
           )}
 
@@ -312,6 +389,54 @@ const Documents: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <Modal
+          isOpen={true}
+          onClose={() => setDeleteConfirmId(null)}
+          title="Delete Document"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Delete Document</h3>
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete "{documents.find(d => d._id === deleteConfirmId)?.title}"?
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <p className="text-sm text-red-800">
+                ⚠️ This action cannot be undone. The document will be permanently removed.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="btn-outline btn-md"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => onDeleteDocument(deleteConfirmId)}
+                disabled={deleting}
+                className="btn-danger btn-md"
+              >
+                {deleting ? 'Deleting...' : 'Delete Document'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
