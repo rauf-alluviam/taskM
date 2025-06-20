@@ -6,6 +6,8 @@ interface User {
   id: string;
   email: string;
   name: string;
+  mobile?: string;
+  organization?: string;
   role: 'admin' | 'manager' | 'member';
   avatar?: string;
   department?: string;

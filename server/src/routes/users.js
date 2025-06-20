@@ -1,8 +1,147 @@
 import express from 'express';
+import multer from 'multer';
 import User from '../models/User.js';
 import { protect, admin } from '../middleware/auth.js';
+import { uploadToS3, getSignedUrl } from '../services/s3Service.js';
 
 const router = express.Router();
+
+// Configure multer for avatar uploads
+const storage = multer.memoryStorage();
+
+const avatarFileFilter = (req, file, cb) => {
+  // Only allow image files for avatars
+  const allowedTypes = {
+    'image/jpeg': true,
+    'image/jpg': true,
+    'image/png': true,
+    'image/gif': true,
+    'image/webp': true,
+  };
+
+  if (allowedTypes[file.mimetype]) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only image files are allowed for avatars.'), false);
+  }
+};
+
+const avatarUpload = multer({
+  storage,
+  fileFilter: avatarFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit for avatars
+  },
+});
+
+// Get current user profile
+router.get('/me', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id, '-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const userResponse = user.toObject();
+
+    // Generate signed URL for avatar if it exists
+    if (user.avatar) {
+      try {
+        userResponse.avatarUrl = await getSignedUrl(user.avatar);
+      } catch (error) {
+        console.error('Error generating avatar URL:', error);
+        // Don't fail the request if avatar URL generation fails
+        userResponse.avatarUrl = null;
+      }
+    }
+
+    res.json(userResponse);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch user profile', error: error.message });
+  }
+});
+
+// Update current user profile
+router.put('/me', protect, async (req, res) => {
+  try {
+    const { name, email, mobile, organization } = req.body;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update fields
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) user.email = email;
+    if (mobile !== undefined) user.mobile = mobile;
+    if (organization !== undefined) user.organization = organization;    await user.save();
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    // Generate signed URL for avatar if it exists
+    if (user.avatar) {
+      try {
+        userResponse.avatarUrl = await getSignedUrl(user.avatar);
+      } catch (error) {
+        console.error('Error generating avatar URL:', error);
+        userResponse.avatarUrl = null;
+      }
+    }
+
+    res.json(userResponse);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update profile', error: error.message });
+  }
+});
+
+// Upload avatar for current user
+router.post('/me/avatar', protect, avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No avatar file provided' });
+    }
+
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Generate unique filename for the avatar
+    const fileExtension = req.file.originalname.split('.').pop();
+    const avatarKey = `avatars/${userId}-${Date.now()}.${fileExtension}`;
+
+    // Upload to S3
+    const uploadResult = await uploadToS3(req.file, avatarKey);
+    
+    // Update user's avatar field with the S3 key
+    user.avatar = avatarKey;
+    await user.save();
+
+    // Generate signed URL for immediate use
+    const avatarUrl = await getSignedUrl(avatarKey);
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    userResponse.avatarUrl = avatarUrl;
+
+    res.json({
+      message: 'Avatar uploaded successfully',
+      user: userResponse,
+      avatarUrl
+    });
+
+  } catch (error) {
+    console.error('Avatar upload error:', error);
+    res.status(500).json({ message: 'Failed to upload avatar', error: error.message });
+  }
+});
 
 // Get all users (admin only)
 router.get('/', protect, admin, async (req, res) => {
@@ -21,7 +160,20 @@ router.get('/:id', protect, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+
+    const userResponse = user.toObject();
+
+    // Generate signed URL for avatar if it exists
+    if (user.avatar) {
+      try {
+        userResponse.avatarUrl = await getSignedUrl(user.avatar);
+      } catch (error) {
+        console.error('Error generating avatar URL:', error);
+        userResponse.avatarUrl = null;
+      }
+    }
+
+    res.json(userResponse);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch user', error: error.message });
   }
@@ -54,7 +206,7 @@ router.post('/', protect, admin, async (req, res) => {
 // Update user
 router.put('/:id', protect, async (req, res) => {
   try {
-    const { name, email, role } = req.body;
+    const { name, email, mobile, organization, role } = req.body;
     const userId = req.params.id;
 
     // Check if user can update this profile
@@ -68,15 +220,25 @@ router.put('/:id', protect, async (req, res) => {
     }
 
     // Update fields
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (role && req.user.role === 'admin') user.role = role; // Only admin can change roles
-
-    await user.save();
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) user.email = email;
+    if (mobile !== undefined) user.mobile = mobile;
+    if (organization !== undefined) user.organization = organization;
+    if (role && req.user.role === 'admin') user.role = role; // Only admin can change roles    await user.save();
 
     // Remove password from response
     const userResponse = user.toObject();
     delete userResponse.password;
+
+    // Generate signed URL for avatar if it exists
+    if (user.avatar) {
+      try {
+        userResponse.avatarUrl = await getSignedUrl(user.avatar);
+      } catch (error) {
+        console.error('Error generating avatar URL:', error);
+        userResponse.avatarUrl = null;
+      }
+    }
 
     res.json(userResponse);
   } catch (error) {

@@ -296,6 +296,31 @@ export const fileAPI = {
 };
 
 export const userAPI = {
+  getCurrentUser: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/users/me');
+      return response.data;
+    });
+  },
+  updateCurrentUser: async (userData: any) => {
+    return withRetry(async () => {
+      const response = await api.put('/users/me', userData);
+      return response.data;
+    });
+  },
+  uploadAvatar: async (file: File) => {
+    return withRetry(async () => {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      
+      const response = await api.post('/users/me/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    });
+  },
   getUsers: async () => {
     return withRetry(async () => {
       const response = await api.get('/users');
