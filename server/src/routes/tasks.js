@@ -30,6 +30,7 @@ router.get('/', authenticate, async (req, res) => {
       .populate('createdBy', 'name email')
       .populate('assignedUsers', 'name email')
       .populate('projectId', 'name')
+      .populate('subtasks')
       .sort({ createdAt: -1 });
 
     res.json(tasks);
@@ -234,6 +235,139 @@ router.delete('/:id', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Delete task error:', error);
     res.status(500).json({ message: 'Server error while deleting task' });
+  }
+});
+
+// Create subtask
+router.post('/:id/subtasks', authenticate, async (req, res) => {
+  try {
+    const { id: parentTaskId } = req.params;
+    const { title, description, priority = 'medium', startDate, endDate } = req.body;
+
+    // Verify parent task exists
+    const parentTask = await Task.findById(parentTaskId);
+    if (!parentTask) {
+      return res.status(404).json({ message: 'Parent task not found' });
+    }
+
+    // Create subtask
+    const subtask = new Task({
+      title,
+      description,
+      priority,
+      startDate,
+      endDate,
+      status: 'todo',
+      projectId: parentTask.projectId,
+      parentTask: parentTaskId,
+      isSubtask: true,
+      createdBy: req.user._id,
+    });
+
+    await subtask.save();
+
+    // Update parent task's subtasks array
+    parentTask.subtasks.push(subtask._id);
+    parentTask.subtaskProgress.total = parentTask.subtasks.length;
+    await parentTask.save();
+
+    const populatedSubtask = await Task.findById(subtask._id)
+      .populate('assignedUsers', 'name email')
+      .populate('createdBy', 'name email');
+
+    res.status(201).json(populatedSubtask);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to create subtask', error: error.message });
+  }
+});
+
+// Get subtasks for a task
+router.get('/:id/subtasks', authenticate, async (req, res) => {
+  try {
+    const { id: parentTaskId } = req.params;
+
+    const subtasks = await Task.find({ parentTask: parentTaskId })
+      .populate('assignedUsers', 'name email')
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: 1 });
+
+    res.json(subtasks);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch subtasks', error: error.message });
+  }
+});
+
+// Update subtask
+router.put('/:id/subtasks/:subtaskId', authenticate, async (req, res) => {
+  try {
+    const { id: parentTaskId, subtaskId } = req.params;
+    const updateData = req.body;
+
+    const subtask = await Task.findOneAndUpdate(
+      { _id: subtaskId, parentTask: parentTaskId },
+      updateData,
+      { new: true }
+    ).populate('assignedUsers', 'name email')
+     .populate('createdBy', 'name email');
+
+    if (!subtask) {
+      return res.status(404).json({ message: 'Subtask not found' });
+    }
+
+    // Update parent task progress if subtask status changed
+    if (updateData.status) {
+      const parentTask = await Task.findById(parentTaskId);
+      if (parentTask) {
+        const completedSubtasks = await Task.countDocuments({
+          parentTask: parentTaskId,
+          status: 'done'
+        });
+        
+        parentTask.subtaskProgress.completed = completedSubtasks;
+        await parentTask.save();
+      }
+    }
+
+    res.json(subtask);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update subtask', error: error.message });
+  }
+});
+
+// Delete subtask
+router.delete('/:id/subtasks/:subtaskId', authenticate, async (req, res) => {
+  try {
+    const { id: parentTaskId, subtaskId } = req.params;
+
+    const subtask = await Task.findOneAndDelete({
+      _id: subtaskId,
+      parentTask: parentTaskId
+    });
+
+    if (!subtask) {
+      return res.status(404).json({ message: 'Subtask not found' });
+    }
+
+    // Update parent task
+    const parentTask = await Task.findById(parentTaskId);
+    if (parentTask) {
+      parentTask.subtasks = parentTask.subtasks.filter(
+        id => id.toString() !== subtaskId
+      );
+      parentTask.subtaskProgress.total = parentTask.subtasks.length;
+      
+      const completedSubtasks = await Task.countDocuments({
+        parentTask: parentTaskId,
+        status: 'done'
+      });
+      parentTask.subtaskProgress.completed = completedSubtasks;
+      
+      await parentTask.save();
+    }
+
+    res.json({ message: 'Subtask deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete subtask', error: error.message });
   }
 });
 

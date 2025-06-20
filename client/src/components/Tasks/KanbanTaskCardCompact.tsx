@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2 } from 'lucide-react';
+import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2, CheckSquare } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
 
 interface KanbanTaskCardProps {
@@ -161,6 +161,27 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete 
         <h4 className="font-medium text-gray-900 text-sm mb-1.5 line-clamp-2 leading-4">
           {task.title}
         </h4>
+
+        {/* Subtask Progress */}
+        {task.subtaskProgress && task.subtaskProgress.total > 0 && (
+          <div className="mb-2">
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+              <div className="flex items-center space-x-1">
+                <CheckSquare className="w-3 h-3" />
+                <span>Subtasks</span>
+              </div>
+              <span>{task.subtaskProgress.completed}/{task.subtaskProgress.total}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1">
+              <div
+                className="bg-primary-600 h-1 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${(task.subtaskProgress.completed / task.subtaskProgress.total) * 100}%` 
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Categories/Tags - Compact */}
         {task.tags && task.tags.length > 0 && (

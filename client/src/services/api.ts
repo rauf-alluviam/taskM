@@ -50,16 +50,42 @@ export const taskAPI = {
     const response = await api.get('/tasks', { params });
     return response.data;
   },
-  createTask: async (taskData: any) => {
-    const response = await api.post('/tasks', taskData);
+  createTask: async (task: any) => {
+    const response = await api.post('/tasks', task);
     return response.data;
   },
   updateTask: async (id: string, taskData: any) => {
+    console.log('🌐 API.UPDATETASK CALLED!', { id, taskData });
+    console.log('🌐 Making HTTP PUT request to:', `/tasks/${id}`);
+    
     const response = await api.put(`/tasks/${id}`, taskData);
+    
+    console.log('🌐 API RESPONSE RECEIVED!', response.data);
     return response.data;
   },
   deleteTask: async (id: string) => {
     const response = await api.delete(`/tasks/${id}`);
+    return response.data;
+  },
+  // Subtask management
+  createSubtask: async (parentTaskId: string, subtaskData: any) => {
+    const response = await api.post('/subtasks', { ...subtaskData, parentTaskId });
+    return response.data;
+  },
+  getSubtasks: async (parentTaskId: string) => {
+    const response = await api.get(`/subtasks/task/${parentTaskId}`);
+    return response.data;
+  },
+  updateSubtask: async (subtaskId: string, subtaskData: any) => {
+    const response = await api.put(`/subtasks/${subtaskId}`, subtaskData);
+    return response.data;
+  },
+  deleteSubtask: async (subtaskId: string) => {
+    const response = await api.delete(`/subtasks/${subtaskId}`);
+    return response.data;
+  },
+  getSubtaskStats: async (parentTaskId: string) => {
+    const response = await api.get(`/subtasks/task/${parentTaskId}/stats`);
     return response.data;
   },
 };

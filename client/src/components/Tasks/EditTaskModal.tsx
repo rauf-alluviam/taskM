@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { X, Plus, Tag, Calendar, Flag, User, Trash2 } from 'lucide-react';
+import { X, Plus, Tag, Calendar, Flag, User, Trash2, List } from 'lucide-react';
 import Modal from '../UI/Modal';
+import SubtaskManager from './SubtaskManager';
 import { Task } from '../../contexts/TaskContext';
 
 interface TaskFormData {
@@ -292,9 +293,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               </div>
             )}
           </div>
-        </div>
-
-        {/* Form Actions */}
+        </div>        {/* Form Actions */}
         <div className="flex justify-between pt-4 border-t border-gray-200">
           <div>
             {onDelete && (
@@ -329,6 +328,15 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </div>
         </div>
       </form>
+
+      {/* Subtask Manager - Outside of main form to avoid nested forms */}
+      <div className="border-t border-gray-200 pt-6 mt-6">
+        <label className="block text-sm font-medium text-gray-700 mb-4">
+          <List className="w-4 h-4 inline mr-1" />
+          Subtasks
+        </label>
+        <SubtaskManager parentTask={task} />
+      </div>
     </Modal>
   );
 };

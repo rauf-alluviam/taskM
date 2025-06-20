@@ -16,6 +16,14 @@ export interface Task {
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
+  // Subtask support
+  parentTask?: string;
+  subtasks?: string[];
+  isSubtask?: boolean;
+  subtaskProgress?: {
+    total: number;
+    completed: number;
+  };
 }
 
 export interface Project {

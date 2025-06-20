@@ -44,6 +44,24 @@ const taskSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
+  // Subtask support
+  parentTask: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task',
+    default: null,
+  },
+  subtasks: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task',
+  }],
+  isSubtask: {
+    type: Boolean,
+    default: false,
+  },
+  subtaskProgress: {
+    total: { type: Number, default: 0 },
+    completed: { type: Number, default: 0 },
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
