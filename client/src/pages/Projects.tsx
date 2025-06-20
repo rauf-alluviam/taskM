@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, FolderOpen, Calendar, Users, MoreVertical, AlertCircle, Edit, Trash2 } from 'lucide-react';
+import { Plus, FolderOpen, Calendar, MoreVertical, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { useTask, Project } from '../contexts/TaskContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { projectAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
+import ProjectFilters, { ProjectFilters as ProjectFiltersType } from '../components/Filters/ProjectFilters';
 import { useForm } from 'react-hook-form';
 
 interface ProjectForm {
@@ -18,7 +19,14 @@ const Projects: React.FC = () => {
   const { projects, dispatch } = useTask();
   const { addNotification } = useNotification();
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+  const [filters, setFilters] = useState<ProjectFiltersType>({
+    search: '',
+    department: '',
+    dateRange: { start: '', end: '' },
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +54,20 @@ const Projects: React.FC = () => {
       dispatch({ type: 'SET_PROJECTS', payload: data });
     } catch (error: any) {
       console.error('Failed to load projects:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to load projects';
+      
+      let errorMessage = 'Failed to load projects';
+      
+      // Provide more specific error messages
+      if (error.response?.status === 429) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (error.response?.status >= 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setError(errorMessage);
       addNotification({
         type: 'error',
@@ -117,12 +138,6 @@ const Projects: React.FC = () => {
     }
   };
 
-  const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const departments = [...new Set(projects.map(p => p.department))];
 
   if (loading) {
@@ -135,21 +150,6 @@ const Projects: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-          <p className="text-gray-600 mt-1">Manage your project portfolio</p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn-primary btn-md mt-4 sm:mt-0"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Project
-        </button>
-      </div>
-
       {/* Error Display */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
@@ -167,19 +167,32 @@ const Projects: React.FC = () => {
         </div>
       )}
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search projects..."
-            className="input pl-10 w-full"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {/* Project Filters */}
+      <ProjectFilters
+        projects={projects}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onFilteredProjectsChange={setFilteredProjects}
+        onCreateProject={() => setShowCreateModal(true)}
+      />
+
+      {/* Results Count */}
+      {!loading && (
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Showing {filteredProjects.length} of {projects.length} project{projects.length !== 1 ? 's' : ''}
+          </span>
+          {filteredProjects.length !== projects.length && (
+            <span className="text-primary-600">
+              Filtered by: {[
+                filters.search && 'search',
+                filters.department && 'department',
+                filters.dateRange.start && 'date range'
+              ].filter(Boolean).join(', ')}
+            </span>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Projects Grid */}
       {filteredProjects.length > 0 ? (
@@ -277,15 +290,18 @@ const Projects: React.FC = () => {
         <div className="text-center py-12">
           <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchTerm ? 'No projects found' : 'No projects yet'}
+            {filters.search || filters.department || filters.dateRange.start || filters.dateRange.end
+              ? 'No projects found' 
+              : 'No projects yet'
+            }
           </h3>
           <p className="text-gray-500 mb-6">
-            {searchTerm 
-              ? 'Try adjusting your search terms' 
+            {filters.search || filters.department || filters.dateRange.start || filters.dateRange.end
+              ? 'Try adjusting your filters or search terms' 
               : 'Create your first project to get started'
             }
           </p>
-          {!searchTerm && (
+          {!(filters.search || filters.department || filters.dateRange.start || filters.dateRange.end) && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="btn-primary btn-md"

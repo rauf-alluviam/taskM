@@ -26,8 +26,14 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: [
+      process.env.CLIENT_URL || 'http://localhost:3000',
+      'http://localhost:5173', // Vite default
+      'http://localhost:3000', // React default
+      'http://localhost:3001', // Alternative React port
+    ],
     credentials: true,
+    methods: ['GET', 'POST'],
   },
 });
 
@@ -40,10 +46,17 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
+// Rate limiting - more lenient for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // 1000 requests per 15 minutes in dev, 100 in production
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => {
+    // Skip rate limiting for authentication endpoints to allow quick retries
+    return req.url.startsWith('/api/auth/');
+  },
 });
 app.use(limiter);
 

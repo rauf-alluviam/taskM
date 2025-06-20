@@ -34,7 +34,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onEditTask, 
   onDeleteTask,
   columns: propColumns 
-}) => {const [activeTask, setActiveTask] = useState<Task | null>(null);
+}) => {
+  console.log('🎯 KanbanBoard received tasks:', tasks.length, tasks.map(t => ({ title: t.title, status: t.status })));
+
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [dragStartStatus, setDragStartStatus] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false); // Prevent multiple simultaneous updates
 
@@ -57,13 +60,27 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   ];
 
   const columns = propColumns || defaultColumns;  const getTasksByStatus = (status: string) => {
-    return tasks.filter(task => {
+    const tasksForStatus = tasks.filter(task => {
       // Normalize both values to kebab-case for comparison
       const normalizedTaskStatus = normalizeStatus(task.status);
       const normalizedColumnStatus = normalizeStatus(status);
-      return normalizedTaskStatus === normalizedColumnStatus;
+      const matches = normalizedTaskStatus === normalizedColumnStatus;
+      
+      console.log('🔍 KanbanBoard filtering task for column:', {
+        columnStatus: status,
+        normalizedColumnStatus,
+        taskTitle: task.title,
+        taskStatus: task.status,
+        normalizedTaskStatus,
+        matches
+      });
+      
+      return matches;
     });
-  };  const handleDragStart = (event: DragStartEvent) => {
+    
+    console.log(`📋 Column "${status}" has ${tasksForStatus.length} tasks`);
+    return tasksForStatus;
+  };const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const task = tasks.find(t => t._id === active.id);
     if (task) {

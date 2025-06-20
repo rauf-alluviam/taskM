@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Calendar, Flag, Tag } from 'lucide-react';
+import { Plus, Calendar, Flag, Tag } from 'lucide-react';
 import { useTask } from '../contexts/TaskContext';
 import { taskAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
+import TaskFilters from '../components/Filters/TaskFilters';
 import { useForm } from 'react-hook-form';
 
 interface TaskForm {
@@ -16,21 +17,32 @@ interface TaskForm {
   status: string;
 }
 
-interface TaskFilters {
+interface TaskFiltersState {
   status: string;
   priority: string;
   search: string;
+  tags: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  assignedTo: string;
 }
 
 const Tasks: React.FC = () => {
   const { tasks, dispatch } = useTask();
   const [loading, setLoading] = useState(true);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [filters, setFilters] = useState<TaskFilters>({
+  const [creating, setCreating] = useState(false);  const [filters, setFilters] = useState<TaskFiltersState>({
     status: 'all',
     priority: 'all',
     search: '',
+    tags: '',
+    dateRange: {
+      start: '',
+      end: '',
+    },
+    assignedTo: '',
   });
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskForm>();
@@ -69,31 +81,59 @@ const Tasks: React.FC = () => {
       setCreating(false);
     }
   };
-
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(filters.search.toLowerCase()) ||
                          task.description.toLowerCase().includes(filters.search.toLowerCase());
     const matchesStatus = filters.status === 'all' || task.status === filters.status;
     const matchesPriority = filters.priority === 'all' || task.priority === filters.priority;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    // Tag filtering
+    const matchesTags = !filters.tags || 
+      task.tags.some(tag => tag.toLowerCase().includes(filters.tags.toLowerCase()));
+    
+    // Date range filtering (for end date/due date)
+    let matchesDateRange = true;
+    if (filters.dateRange.start || filters.dateRange.end) {
+      const taskEndDate = task.endDate ? new Date(task.endDate) : null;
+      if (taskEndDate) {
+        if (filters.dateRange.start) {
+          const startDate = new Date(filters.dateRange.start);
+          matchesDateRange = matchesDateRange && taskEndDate >= startDate;
+        }
+        if (filters.dateRange.end) {
+          const endDate = new Date(filters.dateRange.end);
+          matchesDateRange = matchesDateRange && taskEndDate <= endDate;
+        }
+      } else {
+        // If task has no end date but filter is set, exclude it
+        matchesDateRange = false;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesPriority && matchesTags && matchesDateRange;
   });
 
-  const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'todo', label: 'To Do' },
-    { value: 'in-progress', label: 'In Progress' },
-    { value: 'review', label: 'Review' },
-    { value: 'done', label: 'Done' },
-  ];
-
-  const priorityOptions = [
-    { value: 'all', label: 'All Priority' },
-    { value: 'low', label: 'Low', color: 'text-success-600' },
-    { value: 'medium', label: 'Medium', color: 'text-warning-600' },
-    { value: 'high', label: 'High', color: 'text-accent-600' },
-    { value: 'critical', label: 'Critical', color: 'text-error-600' },
-  ];
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (filters.status !== 'all') count++;
+    if (filters.priority !== 'all') count++;
+    if (filters.tags) count++;
+    if (filters.dateRange.start || filters.dateRange.end) count++;
+    return count;
+  };
+  const clearAllFilters = () => {
+    setFilters({
+      status: 'all',
+      priority: 'all',
+      search: '',
+      tags: '',
+      dateRange: {
+        start: '',
+        end: '',
+      },
+      assignedTo: '',
+    });
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -121,62 +161,27 @@ const Tasks: React.FC = () => {
       </div>
     );
   }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="text-gray-600 mt-1">Manage all your tasks across projects</p>
-        </div>
-        <button
-          onClick={() => setShowTaskModal(true)}
-          className="btn-primary btn-md mt-4 sm:mt-0"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Task
-        </button>
-      </div>
+      {/* Filters with Header */}
+      <TaskFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        onClearFilters={clearAllFilters}
+        activeFiltersCount={getActiveFiltersCount()}
+        onCreateTask={() => setShowTaskModal(true)}
+      />
 
-      {/* Filters */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            className="input pl-10 w-full"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          />
-        </div>
-        
-        <div className="flex gap-3">
-          <select
-            className="input w-40"
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-          >
-            {statusOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          
-          <select
-            className="input w-40"
-            value={filters.priority}
-            onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-          >
-            {priorityOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Results Summary */}
+      <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
+        <span>
+          Showing {filteredTasks.length} of {tasks.length} tasks
+        </span>
+        {getActiveFiltersCount() > 0 && (
+          <span>
+            {getActiveFiltersCount()} filter{getActiveFiltersCount() > 1 ? 's' : ''} applied
+          </span>
+        )}
       </div>
 
       {/* Tasks List */}
@@ -240,20 +245,19 @@ const Tasks: React.FC = () => {
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Flag className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {filters.search || filters.status !== 'all' || filters.priority !== 'all' 
+          </div>          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {getActiveFiltersCount() > 0 || filters.search
               ? 'No tasks found' 
               : 'No tasks yet'
             }
           </h3>
           <p className="text-gray-500 mb-6">
-            {filters.search || filters.status !== 'all' || filters.priority !== 'all'
+            {getActiveFiltersCount() > 0 || filters.search
               ? 'Try adjusting your search or filters'
               : 'Create your first task to get started'
             }
           </p>
-          {!filters.search && filters.status === 'all' && filters.priority === 'all' && (
+          {getActiveFiltersCount() === 0 && !filters.search && (
             <button
               onClick={() => setShowTaskModal(true)}
               className="btn-primary btn-md"

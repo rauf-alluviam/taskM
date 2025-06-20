@@ -46,12 +46,11 @@ const TasksPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('todo');  const [columns, setColumns] = useState<Array<{ id: string; title: string; color: string }>>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(projectIdFromUrl || undefined);
   const [isConnected, setIsConnected] = useState(false);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [filters, setFilters] = useState<TaskFilters>({
+  const [projects, setProjects] = useState<Project[]>([]);  const [filters, setFilters] = useState<TaskFilters>({
     search: '',
     priority: 'all',    assignedUser: 'all',
     tags: [],
-    project: projectIdFromUrl || 'all',
+    project: projectIdFromUrl ? 'all' : 'all', // Always start with 'all' since API filtering takes precedence
   });
   useEffect(() => {
     loadTasks();
@@ -152,19 +151,20 @@ const TasksPage: React.FC = () => {
       socket?.on('disconnect', () => setIsConnected(false));
     }
   };
-
   const loadColumns = async () => {
     try {
       setColumnsLoading(true);
       const serverColumns = await kanbanAPI.getColumns(currentProjectId);
       
-      // Convert server format to client format
+      console.log('🏛️ Server columns:', serverColumns);
+        // Convert server format to client format
       const clientColumns = serverColumns.map((col: any) => ({
-        id: col._id || col.name.toLowerCase().replace(/\s+/g, '-'),
+        id: col.name.toLowerCase().replace(/\s+/g, '-'), // Use status name, not database ID
         title: col.name,
         color: getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-'))
       }));
       
+      console.log('🎨 Client columns:', clientColumns);
       setColumns(clientColumns);
     } catch (error) {
       console.error('Failed to load columns:', error);
@@ -195,7 +195,9 @@ const TasksPage: React.FC = () => {
     try {
       setLoading(true);
       // Load tasks for the specific project if currentProjectId is set
+      console.log('🚀 Loading tasks with currentProjectId:', currentProjectId);
       const data = await taskAPI.getTasks(currentProjectId);
+      console.log('📦 Tasks received from API:', data.length, 'tasks');
       dispatch({ type: 'SET_TASKS', payload: data });
     } catch (error) {
       console.error('Failed to load tasks:', error);
@@ -326,23 +328,51 @@ const TasksPage: React.FC = () => {
     const matchesTags = filters.tags.length === 0 || 
                        filters.tags.some(tag => task.tags?.includes(tag));
     
-    // Fix project filtering to handle both string and object projectId
+    // Project filtering logic:
+    // - If currentProjectId is set, the API already filtered tasks by project, so no additional filtering needed
+    // - If currentProjectId is not set (All Projects), we need to filter by filters.project
     let matchesProject = true;
-    if (currentProjectId) {
+    if (!currentProjectId && filters.project !== 'all') {
+      // Only apply frontend project filtering when viewing "All Projects" and a specific project filter is set
       const taskProjectId = typeof task.projectId === 'string' 
         ? task.projectId 
         : (task.projectId as any)?._id || task.projectId;
-      matchesProject = String(taskProjectId) === String(currentProjectId);
-      console.log('🔍 TasksKanban filtering:', {
+      matchesProject = String(taskProjectId) === String(filters.project);
+      console.log('🔍 TasksKanban frontend filtering:', {
         taskTitle: task.title,
         taskProjectId: task.projectId,
         extractedId: taskProjectId,
-        currentProjectId,
+        filterProject: filters.project,
         matchesProject
+      });
+    } else if (currentProjectId) {
+      // When a specific project is selected, API already filtered, so all tasks match
+      console.log('🔍 TasksKanban API filtering active for project:', currentProjectId);
+      matchesProject = true;
+    }
+    
+    const finalMatch = matchesSearch && matchesPriority && matchesTags && matchesProject;
+    
+    if (!finalMatch) {
+      console.log('❌ Task filtered out:', {
+        title: task.title,
+        matchesSearch,
+        matchesPriority,
+        matchesTags,
+        matchesProject,
+        currentProjectId,
+        'filters.project': filters.project
       });
     }
     
-    return matchesSearch && matchesPriority && matchesTags && matchesProject;
+    return finalMatch;
+  });
+
+  console.log('📊 Filtering summary:', {
+    totalTasks: tasks.length,
+    filteredTasks: filteredTasks.length,
+    currentProjectId,
+    filters
   });
 
   // Breadcrumb items
@@ -398,25 +428,7 @@ const TasksPage: React.FC = () => {
               }
             </p>
           </div>
-            {/* Connection Status */}
-          <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm ${
-            isConnected 
-              ? 'bg-green-900 text-green-200 border border-green-700' 
-              : 'bg-red-900 text-red-200 border border-red-700'
-          }`}>
-            {isConnected ? (
-              <>
-                <Wifi className="w-4 h-4" />
-                <span>Live</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-4 h-4" />
-                <span>Offline</span>
-              </>
-            )}
-          </div>        </div>        <div className="flex items-center space-x-3">
-          {/* Back to Project Button */}
+         
           {currentProjectId && (
             <Link
               to={`/projects/${currentProjectId}`}
@@ -426,33 +438,6 @@ const TasksPage: React.FC = () => {
               View Project
             </Link>
           )}
-
-          {/* Project Selector */}
-          <div className="flex items-center space-x-2">
-            <FolderOpen className="w-4 h-4 text-gray-500" />            <select
-              value={currentProjectId || 'all'}
-              onChange={(e) => {
-                const newProjectId = e.target.value === 'all' ? undefined : e.target.value;
-                setCurrentProjectId(newProjectId);
-                if (newProjectId) {
-                  setSearchParams({ project: newProjectId });
-                } else {
-                  setSearchParams({});
-                }
-                setFilters(prev => ({ ...prev, project: e.target.value }));
-                // Reload tasks for the new project
-                console.log('Project changed to:', newProjectId);
-              }}
-              className="input text-sm min-w-[160px]"
-            >
-              <option value="all">All Projects</option>
-              {projects.map(project => (
-                <option key={project._id} value={project._id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
 
           {/* View Toggle */}
           <div className="flex bg-gray-100 rounded-lg p-1">
@@ -514,8 +499,7 @@ const TasksPage: React.FC = () => {
           </div>
         </div>
       )}      {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-4">        <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900">Filters</h3>
           <button
             onClick={() => setFilters({ search: '', priority: 'all', assignedUser: 'all', tags: [], project: 'all' })}
@@ -523,6 +507,56 @@ const TasksPage: React.FC = () => {
           >
             Clear all
           </button>
+        </div>
+
+        {/* Project Filter */}
+        <div className="flex items-center space-x-2">
+          <FolderOpen className="w-4 h-4 text-gray-500" />          <select
+            value={currentProjectId || 'all'}
+            onChange={async (e) => {              const newProjectId = e.target.value === 'all' ? undefined : e.target.value;
+              
+              console.log('🔄 Project dropdown changed:', {
+                selectedValue: e.target.value,
+                newProjectId,
+                previousProjectId: currentProjectId
+              });
+              
+              // Leave current project room if connected
+              if (currentProjectId && socketService.isConnected) {
+                socketService.leaveProject(currentProjectId);
+              }
+                setCurrentProjectId(newProjectId);
+              if (newProjectId) {
+                setSearchParams({ project: newProjectId });
+                // When selecting a specific project, reset filter.project since API handles filtering
+                setFilters(prev => ({ ...prev, project: 'all' }));
+                console.log('✅ Set filters.project to "all" for API filtering');
+              } else {
+                setSearchParams({});
+                // When selecting "All Projects", keep the dropdown value in filters for potential frontend filtering
+                setFilters(prev => ({ ...prev, project: e.target.value }));
+                console.log('✅ Set filters.project to:', e.target.value);
+              }
+              
+              // Join new project room if connected
+              if (newProjectId && socketService.isConnected) {
+                socketService.joinProject(newProjectId);
+              }
+              
+              // Reload tasks for the new project
+              console.log('🔄 About to reload tasks...');
+              await loadTasks();
+              console.log('✅ Tasks reloaded');
+            }}
+            className="input text-sm min-w-[160px]"
+          >
+            <option value="all">All Projects</option>
+            {projects.map(project => (
+              <option key={project._id} value={project._id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -623,7 +657,7 @@ const TasksPage: React.FC = () => {
           setSelectedTask(null);
         }}
         onSubmit={handleUpdateTask}
-        onDelete={handleDeleteTask}
+        onDelete={() => { if (selectedTask) handleDeleteTask(selectedTask); }}
         task={selectedTask}
         loading={updating}
         availableStatuses={columns.map(col => ({ id: col.id, title: col.title }))}

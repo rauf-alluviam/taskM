@@ -8,6 +8,35 @@ const api = axios.create({
   timeout: API_TIMEOUT,
 });
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+
+// Exponential backoff delay
+const getRetryDelay = (attempt: number) => INITIAL_RETRY_DELAY * Math.pow(2, attempt);
+
+// Check if error is retryable
+const isRetryableError = (error: any) => {
+  if (!error.response) return true; // Network errors are retryable
+  const status = error.response.status;
+  return status === 429 || status >= 500; // Retry on rate limit and server errors
+};
+
+// Retry wrapper function
+const withRetry = async (fn: () => Promise<any>, retries = MAX_RETRIES): Promise<any> => {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (retries > 0 && isRetryableError(error)) {
+      const delay = getRetryDelay(MAX_RETRIES - retries);
+      console.log(`Request failed, retrying in ${delay}ms... (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1);
+    }
+    throw error;
+  }
+};
+
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
@@ -20,205 +49,288 @@ api.interceptors.request.use((config) => {
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
+    
+    // Log rate limit info for debugging
+    if (error.response?.status === 429) {
+      console.warn('Rate limit exceeded. Response:', error.response.data);
+      const retryAfter = error.response.headers['retry-after'];
+      if (retryAfter) {
+        console.warn(`Retry after: ${retryAfter} seconds`);
+      }
+    }
+    
     throw error;
   }
 );
 
 export const authAPI = {
   login: async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/auth/login', { email, password });
+      return response.data;
+    });
   },
   register: async (email: string, password: string, name: string, role: string) => {
-    const response = await api.post('/auth/register', { email, password, name, role });
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/auth/register', { email, password, name, role });
+      return response.data;
+    });
   },
   verifyToken: async () => {
-    const response = await api.get('/auth/verify');
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get('/auth/verify');
+      return response.data;
+    });
   },
 };
 
 export const taskAPI = {
   getTasks: async (projectId?: string) => {
-    const params = projectId ? { projectId } : {};
-    const response = await api.get('/tasks', { params });
-    return response.data;
+    return withRetry(async () => {
+      const params = projectId ? { projectId } : {};
+      const response = await api.get('/tasks', { params });
+      return response.data;
+    });
   },
   createTask: async (task: any) => {
-    const response = await api.post('/tasks', task);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/tasks', task);
+      return response.data;
+    });
   },
   updateTask: async (id: string, taskData: any) => {
     console.log('🌐 API.UPDATETASK CALLED!', { id, taskData });
     console.log('🌐 Making HTTP PUT request to:', `/tasks/${id}`);
     
-    const response = await api.put(`/tasks/${id}`, taskData);
-    
-    console.log('🌐 API RESPONSE RECEIVED!', response.data);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.put(`/tasks/${id}`, taskData);
+      console.log('🌐 API RESPONSE RECEIVED!', response.data);
+      return response.data;
+    });
   },
   deleteTask: async (id: string) => {
-    const response = await api.delete(`/tasks/${id}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.delete(`/tasks/${id}`);
+      return response.data;
+    });
   },
   // Subtask management
   createSubtask: async (parentTaskId: string, subtaskData: any) => {
-    const response = await api.post('/subtasks', { ...subtaskData, parentTaskId });
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/subtasks', { ...subtaskData, parentTaskId });
+      return response.data;
+    });
   },
   getSubtasks: async (parentTaskId: string) => {
-    const response = await api.get(`/subtasks/task/${parentTaskId}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get(`/subtasks/task/${parentTaskId}`);
+      return response.data;
+    });
   },
   updateSubtask: async (subtaskId: string, subtaskData: any) => {
-    const response = await api.put(`/subtasks/${subtaskId}`, subtaskData);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.put(`/subtasks/${subtaskId}`, subtaskData);
+      return response.data;
+    });
   },
   deleteSubtask: async (subtaskId: string) => {
-    const response = await api.delete(`/subtasks/${subtaskId}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.delete(`/subtasks/${subtaskId}`);
+      return response.data;
+    });
   },
   getSubtaskStats: async (parentTaskId: string) => {
-    const response = await api.get(`/subtasks/task/${parentTaskId}/stats`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get(`/subtasks/task/${parentTaskId}/stats`);
+      return response.data;
+    });
   },
 };
 
 export const projectAPI = {
   getProjects: async () => {
-    const response = await api.get('/projects');
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get('/projects');
+      return response.data;
+    });
   },
   getProject: async (id: string) => {
-    const response = await api.get(`/projects/${id}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get(`/projects/${id}`);
+      return response.data;
+    });
   },
   createProject: async (projectData: any) => {
-    const response = await api.post('/projects', projectData);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/projects', projectData);
+      return response.data;
+    });
   },
   updateProject: async (id: string, projectData: any) => {
-    const response = await api.put(`/projects/${id}`, projectData);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.put(`/projects/${id}`, projectData);
+      return response.data;
+    });
   },
   deleteProject: async (id: string) => {
-    const response = await api.delete(`/projects/${id}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.delete(`/projects/${id}`);
+      return response.data;
+    });
   },
 };
 
 export const documentAPI = {
   getDocuments: async (projectId?: string) => {
-    const params = projectId ? { projectId } : {};
-    const response = await api.get('/documents', { params });
-    return response.data;
+    return withRetry(async () => {
+      const params = projectId ? { projectId } : {};
+      const response = await api.get('/documents', { params });
+      return response.data;
+    });
   },
   getDocument: async (id: string) => {
-    const response = await api.get(`/documents/${id}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get(`/documents/${id}`);
+      return response.data;
+    });
   },
   createDocument: async (documentData: any) => {
-    const response = await api.post('/documents', documentData);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/documents', documentData);
+      return response.data;
+    });
   },
   updateDocument: async (id: string, documentData: any) => {
-    const response = await api.put(`/documents/${id}`, documentData);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.put(`/documents/${id}`, documentData);
+      return response.data;
+    });
   },
   deleteDocument: async (id: string) => {
-    const response = await api.delete(`/documents/${id}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.delete(`/documents/${id}`);
+      return response.data;
+    });
   },
 };
 
 export const kanbanAPI = {
   getColumns: async (projectId?: string) => {
-    const params = projectId ? { projectId } : {};
-    const response = await api.get('/kanban/columns', { params });
-    return response.data;
+    return withRetry(async () => {
+      const params = projectId ? { projectId } : {};
+      const response = await api.get('/kanban/columns', { params });
+      return response.data;
+    });
   },
   updateColumns: async (columns: any[], projectId?: string) => {
-    const response = await api.put('/kanban/columns', { columns, projectId });
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.put('/kanban/columns', { columns, projectId });
+      return response.data;
+    });
   },
   addColumn: async (title: string, color: string, projectId?: string) => {
-    const response = await api.post('/kanban/columns', { title, color, projectId });
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/kanban/columns', { title, color, projectId });
+      return response.data;
+    });
   },
   deleteColumn: async (columnId: string, projectId?: string) => {
-    const params = projectId ? { projectId } : {};
-    const response = await api.delete(`/kanban/columns/${columnId}`, { params });
-    return response.data;
+    return withRetry(async () => {
+      const params = projectId ? { projectId } : {};
+      const response = await api.delete(`/kanban/columns/${columnId}`, { params });
+      return response.data;
+    });
   },
 };
 
 export const fileAPI = {
   uploadFile: async (file: File, type: string) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', type);
-    
-    const response = await api.post('/files/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    return withRetry(async () => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+      
+      const response = await api.post('/files/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
     });
-    return response.data;
   },
   deleteFile: async (fileUrl: string) => {
-    const response = await api.delete('/files/delete', { data: { fileUrl } });
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.delete('/files/delete', { data: { fileUrl } });
+      return response.data;
+    });
   },
 };
 
 export const userAPI = {
   getUsers: async () => {
-    const response = await api.get('/users');
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get('/users');
+      return response.data;
+    });
   },
   createUser: async (userData: any) => {
-    const response = await api.post('/users', userData);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.post('/users', userData);
+      return response.data;
+    });
   },
   updateUser: async (userId: string, userData: any) => {
-    const response = await api.put(`/users/${userId}`, userData);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.put(`/users/${userId}`, userData);
+      return response.data;
+    });
   },
   deleteUser: async (userId: string) => {
-    const response = await api.delete(`/users/${userId}`);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.delete(`/users/${userId}`);
+      return response.data;
+    });
   },
 };
 
 export const analyticsAPI = {
   getAnalytics: async () => {
-    const response = await api.get('/analytics');
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get('/analytics');
+      return response.data;
+    });
   },
   getTaskStats: async () => {
-    const response = await api.get('/analytics/tasks');
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get('/analytics/tasks');
+      return response.data;
+    });
   },
   getProjectStats: async () => {
-    const response = await api.get('/analytics/projects');
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get('/analytics/projects');
+      return response.data;
+    });
   },
 };
 
 export const settingsAPI = {
   getSettings: async () => {
-    const response = await api.get('/settings');
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.get('/settings');
+      return response.data;
+    });
   },
   updateSettings: async (settings: any) => {
-    const response = await api.put('/settings', settings);
-    return response.data;
+    return withRetry(async () => {
+      const response = await api.put('/settings', settings);
+      return response.data;
+    });
   },
 };
 

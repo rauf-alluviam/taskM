@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   CheckSquare, 
@@ -14,6 +14,7 @@ import { useTask } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { taskAPI, projectAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
+import { debounce } from '../utils/debounce';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -26,39 +27,69 @@ const Dashboard: React.FC = () => {
     totalProjects: 0,
   });
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  // Create debounced version of loadDashboardData to prevent excessive calls
+  const debouncedLoadDashboardData = useCallback(
+    debounce(async () => {
+      try {
+        setLoading(true);
+        
+        // Use Promise.allSettled instead of Promise.all to handle partial failures
+        const results = await Promise.allSettled([
+          taskAPI.getTasks(),
+          projectAPI.getProjects(),
+        ]);
+        
+        // Handle tasks result
+        if (results[0].status === 'fulfilled') {
+          dispatch({ type: 'SET_TASKS', payload: results[0].value });
+          
+          // Calculate stats from successful task data
+          const tasksData = results[0].value;
+          const completedTasks = tasksData.filter((task: any) => task.status === 'done').length;
+          const overdueTasks = tasksData.filter((task: any) => 
+            task.endDate && new Date(task.endDate) < new Date() && task.status !== 'done'
+          ).length;
+          
+          setStats(prevStats => ({
+            ...prevStats,
+            totalTasks: tasksData.length,
+            completedTasks,
+            overdueTasks,
+          }));
+        } else {
+          console.error('Failed to load tasks:', results[0].reason);
+        }
+        
+        // Handle projects result
+        if (results[1].status === 'fulfilled') {
+          const projectsData = results[1].value;
+          dispatch({ type: 'SET_PROJECTS', payload: projectsData });
+          setStats(prevStats => ({
+            ...prevStats,
+            totalProjects: projectsData.length,
+          }));
+        } else {
+          console.error('Failed to load projects:', results[1].reason);
+        }
+        
+        // Check if both failed
+        if (results[0].status === 'rejected' && results[1].status === 'rejected') {
+          throw new Error('Failed to load dashboard data');
+        }
+        
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        // Don't throw here to prevent complete UI failure
+      } finally {
+        setLoading(false);
+      }
+    }, 500), // 500ms debounce
+    [dispatch]
+  );
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [tasksData, projectsData] = await Promise.all([
-        taskAPI.getTasks(),
-        projectAPI.getProjects(),
-      ]);
-      
-      dispatch({ type: 'SET_TASKS', payload: tasksData });
-      dispatch({ type: 'SET_PROJECTS', payload: projectsData });
-      
-      // Calculate stats
-      const completedTasks = tasksData.filter((task: any) => task.status === 'done').length;
-      const overdueTasks = tasksData.filter((task: any) => 
-        task.endDate && new Date(task.endDate) < new Date() && task.status !== 'done'
-      ).length;
-      
-      setStats({
-        totalTasks: tasksData.length,
-        completedTasks,
-        overdueTasks,
-        totalProjects: projectsData.length,
-      });
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    debouncedLoadDashboardData();
+  }, [debouncedLoadDashboardData]);
 
   const recentTasks = tasks.slice(0, 5);
   const recentProjects = projects.slice(0, 3);
