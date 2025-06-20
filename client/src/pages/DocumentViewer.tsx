@@ -14,6 +14,8 @@ import {
 import { documentAPI, attachmentAPI } from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
+import ExcelViewer from '../components/UI/ExcelViewer';
+import WordViewer from '../components/UI/WordViewer';
 
 interface Document {
   _id: string;
@@ -217,8 +219,7 @@ const DocumentViewer: React.FC = () => {
       </div>
     );
   }
-
-  // If this is an imported document, show the file viewer
+  // If this is an imported document, show the appropriate file viewer
   if (document.isImported && document.originalFileName) {
     const handleFileDownload = () => {
       if (downloadUrl) {
@@ -244,8 +245,151 @@ const DocumentViewer: React.FC = () => {
              mimetype === 'application/pdf';
     };
 
+    const renderFileViewer = () => {
+      if (!document.mimetype || !downloadUrl) {
+        return null;
+      }
+
+      const mimetype = document.mimetype;
+
+      // Excel files
+      if (mimetype.includes('spreadsheet') || mimetype.includes('excel') || mimetype === 'text/csv') {
+        return (
+          <ExcelViewer 
+            fileUrl={downloadUrl} 
+            fileName={document.originalFileName!}
+            onDownload={handleFileDownload}
+          />
+        );
+      }
+
+      // Word files
+      if (mimetype.includes('word') && mimetype.includes('openxmlformats')) {
+        return (
+          <WordViewer 
+            fileUrl={downloadUrl} 
+            fileName={document.originalFileName!}
+            onDownload={handleFileDownload}
+          />
+        );
+      }
+
+      // PDF files - open in new tab for better experience
+      if (mimetype === 'application/pdf') {
+        return (
+          <div className="bg-white border rounded-lg shadow-sm p-8">
+            <div className="text-center">
+              <div className="flex justify-center mb-6">
+                {getFileIcon(document.mimetype!)}
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                {document.originalFileName}
+              </h2>
+              <p className="text-gray-600 mb-2">PDF Document</p>
+              <p className="text-sm text-gray-500 mb-6">
+                {formatFileSize(document.fileSize!)} • Created by {document.createdBy.name} • {new Date(document.createdAt).toLocaleDateString()}
+              </p>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={handleFilePreview}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Open PDF
+                </button>
+                <button
+                  onClick={handleFileDownload}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Image files
+      if (mimetype.startsWith('image/')) {
+        return (
+          <div className="bg-white border rounded-lg shadow-sm p-8">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                {document.originalFileName}
+              </h2>
+              <div className="mb-6">
+                <img 
+                  src={downloadUrl} 
+                  alt={document.originalFileName}
+                  className="max-w-full h-auto max-h-96 mx-auto rounded border shadow-sm"
+                />
+              </div>
+              <p className="text-sm text-gray-500 mb-6">
+                {formatFileSize(document.fileSize!)} • Created by {document.createdBy.name} • {new Date(document.createdAt).toLocaleDateString()}
+              </p>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={handleFilePreview}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View Full Size
+                </button>
+                <button
+                  onClick={handleFileDownload}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Default file card for other file types
+      return (
+        <div className="bg-white border rounded-lg shadow-sm p-8">
+          <div className="text-center">
+            <div className="flex justify-center mb-6">
+              {getFileIcon(document.mimetype!)}
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              {document.originalFileName}
+            </h2>
+            <p className="text-gray-600 mb-2">
+              {getFileTypeLabel(document.mimetype!)}
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              {formatFileSize(document.fileSize!)} • Created by {document.createdBy.name} • {new Date(document.createdAt).toLocaleDateString()}
+            </p>
+            <div className="flex justify-center space-x-4">
+              {canPreview(document.mimetype!) && (
+                <button
+                  onClick={handleFilePreview}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview
+                </button>
+              )}
+              <button
+                onClick={handleFileDownload}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
@@ -264,58 +408,8 @@ const DocumentViewer: React.FC = () => {
           </div>
         </div>
 
-        {/* File Card */}
-        <div className="bg-white border rounded-lg shadow-sm p-8">
-          <div className="text-center">
-            {/* File Icon */}
-            <div className="flex justify-center mb-6">
-              {getFileIcon(document.mimetype!)}
-            </div>
-
-            {/* File Info */}
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {document.originalFileName}
-            </h2>
-            <p className="text-gray-600 mb-2">
-              {getFileTypeLabel(document.mimetype!)}
-            </p>
-            <p className="text-sm text-gray-500 mb-6">
-              {formatFileSize(document.fileSize!)} • Created by {document.createdBy.name} • {new Date(document.createdAt).toLocaleDateString()}
-            </p>
-
-            {/* Image Preview */}
-            {previewUrl && document.mimetype?.startsWith('image/') && (
-              <div className="mb-6">
-                <img 
-                  src={previewUrl} 
-                  alt={document.originalFileName}
-                  className="max-w-full h-auto max-h-96 mx-auto rounded border shadow-sm"
-                />
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-center space-x-4">
-              {canPreview(document.mimetype!) && (
-                <button
-                  onClick={handleFilePreview}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Preview
-                </button>
-              )}
-              
-              <button
-                onClick={handleFileDownload}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* File Viewer */}
+        {renderFileViewer()}
 
         {/* Metadata */}
         <div className="mt-6 bg-gray-50 rounded-lg p-4">

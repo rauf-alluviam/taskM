@@ -1,6 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FileText, Plus, Search, Calendar, User, FolderOpen, AlertCircle, Trash2, Upload } from 'lucide-react';
+import { 
+  FileText, 
+  Plus, 
+  Search, 
+  Calendar, 
+  User, 
+  FolderOpen, 
+  AlertCircle, 
+  Trash2, 
+  Upload,
+  Grid3X3,
+  List,
+  File,
+  Image,
+  FileSpreadsheet,
+  Presentation,
+  Archive
+} from 'lucide-react';
 import { documentAPI, projectAPI } from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
@@ -16,6 +33,10 @@ interface Document {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  isImported?: boolean;
+  originalFileName?: string;
+  mimetype?: string;
+  fileSize?: number;
 }
 
 interface DocumentForm {
@@ -45,8 +66,55 @@ const Documents: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<DocumentForm>();
+
+  // Utility function to get file-specific icons
+  const getFileIcon = (document: Document, isCardView = false) => {
+    const iconClass = isCardView ? "w-6 h-6 text-white" : "w-6 h-6";
+    
+    if (document.isImported && document.mimetype) {
+      const mimetype = document.mimetype;
+      
+      if (mimetype.startsWith('image/')) {
+        return <Image className={`${iconClass} ${!isCardView ? 'text-green-600' : ''}`} />;
+      }
+      
+      if (mimetype.includes('spreadsheet') || mimetype.includes('excel') || mimetype === 'text/csv') {
+        return <FileSpreadsheet className={`${iconClass} ${!isCardView ? 'text-green-600' : ''}`} />;
+      }
+      
+      if (mimetype.includes('presentation') || mimetype.includes('powerpoint')) {
+        return <Presentation className={`${iconClass} ${!isCardView ? 'text-orange-600' : ''}`} />;
+      }
+      
+      if (mimetype.includes('pdf')) {
+        return <FileText className={`${iconClass} ${!isCardView ? 'text-red-600' : ''}`} />;
+      }
+      
+      if (mimetype.includes('word')) {
+        return <FileText className={`${iconClass} ${!isCardView ? 'text-blue-600' : ''}`} />;
+      }
+      
+      if (mimetype.includes('zip') || mimetype.includes('rar') || mimetype.includes('archive')) {
+        return <Archive className={`${iconClass} ${!isCardView ? 'text-purple-600' : ''}`} />;
+      }
+      
+      return <File className={`${iconClass} ${!isCardView ? 'text-gray-600' : ''}`} />;
+    }
+    
+    // Default icon for regular documents
+    return <FileText className={`${iconClass} ${!isCardView ? 'text-blue-600' : ''}`} />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   useEffect(() => {
     loadDocuments();
@@ -328,33 +396,189 @@ const Documents: React.FC = () => {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search documents..."
-          className="input pl-10 w-full"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Search and View Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search documents..."
+            className="input pl-10 w-full"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        {/* View Toggle */}
+        <div className="flex items-center bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('card')}
+            className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'card'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Grid3X3 className="w-4 h-4 mr-1.5" />
+            Cards
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <List className="w-4 h-4 mr-1.5" />
+            List
+          </button>
+        </div>
       </div>
 
-      {/* Documents Grid */}
+      {/* Documents Display */}
       {filteredDocuments.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDocuments.map((doc) => (
-            <div key={doc._id} className="card hover:shadow-md transition-shadow">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-accent-400 to-accent-600 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-white" />
+        viewMode === 'card' ? (
+          /* Card View */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredDocuments.map((doc) => (
+              <div key={doc._id} className="card hover:shadow-md transition-shadow">
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-accent-400 to-accent-600 rounded-lg flex items-center justify-center">
+                      {getFileIcon(doc, true)}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">
+                        {new Date(doc.updatedAt).toLocaleDateString()}
+                      </span>
+                      <div className="relative group">
+                        <button
+                          className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-gray-100"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setDeleteConfirmId(doc._id);
+                          }}
+                          title="Delete document"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
-                      {new Date(doc.updatedAt).toLocaleDateString()}
-                    </span>
-                    <div className="relative group">
+
+                  <Link to={`/documents/${doc._id}`} className="block">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600 line-clamp-2">
+                      {doc.isImported ? (doc.originalFileName || doc.title) : doc.title}
+                    </h3>
+                  </Link>
+
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                    {doc.isImported ? (
+                      <span className="flex items-center space-x-2">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                          Imported File
+                        </span>
+                        {doc.fileSize && (
+                          <span className="text-gray-500">
+                            {formatFileSize(doc.fileSize)}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      doc.content ? 
+                        doc.content.replace(/<[^>]*>/g, '').substring(0, 100) + '...' :
+                        'No content yet...'
+                    )}
+                  </p>
+
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center space-x-3">
+                      <span className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        {new Date(doc.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {doc.projectName && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                        <FolderOpen className="w-3 h-3 mr-1" />
+                        {doc.projectName}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <Link
+                      to={`/documents/${doc._id}`}
+                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      {doc.isImported ? 'View File →' : 'Open Document →'}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* List View */
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+              <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div className="col-span-1">Type</div>
+                <div className="col-span-4">Name</div>
+                <div className="col-span-2">Project</div>
+                <div className="col-span-2">Size</div>
+                <div className="col-span-2">Modified</div>
+                <div className="col-span-1">Actions</div>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-200">
+              {filteredDocuments.map((doc) => (
+                <div key={doc._id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <div className="col-span-1">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                        {getFileIcon(doc, false)}
+                      </div>
+                    </div>
+                    <div className="col-span-4">
+                      <Link 
+                        to={`/documents/${doc._id}`}
+                        className="block hover:text-primary-600"
+                      >
+                        <div className="font-medium text-gray-900 truncate">
+                          {doc.isImported ? (doc.originalFileName || doc.title) : doc.title}
+                        </div>
+                        {doc.isImported && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                              Imported
+                            </span>
+                          </div>
+                        )}
+                      </Link>
+                    </div>
+                    <div className="col-span-2">
+                      {doc.projectName ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                          <FolderOpen className="w-3 h-3 mr-1" />
+                          {doc.projectName}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">Personal</span>
+                      )}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-sm text-gray-500">
+                        {doc.fileSize ? formatFileSize(doc.fileSize) : '—'}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-sm text-gray-500">
+                        {new Date(doc.updatedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="col-span-1">
                       <button
                         className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-gray-100"
                         onClick={(e) => {
@@ -368,47 +592,10 @@ const Documents: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                <Link to={`/documents/${doc._id}`} className="block">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600 line-clamp-2">
-                    {doc.title}
-                  </h3>
-                </Link>
-
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                  {doc.content ? 
-                    doc.content.replace(/<[^>]*>/g, '').substring(0, 100) + '...' :
-                    'No content yet...'
-                  }
-                </p>
-
-                <div className="flex items-center justify-between text-sm text-gray-500">
-                  <div className="flex items-center space-x-3">
-                    <span className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {new Date(doc.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {doc.projectName && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                      <FolderOpen className="w-3 h-3 mr-1" />
-                      {doc.projectName}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <Link
-                    to={`/documents/${doc._id}`}
-                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    Open Document →
-                  </Link>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )
       ) : (
         <div className="text-center py-12">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
