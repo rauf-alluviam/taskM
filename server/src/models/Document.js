@@ -31,6 +31,30 @@ const documentSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Fields for imported documents
+  isImported: {
+    type: Boolean,
+    default: false,
+  },
+  originalFileName: {
+    type: String,
+  },
+  mimetype: {
+    type: String,
+  },
+  fileSize: {
+    type: Number,
+  },
+  s3Key: {
+    type: String,
+  },
+  s3Url: {
+    type: String,
+  },
+  attachments: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Attachment',
+  }],
 }, {
   timestamps: true,
 });

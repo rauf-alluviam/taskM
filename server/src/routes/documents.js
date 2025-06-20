@@ -1,10 +1,102 @@
 import express from 'express';
+import multer from 'multer';
 import { body, validationResult } from 'express-validator';
 import Document from '../models/Document.js';
 import Project from '../models/Project.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    // Documents
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
+    'text/markdown',
+    'application/rtf',
+    // Spreadsheets
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/csv',
+    // Images
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/bmp',
+    'image/webp',
+    'image/svg+xml',
+    // Presentations
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    // Other
+    'application/json',
+    'text/html',
+    'text/xml',
+    'application/xml'
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Please upload a supported file format.'), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit to accommodate larger files
+  },
+});
+
+// Function to extract text content from different file types
+const extractTextFromFile = (file) => {
+  try {
+    console.log('🔍 Extracting text from file type:', file.mimetype);
+    
+    // For different file types, we might want to process differently
+    switch (file.mimetype) {
+      case 'text/plain':
+      case 'text/markdown':
+        const textContent = file.buffer.toString('utf8');
+        console.log('✅ Text extraction completed, length:', textContent.length);
+        return textContent;
+        
+      case 'application/pdf':
+        // For PDF, we'd need a PDF parser library, for now return placeholder
+        const pdfPlaceholder = `[PDF Document: ${file.originalname}]\n\nThis PDF document has been imported. Content extraction from PDF files will be implemented in a future update.\n\nOriginal filename: ${file.originalname}\nFile size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+        console.log('✅ PDF placeholder created');
+        return pdfPlaceholder;
+        
+      case 'application/msword':
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        // For Word docs, we'd need a library like mammoth.js, for now return placeholder
+        const wordPlaceholder = `[Word Document: ${file.originalname}]\n\nThis Word document has been imported. Content extraction from Word files will be implemented in a future update.\n\nOriginal filename: ${file.originalname}\nFile size: ${(file.size / 1024 / 1024).toFixed(2)} MB\n\nTo view the full content, please download the original file.`;
+        console.log('✅ Word placeholder created');
+        return wordPlaceholder;
+        
+      case 'application/rtf':
+        // Basic RTF handling (removing RTF codes)
+        const rtfContent = file.buffer.toString('utf8').replace(/\{\\.*?\}|\\\w+\s?/g, '').trim();
+        console.log('✅ RTF extraction completed, length:', rtfContent.length);
+        return rtfContent;
+        
+      default:
+        const defaultContent = `[Document: ${file.originalname}]\n\nFile type: ${file.mimetype}\nFile size: ${(file.size / 1024 / 1024).toFixed(2)} MB\n\nThis file has been imported but content extraction is not supported for this file type. Please download the original file to view its contents.`;
+        console.log('✅ Default placeholder created');
+        return defaultContent;
+    }
+  } catch (error) {
+    console.error('❌ Error extracting text from file:', error);
+    return `[Import Error: ${file.originalname}]\n\nThere was an error processing this file. Please try importing again or contact support.\n\nError: ${error.message}`;
+  }
+};
 
 // Get all documents (with optional project filter)
 router.get('/', authenticate, async (req, res) => {
@@ -209,6 +301,131 @@ router.post('/', authenticate, [
   }
 });
 
+// Import document from file
+router.post('/import', authenticate, upload.single('file'), async (req, res) => {
+  try {
+    console.log('📁 Document import request received:');
+    console.log('User:', req.user._id);
+    console.log('File:', req.file ? {
+      name: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    } : 'No file');
+    console.log('Body:', req.body);
+
+    if (!req.file) {
+      console.log('❌ No file in request');
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const { projectId } = req.body;
+
+    // Extract title from filename (remove extension)
+    const title = req.file.originalname.replace(/\.[^/.]+$/, '');
+    console.log('📝 Extracted title:', title);
+    
+    // Upload file directly to S3 first
+    console.log('📤 Uploading file to S3...');
+    const { uploadToS3 } = await import('../services/s3Service.js');
+    
+    // Generate unique S3 key
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 15);
+    const fileExtension = req.file.originalname.split('.').pop() || '';
+    const s3Key = `imported-documents/${timestamp}-${randomString}.${fileExtension}`;
+    
+    // Upload to S3
+    const s3Result = await uploadToS3(req.file, s3Key);
+    console.log('✅ File uploaded to S3:', s3Result.key);
+
+    // If projectId is provided, verify user has access to the project
+    if (projectId) {
+      console.log('🔍 Checking project access for:', projectId);
+      const project = await Project.findById(projectId);
+      if (!project) {
+        console.log('❌ Project not found:', projectId);
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      const hasProjectAccess = project.createdBy.equals(req.user._id) ||
+                              project.members.includes(req.user._id) ||
+                              req.user.role === 'admin';
+
+      if (!hasProjectAccess) {
+        console.log('❌ Access denied to project:', projectId);
+        return res.status(403).json({ message: 'Access denied to project' });
+      }
+      console.log('✅ Project access granted');
+
+      // Create document within project
+      console.log('📝 Creating document within project...');
+      const document = new Document({
+        title,
+        content: '', // No Quill content for imported files
+        projectId,
+        createdBy: req.user._id,
+        lastEditedBy: req.user._id,
+        isPublic: false,
+        isImported: true,
+        originalFileName: req.file.originalname,
+        mimetype: req.file.mimetype,
+        fileSize: req.file.size,
+        s3Key: s3Result.key,
+        s3Url: s3Result.url,
+      });
+
+      await document.save();
+      console.log('✅ Document saved:', document._id);
+      
+      // No need to create attachment record since file info is in document itself
+      
+      await document.populate('createdBy', 'name email');
+      await document.populate('projectId', 'name');
+      console.log('✅ Document populated');
+
+      // Add document to project
+      await Project.findByIdAndUpdate(
+        projectId,
+        { $push: { documents: document._id } }
+      );
+      console.log('✅ Document added to project');
+
+      return res.status(201).json(document);
+    } else {
+      // Create personal document (not associated with any project)
+      console.log('📝 Creating personal document...');
+      const document = new Document({
+        title,
+        content: '', // No Quill content for imported files
+        createdBy: req.user._id,
+        lastEditedBy: req.user._id,
+        isPublic: false,
+        isImported: true,
+        originalFileName: req.file.originalname,
+        mimetype: req.file.mimetype,
+        fileSize: req.file.size,
+        s3Key: s3Result.key,
+        s3Url: s3Result.url,
+      });
+
+      await document.save();
+      console.log('✅ Document saved:', document._id);
+      
+      // No need to create attachment record since file info is in document itself
+      
+      await document.populate('createdBy', 'name email');
+      console.log('✅ Document populated');
+
+      return res.status(201).json(document);
+    }
+  } catch (error) {
+    console.error('Import document error:', error);
+    res.status(500).json({ 
+      message: error.message || 'Server error while importing document' 
+    });
+  }
+});
+
 // Update document
 router.put('/:id', authenticate, [
   body('title').optional().trim().isLength({ min: 1 }),
@@ -315,6 +532,58 @@ router.delete('/:id', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Delete document error:', error);
     res.status(500).json({ message: 'Server error while deleting document' });
+  }
+});
+
+// Get download URL for imported document
+router.get('/:id/download', authenticate, async (req, res) => {
+  try {
+    console.log('⬇️ Download URL request for document:', req.params.id);
+    
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    // Check if user has access to this document
+    if (document.projectId) {
+      const project = await Project.findById(document.projectId);
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      const hasAccess = project.createdBy.equals(req.user._id) ||
+                       project.members.includes(req.user._id) ||
+                       req.user.role === 'admin';
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    } else {
+      // Personal document - check ownership
+      if (!document.createdBy.equals(req.user._id) && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
+    // Check if this is an imported document
+    if (!document.isImported || !document.s3Key) {
+      return res.status(400).json({ message: 'This is not an imported document' });
+    }
+
+    // Generate signed URL for download
+    const { getSignedUrl } = await import('../services/s3Service.js');
+    const signedUrl = await getSignedUrl(document.s3Key, 3600); // 1 hour expiry
+    
+    res.json({
+      downloadUrl: signedUrl,
+      filename: document.originalFileName,
+      size: document.fileSize,
+      mimetype: document.mimetype,
+    });
+  } catch (error) {
+    console.error('Get document download URL error:', error);
+    res.status(500).json({ message: 'Server error while generating download URL' });
   }
 });
 

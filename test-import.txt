@@ -1,0 +1,10 @@
+Test Document Content
+
+This is a test document for importing functionality.
+
+Features to test:
+- File upload
+- Content extraction
+- Document creation
+
+This file should be successfully imported as a new document.

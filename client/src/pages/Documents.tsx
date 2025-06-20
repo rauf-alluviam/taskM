@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FileText, Plus, Search, Calendar, User, FolderOpen, AlertCircle, Trash2 } from 'lucide-react';
+import { FileText, Plus, Search, Calendar, User, FolderOpen, AlertCircle, Trash2, Upload } from 'lucide-react';
 import { documentAPI, projectAPI } from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
@@ -33,12 +33,14 @@ const Documents: React.FC = () => {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('project');
   const { addNotification } = useNotification();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [documents, setDocuments] = useState<Document[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -129,6 +131,100 @@ const Documents: React.FC = () => {
     }
   };
 
+  const onImportDocument = async (file: File) => {
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Only include projectId if it's provided
+      const finalProjectId = projectId;
+      if (finalProjectId) {
+        formData.append('projectId', finalProjectId);
+      }
+
+      console.log('Importing document with file:', file.name);
+      const newDoc = await documentAPI.importDocument(formData);
+      setDocuments([newDoc, ...documents]);
+      addNotification({
+        type: 'success',
+        title: 'Document Imported',
+        message: `"${newDoc.title}" has been imported successfully`,
+      });
+    } catch (error: any) {
+      console.error('Failed to import document:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to import document';
+      addNotification({
+        type: 'error',
+        title: 'Error Importing Document',
+        message: errorMessage,
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Expanded list of allowed file types
+      const allowedTypes = [
+        // Documents
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+        'text/markdown',
+        'application/rtf',
+        // Spreadsheets
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+        // Images
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/bmp',
+        'image/webp',
+        'image/svg+xml',
+        // Presentations
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        // Other
+        'application/json',
+        'text/html',
+        'text/xml',
+        'application/xml'
+      ];
+      
+      if (!allowedTypes.includes(file.type)) {
+        addNotification({
+          type: 'error',
+          title: 'Invalid File Type',
+          message: 'Please select a supported file type (PDF, Word, Excel, PowerPoint, images, text files, etc.).',
+        });
+        return;
+      }
+
+      // Check file size (max 50MB for larger files like images and spreadsheets)
+      if (file.size > 50 * 1024 * 1024) {
+        addNotification({
+          type: 'error',
+          title: 'File Too Large',
+          message: 'File size must be less than 50MB.',
+        });
+        return;
+      }
+
+      onImportDocument(file);
+    }
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const onDeleteDocument = async (documentId: string) => {
     setDeleting(true);
     try {
@@ -189,13 +285,30 @@ const Documents: React.FC = () => {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn-primary btn-md mt-4 sm:mt-0"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {projectId ? 'New Project Document' : 'New Personal Document'}
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,.md,.rtf"
+            onChange={handleFileImport}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="btn-outline btn-md"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {importing ? 'Importing...' : 'Import Document'}
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn-primary btn-md"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {projectId ? 'New Project Document' : 'New Personal Document'}
+          </button>
+        </div>
       </div>
 
       {/* Error Display */}

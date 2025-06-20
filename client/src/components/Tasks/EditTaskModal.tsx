@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { X, Plus, Tag, Calendar, Flag, User, Trash2, List } from 'lucide-react';
+import { X, Plus, Tag, Calendar, Flag, User, Trash2, List, Paperclip } from 'lucide-react';
 import Modal from '../UI/Modal';
 import SubtaskManager from './SubtaskManager';
+import AttachmentManager from '../UI/AttachmentManager';
+import { attachmentAPI } from '../../services/api';
 import { Task } from '../../contexts/TaskContext';
 
 interface TaskFormData {
@@ -36,9 +38,10 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
 }) => {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<TaskFormData>();
-
   useEffect(() => {
     if (task && isOpen) {
       // Pre-fill form with task data
@@ -49,8 +52,26 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
       setValue('startDate', task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '');
       setValue('endDate', task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : '');
       setTags(task.tags || []);
+      
+      // Load attachments
+      loadAttachments();
     }
   }, [task, isOpen, setValue]);
+
+  const loadAttachments = async () => {
+    if (!task) return;
+    
+    setLoadingAttachments(true);
+    try {
+      const taskAttachments = await attachmentAPI.getAttachments('task', task._id);
+      setAttachments(taskAttachments);
+    } catch (error) {
+      console.error('Failed to load attachments:', error);
+      setAttachments([]);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
 
   const priorityOptions = [
     { value: 'low', label: 'Low Priority', color: 'text-green-600', bg: 'bg-green-100' },
@@ -96,11 +117,11 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   const handleFormSubmit = (data: TaskFormData) => {
     onSubmit({ ...data, tags });
   };
-
   const handleClose = () => {
     reset();
     setTags([]);
     setTagInput('');
+    setAttachments([]);
     onClose();
   };
 
@@ -327,15 +348,37 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
             </button>
           </div>
         </div>
-      </form>
-
-      {/* Subtask Manager - Outside of main form to avoid nested forms */}
+      </form>      {/* Subtask Manager - Outside of main form to avoid nested forms */}
       <div className="border-t border-gray-200 pt-6 mt-6">
         <label className="block text-sm font-medium text-gray-700 mb-4">
           <List className="w-4 h-4 inline mr-1" />
           Subtasks
         </label>
         <SubtaskManager parentTask={task} />
+      </div>
+
+      {/* Attachment Manager */}
+      <div className="border-t border-gray-200 pt-6 mt-6">
+        <label className="block text-sm font-medium text-gray-700 mb-4">
+          <Paperclip className="w-4 h-4 inline mr-1" />
+          Attachments
+        </label>
+        {loadingAttachments ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full"></div>
+            <span className="ml-2 text-sm text-gray-600">Loading attachments...</span>
+          </div>
+        ) : (
+          <AttachmentManager
+            attachedTo="task"
+            attachedToId={task._id}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            canUpload={true}
+            canDelete={true}
+            maxFileSize={50}
+          />
+        )}
       </div>
     </Modal>
   );

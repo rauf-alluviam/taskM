@@ -16,10 +16,15 @@ import {
   Redo,
   Type,
   Palette,
-  Settings
+  Settings,
+  Paperclip,
+  Sidebar,
+  X
 } from 'lucide-react';
-import { documentAPI, fileAPI } from '../services/api';
+import { documentAPI, fileAPI, attachmentAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
+import AttachmentManager from '../components/UI/AttachmentManager';
+import DocumentViewer from './DocumentViewer';
 
 interface Document {
   _id: string;
@@ -41,9 +46,12 @@ const DocumentEditor: React.FC = () => {
   const [isPreview, setIsPreview] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
-  const [findText, setFindText] = useState('');
-  const [replaceText, setReplaceText] = useState('');
+  const [findText, setFindText] = useState('');  const [replaceText, setReplaceText] = useState('');
   const [wordCount, setWordCount] = useState(0);
+  const [showAttachmentsSidebar, setShowAttachmentsSidebar] = useState(false);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [isImportedDocument, setIsImportedDocument] = useState(false);
   const quillRef = useRef<ReactQuill>(null);
 
   // Rich text editor configuration
@@ -84,10 +92,10 @@ const DocumentEditor: React.FC = () => {
     'align', 'direction',
     'code-block', 'script'
   ];
-
   useEffect(() => {
     if (id) {
       loadDocument();
+      loadAttachments();
     }
   }, [id]);
 
@@ -103,15 +111,18 @@ const DocumentEditor: React.FC = () => {
     const text = content.replace(/<[^>]*>/g, ''); // Remove HTML tags
     const words = text.trim().split(/\s+/).filter(word => word.length > 0);
     setWordCount(words.length);
-  }, [content]);
-
-  const loadDocument = async () => {
+  }, [content]);  const loadDocument = async () => {
     try {
       setLoading(true);
       const data = await documentAPI.getDocument(id!);
       setDocument(data);
       setTitle(data.title);
       setContent(data.content || '');
+      
+      // Check if this is an imported document
+      const isImported = data.isImported === true || 
+                        (data.content && data.content.includes('This document was imported from a file'));
+      setIsImportedDocument(isImported);
     } catch (error) {
       console.error('Failed to load document:', error);
     } finally {
@@ -241,6 +252,21 @@ const DocumentEditor: React.FC = () => {
     }
   };
 
+  const loadAttachments = async () => {
+    if (!id) return;
+    
+    setLoadingAttachments(true);
+    try {
+      const docAttachments = await attachmentAPI.getAttachments('document', id);
+      setAttachments(docAttachments);
+    } catch (error) {
+      console.error('Failed to load attachments:', error);
+      setAttachments([]);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -248,7 +274,6 @@ const DocumentEditor: React.FC = () => {
       </div>
     );
   }
-
   if (!document) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -261,6 +286,11 @@ const DocumentEditor: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // If this is an imported document with attachments, show the document viewer instead
+  if (isImportedDocument) {
+    return <DocumentViewer />;
   }
 
   return (
@@ -319,13 +349,20 @@ const DocumentEditor: React.FC = () => {
               title="Print (Ctrl+P)"
             >
               <Printer className="w-4 h-4" />
-            </button>
-            <button
+            </button>            <button
               onClick={() => setIsPreview(!isPreview)}
               className={`btn-sm ${isPreview ? 'btn-primary' : 'btn-outline'}`}
             >
               {isPreview ? <Edit className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
               {isPreview ? 'Edit' : 'Preview'}
+            </button>
+            <button
+              onClick={() => setShowAttachmentsSidebar(!showAttachmentsSidebar)}
+              className={`btn-sm ${showAttachmentsSidebar ? 'btn-primary' : 'btn-outline'}`}
+              title="Attachments"
+            >
+              <Paperclip className="w-4 h-4 mr-2" />
+              Attachments ({attachments.length})
             </button>
             <button
               onClick={saveDocument}
@@ -379,40 +416,75 @@ const DocumentEditor: React.FC = () => {
             </button>
           </div>
         </div>
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1 p-6">
-        <div className="max-w-5xl mx-auto">
-          {isPreview ? (
-            /* Preview Mode */
-            <div className="bg-white rounded-lg border border-gray-200 p-8 min-h-[600px] shadow-sm">
-              <h1 className="text-3xl font-bold mb-6 text-gray-900">{title}</h1>
-              <div 
-                className="prose prose-lg max-w-none"
-                dangerouslySetInnerHTML={{ __html: content }}
-              />
-            </div>
-          ) : (
-            /* Edit Mode */
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <ReactQuill
-                ref={quillRef}
-                theme="snow"
-                value={content}
-                onChange={handleContentChange}
-                modules={modules}
-                formats={formats}
-                style={{ 
-                  height: '600px',
-                  marginBottom: '50px'
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Start writing your document..."
-              />
-            </div>
-          )}
+      )}      {/* Main Content */}
+      <div className="flex-1 flex">
+        <div className={`flex-1 p-6 transition-all duration-300 ${showAttachmentsSidebar ? 'mr-80' : ''}`}>
+          <div className="max-w-5xl mx-auto">
+            {isPreview ? (
+              /* Preview Mode */
+              <div className="bg-white rounded-lg border border-gray-200 p-8 min-h-[600px] shadow-sm">
+                <h1 className="text-3xl font-bold mb-6 text-gray-900">{title}</h1>
+                <div 
+                  className="prose prose-lg max-w-none"
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
+              </div>
+            ) : (
+              /* Edit Mode */
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <ReactQuill
+                  ref={quillRef}
+                  theme="snow"
+                  value={content}
+                  onChange={handleContentChange}
+                  modules={modules}
+                  formats={formats}
+                  style={{ 
+                    height: '600px',
+                    marginBottom: '50px'
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Start writing your document..."
+                />
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Attachments Sidebar */}
+        {showAttachmentsSidebar && (
+          <div className="w-80 bg-gray-50 border-l border-gray-200 p-4 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Paperclip className="w-5 h-5 mr-2" />
+                Attachments
+              </h3>
+              <button
+                onClick={() => setShowAttachmentsSidebar(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {loadingAttachments ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full"></div>
+                <span className="ml-2 text-sm text-gray-600">Loading...</span>
+              </div>
+            ) : document ? (
+              <AttachmentManager
+                attachedTo="document"
+                attachedToId={document._id}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                canUpload={true}
+                canDelete={true}
+                maxFileSize={50}
+              />
+            ) : null}
+          </div>
+        )}
       </div>
 
       {/* Footer with Stats */}

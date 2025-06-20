@@ -217,6 +217,22 @@ export const documentAPI = {
       return response.data;
     });
   },
+  importDocument: async (formData: FormData) => {
+    // Don't use retry wrapper for file uploads to avoid timeout issues
+    const response = await api.post('/documents/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 30000, // 30 seconds for file uploads
+    });
+    return response.data;
+  },
+  getDownloadUrl: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/documents/${id}/download`);
+      return response.data;
+    });
+  },
 };
 
 export const kanbanAPI = {
@@ -329,6 +345,51 @@ export const settingsAPI = {
   updateSettings: async (settings: any) => {
     return withRetry(async () => {
       const response = await api.put('/settings', settings);
+      return response.data;
+    });
+  },
+};
+
+export const attachmentAPI = {
+  uploadAttachment: async (file: File, attachedTo: string, attachedToId: string, description?: string) => {
+    // Don't use retry wrapper for file uploads to avoid timeout issues
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('attachedTo', attachedTo);
+    formData.append('attachedToId', attachedToId);
+    if (description) {
+      formData.append('description', description);
+    }
+
+    const response = await api.post('/attachments/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 60000, // 60 seconds for larger file uploads
+    });
+    return response.data;
+  },
+  getAttachments: async (attachedTo: string, attachedToId: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/attachments/${attachedTo}/${attachedToId}`);
+      return response.data;
+    });
+  },
+  getDownloadUrl: async (attachmentId: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/attachments/download/${attachmentId}`);
+      return response.data;
+    });
+  },
+  deleteAttachment: async (attachmentId: string) => {
+    return withRetry(async () => {
+      const response = await api.delete(`/attachments/${attachmentId}`);
+      return response.data;
+    });
+  },
+  updateAttachment: async (attachmentId: string, description: string) => {
+    return withRetry(async () => {
+      const response = await api.patch(`/attachments/${attachmentId}`, { description });
       return response.data;
     });
   },
