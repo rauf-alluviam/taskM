@@ -12,6 +12,7 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { Plus } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
 import { normalizeStatus, statusToDisplayName } from '../../utils/statusMappings';
 import KanbanColumn from './KanbanColumn';
@@ -25,6 +26,7 @@ interface KanbanBoardProps {
   onEditTask?: (task: Task) => void;
   onDeleteTask?: (task: Task) => void;
   columns?: Array<{ id: string; title: string; color: string }>;
+  onManageColumns?: () => void;
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ 
@@ -33,7 +35,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onAddTask, 
   onEditTask, 
   onDeleteTask,
-  columns: propColumns 
+  columns: propColumns,
+  onManageColumns
 }) => {
   console.log('🎯 KanbanBoard received tasks:', tasks.length, tasks.map(t => ({ title: t.title, status: t.status })));
 
@@ -209,6 +212,20 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDeleteTask={onDeleteTask}
             />
           ))}
+          
+          {/* Add Column Button */}
+          {onManageColumns && (
+            <div className="flex-shrink-0 w-72">
+              <button
+                onClick={onManageColumns}
+                className="w-full h-full min-h-[200px] border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-colors duration-200 flex flex-col items-center justify-center text-gray-500 hover:text-gray-700"
+              >
+                <Plus className="w-8 h-8 mb-2" />
+                <span className="font-medium">Add Column</span>
+                <span className="text-sm text-gray-400">Create new stage</span>
+              </button>
+            </div>
+          )}
         </div>
         <DragOverlay>
           {activeTask ? (

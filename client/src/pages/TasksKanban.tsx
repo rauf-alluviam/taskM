@@ -33,7 +33,7 @@ const TasksPage: React.FC = () => {
   const projectIdFromUrl = searchParams.get('project');
     const { tasks, dispatch } = useTask();
   const { addNotification } = useNotification();
-  const socketEmitTimeoutRef = useRef<number | null>(null);
+  const socketEmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [columnsLoading, setColumnsLoading] = useState(false);
@@ -305,8 +305,21 @@ const TasksPage: React.FC = () => {
       setColumnsLoading(true);
       await kanbanAPI.addColumn(newColumn.title, newColumn.color, currentProjectId);
       await loadColumns(); // Reload columns from server
-    } catch (error) {
+      
+      addNotification({
+        type: 'success',
+        title: 'Column Added',
+        message: `"${newColumn.title}" column has been added successfully.`,
+        duration: 3000
+      });
+    } catch (error: any) {
       console.error('Failed to add column:', error);
+      addNotification({
+        type: 'error',
+        title: 'Failed to Add Column',
+        message: error.response?.data?.message || 'Unable to add the new column. Please try again.',
+        duration: 5000
+      });
     } finally {
       setColumnsLoading(false);
     }
@@ -317,8 +330,21 @@ const TasksPage: React.FC = () => {
       setColumnsLoading(true);
       await kanbanAPI.deleteColumn(columnId, currentProjectId);
       await loadColumns(); // Reload columns from server
-    } catch (error) {
+      
+      addNotification({
+        type: 'success',
+        title: 'Column Removed',
+        message: 'Column has been removed successfully.',
+        duration: 3000
+      });
+    } catch (error: any) {
       console.error('Failed to remove column:', error);
+      addNotification({
+        type: 'error',
+        title: 'Failed to Remove Column',
+        message: error.response?.data?.message || 'Unable to remove the column. Please try again.',
+        duration: 5000
+      });
     } finally {
       setColumnsLoading(false);
     }
@@ -625,6 +651,7 @@ const TasksPage: React.FC = () => {
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
             columns={columns}
+            onManageColumns={() => setShowColumnManager(true)}
           />
         ) : (
           <TaskListView

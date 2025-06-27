@@ -59,8 +59,15 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Manage Columns">
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Kanban Columns">
       <div className="space-y-6">
+        {/* Header Description */}
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+          <p className="text-sm text-blue-700">
+            <strong>Customize your workflow:</strong> Add new stages to match your team's process. 
+            Default columns (To Do, In Progress, Review, Done) cannot be removed.
+          </p>
+        </div>
         {/* Current Columns */}
         <div>
           <h3 className="text-sm font-medium text-gray-700 mb-3">Current Columns</h3>
@@ -95,13 +102,16 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
 
         {/* Add New Column */}
         <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Add New Column</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-3">
+            <Plus className="w-4 h-4 inline mr-2" />
+            Add New Column
+          </h3>
           
           <div className="space-y-4">
             {/* Column Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Column Name
+                Column Name *
               </label>
               <input
                 type="text"
@@ -109,7 +119,7 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
                 onChange={(e) => setNewColumnTitle(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="input w-full"
-                placeholder="e.g., Testing, Blocked, Deployed..."
+                placeholder="e.g., Testing, Blocked, Deployed, QA..."
               />
             </div>
 
@@ -151,14 +161,6 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
               Add Column
             </button>
           </div>
-        </div>
-
-        {/* Note */}
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-          <p className="text-sm text-blue-700">
-            <strong>Note:</strong> Default columns (To Do, In Progress, Review, Done) cannot be removed. 
-            Custom columns can be added and removed as needed.
-          </p>
         </div>
 
         {/* Actions */}

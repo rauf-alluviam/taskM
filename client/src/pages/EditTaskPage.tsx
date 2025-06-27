@@ -24,6 +24,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import SubtaskManager from '../components/Tasks/SubtaskManager';
 import AttachmentManager from '../components/UI/AttachmentManager';
+import VoiceEnabledDescription from '../components/UI/VoiceEnabledDescription';
 
 interface TaskFormData {
   title: string;
@@ -356,11 +357,18 @@ const EditTaskPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description
                   </label>
-                  <textarea
-                    {...register('description')}
-                    rows={4}
-                    className="input w-full"
+                  <VoiceEnabledDescription
+                    value={watch('description') || ''}
+                    onChange={(value) => setValue('description', value)}
                     placeholder="Enter task description..."
+                    rows={4}
+                    className=""
+                    onVoiceNoteAdded={() => {
+                      // Auto-save when voice note is added to capture the change in history
+                      setTimeout(() => {
+                        handleSubmit(onSubmit)();
+                      }, 100);
+                    }}
                   />
                 </div>
 
@@ -465,34 +473,34 @@ const EditTaskPage: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Subtasks */}
-            <div className="card">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  <List className="w-5 h-5 inline mr-2" />
-                  Subtasks
-                </h3>
-                <SubtaskManager parentTask={task} />
-              </div>
-            </div>
-
-            {/* Attachments */}
-            <div className="card">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  <Paperclip className="w-5 h-5 inline mr-2" />
-                  Attachments
-                </h3>
-                <AttachmentManager
-                  attachedTo="task"
-                  attachedToId={task._id}
-                  attachments={attachments}
-                  onAttachmentsChange={setAttachments}
-                />
-              </div>
-            </div>
           </form>
+
+          {/* Subtasks - Outside of main form to avoid nested forms */}
+          <div className="card">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <List className="w-5 h-5 inline mr-2" />
+                Subtasks
+              </h3>
+              <SubtaskManager parentTask={task} />
+            </div>
+          </div>
+
+          {/* Attachments - Outside of main form to avoid nested forms */}
+          <div className="card">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <Paperclip className="w-5 h-5 inline mr-2" />
+                Attachments
+              </h3>
+              <AttachmentManager
+                attachedTo="task"
+                attachedToId={task._id}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Task History Sidebar */}

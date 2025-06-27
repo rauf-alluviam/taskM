@@ -13,7 +13,8 @@ const taskHistorySchema = new mongoose.Schema({
       'created',
       'updated',
       'status_changed',
-      'priority_changed',      'assigned',
+      'priority_changed',      
+      'assigned',
       'unassigned',
       'due_date_changed',
       'start_date_changed',
@@ -26,6 +27,7 @@ const taskHistorySchema = new mongoose.Schema({
       'tag_added',
       'tag_removed',
       'description_updated',
+      'voice_note_added',
       'title_updated',
       'deleted'
     ],
@@ -72,7 +74,12 @@ taskHistorySchema.methods.getFormattedDescription = function() {
     case 'title_updated':
       return `${userName} changed title from "${oldValue}" to "${newValue}"`;
     case 'description_updated':
+      if (details === 'Voice note added to description' || details === 'Voice note added to existing description') {
+        return `${userName} added a voice note to the description`;
+      }
       return `${userName} updated the description`;
+    case 'voice_note_added':
+      return `${userName} added a voice note to the description`;
     case 'status_changed':
       return `${userName} changed status from "${oldValue}" to "${newValue}"`;
     case 'priority_changed':

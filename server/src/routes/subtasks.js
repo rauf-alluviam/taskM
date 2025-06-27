@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Subtask from '../models/Subtask.js';
 import Task from '../models/Task.js';
+import TaskHistory from '../models/TaskHistory.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -90,6 +91,13 @@ router.post('/', authenticate, async (req, res) => {
 
     await subtask.save();
     
+    // Log subtask creation
+    await logTaskChange(parentTaskId, 'subtask_added', {
+      field: 'subtasks',
+      newValue: title,
+      details: `Subtask "${title}" created`
+    }, req.user._id, req.user.name);
+    
     const populatedSubtask = await Subtask.findById(subtask._id)
       .populate('assignedTo', 'name email')
       .populate('createdBy', 'name email');
@@ -107,6 +115,12 @@ router.put('/:id', authenticate, async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
+    // Get the current subtask to track changes
+    const currentSubtask = await Subtask.findById(id).populate('parentTaskId', 'title');
+    if (!currentSubtask) {
+      return res.status(404).json({ message: 'Subtask not found' });
+    }
+
     // Handle date conversion
     if (updateData.startDate) {
       updateData.startDate = new Date(updateData.startDate);
@@ -115,7 +129,7 @@ router.put('/:id', authenticate, async (req, res) => {
       updateData.endDate = new Date(updateData.endDate);
     }
 
-    const subtask = await Subtask.findByIdAndUpdate(
+    const updatedSubtask = await Subtask.findByIdAndUpdate(
       id,
       updateData,
       { new: true, runValidators: true }
@@ -123,11 +137,55 @@ router.put('/:id', authenticate, async (req, res) => {
       .populate('assignedTo', 'name email')
       .populate('createdBy', 'name email');
 
-    if (!subtask) {
-      return res.status(404).json({ message: 'Subtask not found' });
+    // Log subtask update
+    const changedFields = [];
+    for (const [field, newValue] of Object.entries(updateData)) {
+      const oldValue = currentSubtask[field];
+      if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+        changedFields.push(field);
+        
+        // Log specific field changes
+        if (field === 'status' && oldValue !== newValue) {
+          if (newValue === 'done') {
+            await logTaskChange(currentSubtask.parentTaskId._id, 'subtask_completed', {
+              field: 'subtasks',
+              newValue: currentSubtask.title,
+              details: `Subtask "${currentSubtask.title}" marked as completed`
+            }, req.user._id, req.user.name);
+          } else {
+            await logTaskChange(currentSubtask.parentTaskId._id, 'subtask_updated', {
+              field: 'subtasks',
+              details: `Subtask "${currentSubtask.title}" status changed from "${oldValue}" to "${newValue}"`
+            }, req.user._id, req.user.name);
+          }
+        } else if (field === 'title' && oldValue !== newValue) {
+          await logTaskChange(currentSubtask.parentTaskId._id, 'subtask_updated', {
+            field: 'subtasks',
+            details: `Subtask title changed from "${oldValue}" to "${newValue}"`
+          }, req.user._id, req.user.name);
+        } else if (field === 'description' && oldValue !== newValue) {
+          await logTaskChange(currentSubtask.parentTaskId._id, 'subtask_updated', {
+            field: 'subtasks',
+            details: `Subtask "${currentSubtask.title}" description updated`
+          }, req.user._id, req.user.name);
+        } else if (field === 'priority' && oldValue !== newValue) {
+          await logTaskChange(currentSubtask.parentTaskId._id, 'subtask_updated', {
+            field: 'subtasks',
+            details: `Subtask "${currentSubtask.title}" priority changed from "${oldValue}" to "${newValue}"`
+          }, req.user._id, req.user.name);
+        }
+      }
     }
 
-    res.json(subtask);
+    // Generic update log if multiple fields changed
+    if (changedFields.length > 1) {
+      await logTaskChange(currentSubtask.parentTaskId._id, 'subtask_updated', {
+        field: 'subtasks',
+        details: `Subtask "${currentSubtask.title}" updated (${changedFields.join(', ')})`
+      }, req.user._id, req.user.name);
+    }
+
+    res.json(updatedSubtask);
   } catch (error) {
     console.error('Error updating subtask:', error);
     res.status(500).json({ message: 'Failed to update subtask', error: error.message });
@@ -139,10 +197,21 @@ router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const subtask = await Subtask.findByIdAndDelete(id);
+    // Get the subtask before deletion to log history
+    const subtask = await Subtask.findById(id).populate('parentTaskId', 'title');
     if (!subtask) {
       return res.status(404).json({ message: 'Subtask not found' });
     }
+
+    // Log subtask deletion
+    await logTaskChange(subtask.parentTaskId._id, 'subtask_deleted', {
+      field: 'subtasks',
+      oldValue: subtask.title,
+      details: `Subtask "${subtask.title}" deleted`
+    }, req.user._id, req.user.name);
+
+    // Delete the subtask
+    await Subtask.findByIdAndDelete(id);
 
     res.json({ message: 'Subtask deleted successfully' });
   } catch (error) {
@@ -218,3 +287,13 @@ router.get('/task/:taskId/stats', authenticate, async (req, res) => {
 });
 
 export default router;
+
+// Helper function to log task changes
+async function logTaskChange(taskId, action, data, userId, userName) {
+  try {
+    await TaskHistory.logChange(taskId, action, data, userId, userName);
+  } catch (error) {
+    console.error('Error logging task change:', error);
+    // Don't throw error to prevent breaking the main operation
+  }
+}
