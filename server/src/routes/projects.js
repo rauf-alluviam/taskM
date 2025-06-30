@@ -284,6 +284,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 // Add member to project
 router.post('/:id/members', authenticate, [
   body('userId').isMongoId().withMessage('Valid user ID is required'),
+  body('role').optional().isIn(['org_admin', 'member', 'viewer']).withMessage('Valid role is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -297,21 +298,37 @@ router.post('/:id/members', authenticate, [
     }
 
     // Check if user has permission to add members
-    const canAddMembers = project.createdBy.equals(req.user._id) || req.user.role === 'admin';
+    const canAddMembers = project.isAdmin(req.user._id) || 
+                         req.user.role === 'super_admin' ||
+                         (req.user.organization && req.user.isOrganizationAdmin());
     if (!canAddMembers) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const { userId } = req.body;
+    const { userId, role = 'member' } = req.body;
+
+    // Check if user exists and is in the same organization (if applicable)
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check organization membership if project belongs to an organization
+    if (project.organization && (!user.organization || !user.organization.equals(project.organization))) {
+      return res.status(400).json({ message: 'User must be part of the same organization' });
+    }
 
     // Check if user is already a member
-    if (project.members.includes(userId)) {
+    if (project.isMember(userId)) {
       return res.status(400).json({ message: 'User is already a member' });
     }
 
-    project.members.push(userId);
+    // Add member using the model method
+    project.addMember(userId, role, req.user._id);
     await project.save();
-    await project.populate('members', 'name email');
+    
+    await project.populate('members.user', 'name email');
 
     res.json(project);
   } catch (error) {
@@ -329,22 +346,74 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
     }
 
     // Check if user has permission to remove members
-    const canRemoveMembers = project.createdBy.equals(req.user._id) || req.user.role === 'admin';
+    const canRemoveMembers = project.isAdmin(req.user._id) || 
+                            req.user.role === 'super_admin' ||
+                            (req.user.organization && req.user.isOrganizationAdmin());
     if (!canRemoveMembers) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    project.members = project.members.filter(
-      member => !member.equals(req.params.userId)
-    );
-    
+    const { userId } = req.params;
+
+    // Cannot remove project creator
+    if (project.createdBy.equals(userId)) {
+      return res.status(400).json({ message: 'Cannot remove project creator' });
+    }
+
+    // Remove member using the model method
+    project.removeMember(userId);
     await project.save();
-    await project.populate('members', 'name email');
+    
+    await project.populate('members.user', 'name email');
 
     res.json(project);
   } catch (error) {
     console.error('Remove member error:', error);
     res.status(500).json({ message: 'Server error while removing member' });
+  }
+});
+
+// Update member role
+router.put('/:id/members/:userId/role', authenticate, [
+  body('role').isIn(['admin', 'member', 'viewer']).withMessage('Valid role is required'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if user has permission to update member roles
+    const canUpdateRoles = project.isAdmin(req.user._id) || 
+                          req.user.role === 'super_admin' ||
+                          (req.user.organization && req.user.isOrganizationAdmin());
+    if (!canUpdateRoles) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    // Cannot change creator's role
+    if (project.createdBy.equals(userId)) {
+      return res.status(400).json({ message: 'Cannot change project creator role' });
+    }
+
+    // Update member role using the model method
+    project.updateMemberRole(userId, role);
+    await project.save();
+
+    await project.populate('members.user', 'name email');
+
+    res.json(project);
+  } catch (error) {
+    console.error('Update member role error:', error);
+    res.status(500).json({ message: 'Server error while updating member role' });
   }
 });
 

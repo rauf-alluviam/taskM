@@ -42,6 +42,9 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    console.log('🔑 Adding auth token to request:', config.url, `Bearer ${token.substring(0, 20)}...`);
+  } else {
+    console.log('❌ No token found for request:', config.url);
   }
   return config;
 });
@@ -191,6 +194,24 @@ export const projectAPI = {
       return response.data;
     });
   },
+  addMember: async (projectId: string, userId: string, role: string = 'member') => {
+    return withRetry(async () => {
+      const response = await api.post(`/projects/${projectId}/members`, { userId, role });
+      return response.data;
+    });
+  },
+  removeMember: async (projectId: string, userId: string) => {
+    return withRetry(async () => {
+      const response = await api.delete(`/projects/${projectId}/members/${userId}`);
+      return response.data;
+    });
+  },
+  updateMemberRole: async (projectId: string, userId: string, role: string) => {
+    return withRetry(async () => {
+      const response = await api.put(`/projects/${projectId}/members/${userId}/role`, { role });
+      return response.data;
+    });
+  },
 };
 
 export const documentAPI = {
@@ -321,6 +342,24 @@ export const userAPI = {
       return response.data;
     });
   },
+  getOrganizationUsers: async (orgId: string, options?: {
+    excludeProject?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    return withRetry(async () => {
+      const params = new URLSearchParams();
+      if (options?.excludeProject) params.append('excludeProject', options.excludeProject);
+      if (options?.search) params.append('search', options.search);
+      if (options?.page) params.append('page', options.page.toString());
+      if (options?.limit) params.append('limit', options.limit.toString());
+      
+      const url = `/users/organization/${orgId}${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await api.get(url);
+      return response.data;
+    });
+  },
   getUsers: async () => {
     return withRetry(async () => {
       const response = await api.get('/users');
@@ -336,6 +375,13 @@ export const userAPI = {
   getAllUsers: async () => {
     return withRetry(async () => {
       const response = await api.get('/users');
+      return response.data;
+    });
+  },
+  // Simple API to get all users for member selection
+  getAllUsersForSelection: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/users/members-selection');
       return response.data;
     });
   },

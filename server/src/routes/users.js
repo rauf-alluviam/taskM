@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import User from '../models/User.js';
-import { protect, admin } from '../middleware/auth.js';
+import { authenticate, admin } from '../middleware/auth.js';
 import { uploadToS3, getSignedUrl } from '../services/s3Service.js';
 
 const router = express.Router();
@@ -35,7 +35,7 @@ const avatarUpload = multer({
 });
 
 // Get current user profile
-router.get('/me', protect, async (req, res) => {
+router.get('/me', authenticate, async (req, res) => {
   try {
     const user = await User.findById(req.user._id, '-password')
       .populate('organization', 'name _id')
@@ -64,7 +64,7 @@ router.get('/me', protect, async (req, res) => {
 });
 
 // Update current user profile
-router.put('/me', protect, async (req, res) => {
+router.put('/me', authenticate, async (req, res) => {
   try {
     const { name, email, mobile, organization } = req.body;
     const userId = req.user._id;
@@ -100,8 +100,53 @@ router.put('/me', protect, async (req, res) => {
   }
 });
 
+// Get all users for member selection (simple API)
+router.get('/members-selection', authenticate, async (req, res) => {
+  try {
+    console.log('Getting all users for member selection');
+    
+    // Simple query to get all active users
+    const users = await User.find(
+      { 
+        isActive: { $ne: false },
+        status: { $ne: 'suspended' }
+      }, 
+      'name email avatar role userType organization createdAt'
+    )
+    .populate('organization', 'name')
+    .sort({ name: 1 })
+    .limit(100); // Reasonable limit for dropdown
+
+    console.log(`Found ${users.length} users`);
+
+    // Generate signed URLs for avatars
+    const usersWithAvatars = await Promise.all(
+      users.map(async (user) => {
+        const userObj = user.toObject();
+        if (user.avatar) {
+          try {
+            userObj.avatarUrl = await getSignedUrl(user.avatar);
+          } catch (error) {
+            console.error('Error generating avatar URL:', error);
+            userObj.avatarUrl = null;
+          }
+        }
+        return userObj;
+      })
+    );
+
+    res.json({
+      users: usersWithAvatars,
+      count: usersWithAvatars.length
+    });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ message: 'Server error while fetching users' });
+  }
+});
+
 // Upload avatar for current user
-router.post('/me/avatar', protect, avatarUpload.single('avatar'), async (req, res) => {
+router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No avatar file provided' });
@@ -146,7 +191,7 @@ router.post('/me/avatar', protect, avatarUpload.single('avatar'), async (req, re
 });
 
 // Get all users (admin only)
-router.get('/', protect, admin, async (req, res) => {
+router.get('/', authenticate, admin, async (req, res) => {
   try {
     const users = await User.find({}, '-password').sort({ createdAt: -1 });
     res.json(users);
@@ -156,7 +201,7 @@ router.get('/', protect, admin, async (req, res) => {
 });
 
 // Get user by ID
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
     const user = await User.findById(req.params.id, '-password');
     if (!user) {
@@ -182,7 +227,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // Create new user (admin only)
-router.post('/', protect, admin, async (req, res) => {
+router.post('/', authenticate, admin, async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
@@ -206,7 +251,7 @@ router.post('/', protect, admin, async (req, res) => {
 });
 
 // Update user
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   try {
     const { name, email, mobile, organization, role } = req.body;
     const userId = req.params.id;
@@ -258,7 +303,7 @@ router.put('/:id', protect, async (req, res) => {
 });
 
 // Delete user (admin only)
-router.delete('/:id', protect, admin, async (req, res) => {
+router.delete('/:id', authenticate, admin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {

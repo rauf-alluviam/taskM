@@ -32,8 +32,32 @@ export interface Project {
   description: string;
   department: string;
   createdBy: string;
+  organization?: {
+    _id: string;
+    name: string;
+  };
+  team?: {
+    _id: string;
+    name: string;
+  };
+  visibility: 'private' | 'team' | 'organization' | 'public';
+  projectType: 'individual' | 'team' | 'organization';
+  members: Array<{
+    user: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    role: 'admin' | 'member' | 'viewer';
+    addedAt: Date;
+    addedBy: string;
+  }>;
   documents: string[];
   kanbanColumns: { name: string; order: number; _id: string }[];
+  tags: string[];
+  color: string;
+  icon: string;
+  status: 'active' | 'paused' | 'completed' | 'archived';
   createdAt: Date;
   updatedAt: Date;
 }
