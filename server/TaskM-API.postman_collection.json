@@ -1,0 +1,178 @@
+{
+  "info": {
+    "_postman_id": "d1e1b1c2-1234-5678-9abc-def012345678",
+    "name": "TaskM API Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "API requests for EXIM TaskM server (tasks, organizations, projects, teams, users)"
+  },
+  "item": [
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alice@org.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Get All Tasks",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/tasks",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tasks"]
+        }
+      }
+    },
+    {
+      "name": "Create Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Sample Task\",\n  \"description\": \"Task description\",\n  \"priority\": \"medium\",\n  \"status\": \"todo\",\n  \"tags\": [\"urgent\", \"frontend\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tasks",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tasks"]
+        }
+      }
+    },
+    {
+      "name": "Get All Projects",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/projects",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "projects"]
+        }
+      }
+    },
+    {
+      "name": "Create Project",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sample Project\",\n  \"description\": \"Project description\",\n  \"department\": \"Engineering\",\n  \"status\": \"active\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/projects",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "projects"]
+        }
+      }
+    },
+    {
+      "name": "Get All Teams",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/teams",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "teams"]
+        }
+      }
+    },
+    {
+      "name": "Create Team",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sample Team\",\n  \"description\": \"Team description\",\n  \"organization\": \"<organizationId>\",\n  \"lead\": \"<userId>\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/teams",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "teams"]
+        }
+      }
+    },
+    {
+      "name": "Get All Organizations",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/organizations",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "organizations"]
+        }
+      }
+    },
+    {
+      "name": "Create Organization",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sample Organization\",\n  \"description\": \"Organization description\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/organizations",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "organizations"]
+        }
+      }
+    },
+    {
+      "name": "Get All Users",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "token", "value": "" }
+  ]
+}

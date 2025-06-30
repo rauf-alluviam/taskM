@@ -68,7 +68,9 @@ router.post('/login', [
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email })
+      .populate('organization', 'name _id')
+      .populate('teams.team', 'name _id');
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }

@@ -20,6 +20,8 @@ import analyticsRoutes from './routes/analytics.js';
 import settingsRoutes from './routes/settings.js';
 import subtaskRoutes from './routes/subtasks.js';
 import attachmentRoutes from './routes/attachments.js';
+import organizationRoutes from './routes/organizations.js';
+import teamRoutes from './routes/teams.js';
 
 dotenv.config();
 
@@ -94,6 +96,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/subtasks', subtaskRoutes);
 app.use('/api/attachments', attachmentRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/teams', teamRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

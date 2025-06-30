@@ -8,7 +8,11 @@ import {
   Settings,
   X,
   Users,
-  BarChart3
+  BarChart3,
+  Building2,
+  UserCog,
+  Crown,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -20,13 +24,24 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
 
+  // Check user permissions for navigation items
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'org_admin';
+  const isTeamLead = user?.role === 'team_lead';
+  const hasOrganization = user?.organization;
+
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    ...(hasOrganization ? [
+      { name: 'Organization', href: '/organization', icon: Building2 },
+      { name: 'Teams', href: '/teams', icon: Users },
+    ] : [
+      { name: 'Create Organization', href: '/organization/create', icon: Building2 },
+    ]),
     { name: 'Projects', href: '/projects', icon: FolderOpen },
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Documents', href: '/documents', icon: FileText },
-    ...(user?.role === 'admin' ? [
-      { name: 'Users', href: '/users', icon: Users },
+    ...(isAdmin ? [
+      { name: 'User Management', href: '/users', icon: UserCog },
       { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     ] : []),
     { name: 'Settings', href: '/settings', icon: Settings },
@@ -95,12 +110,22 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.name}
+                <div className="flex items-center space-x-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user?.name}
+                  </p>
+                  {user?.role === 'super_admin' && <Crown className="w-4 h-4 text-yellow-600" />}
+                  {user?.role === 'org_admin' && <Shield className="w-4 h-4 text-blue-600" />}
+                </div>
+                <p className="text-xs text-gray-500 capitalize truncate">
+                  {user?.role?.replace('_', ' ')} 
+                  {user?.organization && ` • ${user.organization.name}`}
                 </p>
-                <p className="text-xs text-gray-500 capitalize">
-                  {user?.role}
-                </p>
+                {user?.teams && user.teams.length > 0 && (
+                  <p className="text-xs text-gray-400">
+                    {user.teams.length} team{user.teams.length > 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
             </div>
           </div>

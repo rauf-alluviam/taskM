@@ -1,0 +1,110 @@
+{
+  "info": {
+    "_postman_id": "d1e1b1c2-1234-5678-9abc-def012345678",
+    "name": "TaskM Full API Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "All API endpoints for EXIM TaskM server, generated from the project routes."
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Register", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@org.com\",\n  \"password\": \"password123\",\n  \"name\": \"Test User\"\n}" }, "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] } } },
+        { "name": "Login", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"email\": \"alice@org.com\",\n  \"password\": \"password123\"\n}" }, "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] } } }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        { "name": "Get All Tasks", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/tasks", "host": ["{{baseUrl}}"], "path": ["api", "tasks"] } } },
+        { "name": "Get Task By ID", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/tasks/:id", "host": ["{{baseUrl}}"], "path": ["api", "tasks", ":id"] } } },
+        { "name": "Create Task", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Sample Task\",\n  \"description\": \"Task description\",\n  \"priority\": \"medium\",\n  \"status\": \"todo\",\n  \"tags\": [\"urgent\", \"frontend\"]\n}" }, "url": { "raw": "{{baseUrl}}/api/tasks", "host": ["{{baseUrl}}"], "path": ["api", "tasks"] } } }
+      ]
+    },
+    {
+      "name": "Subtasks",
+      "item": [
+        { "name": "Get Subtasks for Task", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/subtasks/task/:taskId", "host": ["{{baseUrl}}"], "path": ["api", "subtasks", "task", ":taskId"] } } },
+        { "name": "Get Subtask By ID", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/subtasks/:id", "host": ["{{baseUrl}}"], "path": ["api", "subtasks", ":id"] } } },
+        { "name": "Create Subtask", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Sample Subtask\",\n  \"parentTaskId\": \"<taskId>\",\n  \"priority\": \"medium\"\n}" }, "url": { "raw": "{{baseUrl}}/api/subtasks", "host": ["{{baseUrl}}"], "path": ["api", "subtasks"] } } }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        { "name": "Get All Projects", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/projects", "host": ["{{baseUrl}}"], "path": ["api", "projects"] } } },
+        { "name": "Get Project By ID", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/projects/:id", "host": ["{{baseUrl}}"], "path": ["api", "projects", ":id"] } } },
+        { "name": "Create Project", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Project\",\n  \"description\": \"Project description\",\n  \"department\": \"Engineering\",\n  \"status\": \"active\"\n}" }, "url": { "raw": "{{baseUrl}}/api/projects", "host": ["{{baseUrl}}"], "path": ["api", "projects"] } } }
+      ]
+    },
+    {
+      "name": "Teams",
+      "item": [
+        { "name": "Get All Teams", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/teams", "host": ["{{baseUrl}}"], "path": ["api", "teams"] } } },
+        { "name": "Get Team By ID", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/teams/:id", "host": ["{{baseUrl}}"], "path": ["api", "teams", ":id"] } } },
+        { "name": "Create Team", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Team\",\n  \"description\": \"Team description\",\n  \"organization\": \"<organizationId>\",\n  \"lead\": \"<userId>\"\n}" }, "url": { "raw": "{{baseUrl}}/api/teams", "host": ["{{baseUrl}}"], "path": ["api", "teams"] } } }
+      ]
+    },
+    {
+      "name": "Organizations",
+      "item": [
+        { "name": "Get All Organizations", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/organizations", "host": ["{{baseUrl}}"], "path": ["api", "organizations"] } } },
+        { "name": "Get Organization By ID", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/organizations/:id", "host": ["{{baseUrl}}"], "path": ["api", "organizations", ":id"] } } },
+        { "name": "Create Organization", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sample Organization\",\n  \"description\": \"Organization description\"\n}" }, "url": { "raw": "{{baseUrl}}/api/organizations", "host": ["{{baseUrl}}"], "path": ["api", "organizations"] } } }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        { "name": "Get All Users", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/users", "host": ["{{baseUrl}}"], "path": ["api", "users"] } } },
+        { "name": "Get User Profile", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/users/me", "host": ["{{baseUrl}}"], "path": ["api", "users", "me"] } } }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        { "name": "Get All Documents", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/documents", "host": ["{{baseUrl}}"], "path": ["api", "documents"] } } },
+        { "name": "Get Document By ID", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/documents/:id", "host": ["{{baseUrl}}"], "path": ["api", "documents", ":id"] } } },
+        { "name": "Create Document", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Sample Document\",\n  \"project\": \"<projectId>\"\n}" }, "url": { "raw": "{{baseUrl}}/api/documents", "host": ["{{baseUrl}}"], "path": ["api", "documents"] } } }
+      ]
+    },
+    {
+      "name": "Attachments",
+      "item": [
+        { "name": "Test Attachment Route", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/attachments/test", "host": ["{{baseUrl}}"], "path": ["api", "attachments", "test"] } } },
+        { "name": "Get Attachment By ID", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/attachments/test-attachment/:id", "host": ["{{baseUrl}}"], "path": ["api", "attachments", "test-attachment", ":id"] } } }
+      ]
+    },
+    {
+      "name": "Files",
+      "item": [
+        { "name": "Upload File", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/files/upload", "host": ["{{baseUrl}}"], "path": ["api", "files", "upload"] } } }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        { "name": "General Analytics", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/analytics", "host": ["{{baseUrl}}"], "path": ["api", "analytics"] } } },
+        { "name": "Task Analytics", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/analytics/tasks", "host": ["{{baseUrl}}"], "path": ["api", "analytics", "tasks"] } } }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        { "name": "Get User Settings", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/settings", "host": ["{{baseUrl}}"], "path": ["api", "settings"] } } },
+        { "name": "Update User Settings", "request": { "method": "PUT", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"profile\": {\n    \"name\": \"New Name\"\n  }\n}" }, "url": { "raw": "{{baseUrl}}/api/settings", "host": ["{{baseUrl}}"], "path": ["api", "settings"] } } }
+      ]
+    },
+    {
+      "name": "Kanban",
+      "item": [
+        { "name": "Get Kanban Columns", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": { "raw": "{{baseUrl}}/api/kanban/columns", "host": ["{{baseUrl}}"], "path": ["api", "kanban", "columns"] } } },
+        { "name": "Update Kanban Columns", "request": { "method": "PUT", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\n  \"projectId\": \"<projectId>\",\n  \"columns\": []\n}" }, "url": { "raw": "{{baseUrl}}/api/kanban/columns", "host": ["{{baseUrl}}"], "path": ["api", "kanban", "columns"] } } }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "token", "value": "" }
+  ]
+}

@@ -12,8 +12,14 @@ import EditTaskPage from './pages/EditTaskPage';
 import Documents from './pages/Documents';
 import DocumentEditor from './pages/DocumentEditor';
 import Users from './pages/Users';
+import UserManagement from './pages/UserManagement';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import OrganizationDashboard from './pages/OrganizationDashboard';
+import OrganizationSettings from './pages/OrganizationSettings';
+import CreateOrganization from './pages/CreateOrganization';
+import Teams from './pages/Teams';
+import TeamDetail from './pages/TeamDetail';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 
 function App() {
@@ -42,13 +48,21 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/organization" element={<OrganizationDashboard />} />
+          <Route path="/organization/settings" element={<OrganizationSettings />} />
+          <Route path="/organization/create" element={<CreateOrganization />} />
+          <Route path="/teams" element={<Teams />} />
+          <Route path="/teams/create" element={<Teams />} />
+          <Route path="/teams/:id" element={<TeamDetail />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/create" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/tasks" element={<TasksKanban />} />
           <Route path="/tasks/:id/edit" element={<EditTaskPage />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/documents/:id" element={<DocumentEditor />} />
           <Route path="/users" element={<Users />} />
+          <Route path="/user-management" element={<UserManagement />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/login" element={<Navigate to="/dashboard" replace />} />

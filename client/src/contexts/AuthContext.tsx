@@ -3,14 +3,27 @@ import { authAPI } from '../services/api';
 import { socketService } from '../services/socket';
 
 interface User {
+  _id: string;
   id: string;
   email: string;
   name: string;
   mobile?: string;
-  organization?: string;
-  role: 'admin' | 'manager' | 'member';
+  organization?: {
+    _id: string;
+    name: string;
+  };
+  role: 'super_admin' | 'org_admin' | 'team_lead' | 'member' | 'viewer';
   avatar?: string;
   department?: string;
+  teams?: Array<{
+    team: {
+      _id: string;
+      name: string;
+    };
+    role: string;
+    joinedAt: Date;
+  }>;
+  status?: 'active' | 'inactive' | 'pending' | 'suspended';
 }
 
 interface AuthState {

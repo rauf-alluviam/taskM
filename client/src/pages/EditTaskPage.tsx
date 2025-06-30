@@ -353,7 +353,7 @@ const EditTaskPage: React.FC = () => {
                 </div>
 
                 {/* Description */}
-                <div className="mb-4">
+                <div className="mb-4 ">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description
                   </label>
@@ -361,8 +361,8 @@ const EditTaskPage: React.FC = () => {
                     value={watch('description') || ''}
                     onChange={(value) => setValue('description', value)}
                     placeholder="Enter task description..."
-                    rows={4}
-                    className=""
+                    rows={6}
+                    className="min-h-[150px]"
                     onVoiceNoteAdded={() => {
                       // Auto-save when voice note is added to capture the change in history
                       setTimeout(() => {

@@ -37,7 +37,9 @@ const avatarUpload = multer({
 // Get current user profile
 router.get('/me', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id, '-password');
+    const user = await User.findById(req.user._id, '-password')
+      .populate('organization', 'name _id')
+      .populate('teams.team', 'name _id');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -209,22 +211,31 @@ router.put('/:id', protect, async (req, res) => {
     const { name, email, mobile, organization, role } = req.body;
     const userId = req.params.id;
 
-    // Check if user can update this profile
-    if (req.user.role !== 'admin' && req.user._id.toString() !== userId) {
-      return res.status(403).json({ message: 'Not authorized to update this user' });
-    }
-
+    // Fetch user to update
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Permission logic
+    const isSelf = req.user._id.toString() === userId;
+    const isSuperAdmin = req.user.role === 'super_admin';
+    const isOrgAdmin = req.user.role === 'org_admin';
+    const sameOrg = req.user.organization && user.organization && req.user.organization.toString() === user.organization.toString();
+
+    if (!isSelf && !isSuperAdmin && !(isOrgAdmin && sameOrg)) {
+      return res.status(403).json({ message: 'Not authorized to update this user' });
     }
 
     // Update fields
     if (name !== undefined) user.name = name;
     if (email !== undefined) user.email = email;
     if (mobile !== undefined) user.mobile = mobile;
-    if (organization !== undefined) user.organization = organization;
-    if (role && req.user.role === 'admin') user.role = role; // Only admin can change roles    await user.save();
+    if (organization !== undefined && (isSuperAdmin || (isOrgAdmin && sameOrg))) user.organization = organization;
+    // Only super_admin or org_admin can change roles, and only within their org
+    if (role && (isSuperAdmin || (isOrgAdmin && sameOrg))) user.role = role;
+
+    await user.save();
 
     // Remove password from response
     const userResponse = user.toObject();

@@ -9,20 +9,47 @@ const router = express.Router();
 // Get all projects
 router.get('/', authenticate, async (req, res) => {
   try {
-    const filter = {};
+    const filter = { isActive: true };
     
-    // Non-admin users can only see projects they created or are members of
-    if (req.user.role !== 'admin') {
+    // Build access filter based on user type and organization
+    if (req.user.role === 'super_admin') {
+      // Super admin can see all projects
+    } else if (req.user.organization) {
+      // Organization members can see:
+      // 1. Projects they created or are members of
+      // 2. Organization-wide projects (if they are org admin)
+      // 3. Team projects they have access to
+      const accessConditions = [
+        { createdBy: req.user._id },
+        { 'members.user': req.user._id }
+      ];
+
+      // If user is org admin, they can see all organization projects
+      if (req.user.isOrganizationAdmin()) {
+        accessConditions.push({ organization: req.user.organization });
+      } else {
+        // Regular users can see team projects they're part of
+        const userTeams = req.user.teams.map(t => t.team);
+        if (userTeams.length > 0) {
+          accessConditions.push({ team: { $in: userTeams } });
+        }
+      }
+
+      filter.$or = accessConditions;
+    } else {
+      // Individual users can only see projects they created or are members of
       filter.$or = [
         { createdBy: req.user._id },
-        { members: req.user._id },
+        { 'members.user': req.user._id },
       ];
     }
 
     const projects = await Project.find(filter)
       .populate('createdBy', 'name email')
-      .populate('members', 'name email')
-      .sort({ createdAt: -1 });
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email')
+      .sort({ updatedAt: -1 });
 
     res.json(projects);
   } catch (error) {
@@ -36,7 +63,9 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
       .populate('createdBy', 'name email')
-      .populate('members', 'name email')
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email')
       .populate('documents');
 
     if (!project) {
@@ -44,9 +73,40 @@ router.get('/:id', authenticate, async (req, res) => {
     }
 
     // Check if user has access to this project
-    const hasAccess = project.createdBy._id.equals(req.user._id) ||
-                     project.members.some(member => member._id.equals(req.user._id)) ||
-                     req.user.role === 'admin';
+    let hasAccess = false;
+
+    // Super admin has access to everything
+    if (req.user.role === 'super_admin') {
+      hasAccess = true;
+    }
+    // Project creator has access
+    else if (project.createdBy._id.equals(req.user._id)) {
+      hasAccess = true;
+    }
+    // Project members have access
+    else if (project.members.some(member => member.user._id.equals(req.user._id))) {
+      hasAccess = true;
+    }
+    // Organization members have access to organization projects
+    else if (project.organization && req.user.organization && 
+             project.organization.equals(req.user.organization)) {
+      // Org admins can access all org projects
+      if (req.user.isOrganizationAdmin()) {
+        hasAccess = true;
+      }
+      // Team members can access team projects
+      else if (project.team && req.user.isMemberOfTeam(project.team)) {
+        hasAccess = true;
+      }
+      // Organization visibility allows all org members
+      else if (project.visibility === 'organization') {
+        hasAccess = true;
+      }
+    }
+    // Public projects are accessible to all
+    else if (project.visibility === 'public') {
+      hasAccess = true;
+    }
 
     if (!hasAccess) {
       return res.status(403).json({ message: 'Access denied' });
@@ -64,6 +124,8 @@ router.post('/', authenticate, [
   body('name').trim().isLength({ min: 1 }).withMessage('Project name is required'),
   body('description').optional().trim(),
   body('department').trim().isLength({ min: 1 }).withMessage('Department is required'),
+  body('teamId').optional().isMongoId().withMessage('Valid team ID required'),
+  body('visibility').optional().isIn(['private', 'team', 'organization', 'public']),
   body('kanbanColumns').optional().isArray(),
 ], async (req, res) => {
   try {
@@ -76,27 +138,76 @@ router.post('/', authenticate, [
       name,
       description,
       department,
+      teamId,
+      visibility = 'team',
       members = [],
       kanbanColumns = [
-        { name: 'todo', order: 0 },
-        { name: 'in-progress', order: 1 },
-        { name: 'review', order: 2 },
-        { name: 'done', order: 3 },
+        { name: 'To Do', order: 0 },
+        { name: 'In Progress', order: 1 },
+        { name: 'Review', order: 2 },
+        { name: 'Done', order: 3 },
       ],
+      tags = [],
+      color = '#3B82F6',
+      icon = 'folder'
     } = req.body;
 
+    let projectType = 'individual';
+    let organization = null;
+    let team = null;
+
+    // Determine project type and associations based on user's context
+    if (req.user.organization) {
+      organization = req.user.organization;
+      projectType = teamId ? 'team' : 'organization';
+
+      // If teamId is provided, validate it
+      if (teamId) {
+        const Team = (await import('../models/Team.js')).default;
+        const teamDoc = await Team.findById(teamId);
+        if (!teamDoc) {
+          return res.status(404).json({ message: 'Team not found' });
+        }
+
+        // Check if user is part of this team or is org admin
+        if (!teamDoc.isMember(req.user._id) && !teamDoc.isLead(req.user._id) && !req.user.isOrganizationAdmin()) {
+          return res.status(403).json({ message: 'Access denied to this team' });
+        }
+
+        team = teamId;
+      }
+    }
+
     const project = new Project({
-      name,
+      name: name.trim(),
       description,
       department,
+      organization,
+      team,
+      visibility,
+      projectType,
       createdBy: req.user._id,
-      members,
-      kanbanColumns,
+      members: members.map(memberId => ({
+        user: memberId,
+        role: 'member',
+        addedAt: new Date(),
+        addedBy: req.user._id
+      })),
+      kanbanColumns: kanbanColumns.map((col, index) => ({
+        name: col.name || col.title,
+        order: col.order !== undefined ? col.order : index
+      })),
+      tags,
+      color,
+      icon
     });
 
     await project.save();
+    
     await project.populate('createdBy', 'name email');
-    await project.populate('members', 'name email');
+    await project.populate('organization', 'name');
+    await project.populate('team', 'name');
+    await project.populate('members.user', 'name email');
 
     res.status(201).json(project);
   } catch (error) {

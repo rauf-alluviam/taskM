@@ -333,6 +333,12 @@ export const userAPI = {
       return response.data;
     });
   },
+  getAllUsers: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/users');
+      return response.data;
+    });
+  },
   updateUser: async (userId: string, userData: any) => {
     return withRetry(async () => {
       const response = await api.put(`/users/${userId}`, userData);
@@ -384,7 +390,7 @@ export const settingsAPI = {
 };
 
 export const attachmentAPI = {
-  uploadAttachment: async (file: File, attachedTo: string, attachedToId: string, description?: string) => {
+  upload: async (file: File, attachedTo: string, attachedToId: string, description?: string) => {
     // Don't use retry wrapper for file uploads to avoid timeout issues
     const formData = new FormData();
     formData.append('file', file);
@@ -423,6 +429,140 @@ export const attachmentAPI = {
   updateAttachment: async (attachmentId: string, description: string) => {
     return withRetry(async () => {
       const response = await api.patch(`/attachments/${attachmentId}`, { description });
+      return response.data;
+    });
+  },
+};
+
+// Organization API
+export const organizationAPI = {
+  getMyOrganization: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/organizations/my-organization');
+      return response.data;
+    });
+  },
+  getOrganization: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/organizations/${id}`);
+      return response.data;
+    });
+  },
+  createOrganization: async (data: any) => {
+    return withRetry(async () => {
+      const response = await api.post('/organizations', data);
+      return response.data;
+    });
+  },
+  updateOrganization: async (id: string, data: any) => {
+    return withRetry(async () => {
+      const response = await api.put(`/organizations/${id}`, data);
+      return response.data;
+    });
+  },
+  getMembers: async (id: string, params?: any) => {
+    return withRetry(async () => {
+      const response = await api.get(`/organizations/${id}/members`, { params });
+      return response.data;
+    });
+  },
+  addAdmin: async (orgId: string, userId: string) => {
+    return withRetry(async () => {
+      const response = await api.post(`/organizations/${orgId}/admins`, { userId });
+      return response.data;
+    });
+  },
+  removeAdmin: async (orgId: string, userId: string) => {
+    return withRetry(async () => {
+      const response = await api.delete(`/organizations/${orgId}/admins/${userId}`);
+      return response.data;
+    });
+  },
+  inviteMembers: async (orgId: string, data: any) => {
+    return withRetry(async () => {
+      const response = await api.post(`/organizations/${orgId}/invite`, data);
+      return response.data;
+    });
+  },
+  getStats: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/organizations/${id}/stats`);
+      return response.data;
+    });
+  },
+  deleteOrganization: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.delete(`/organizations/${id}`);
+      return response.data;
+    });
+  },
+};
+
+// Team API
+export const teamAPI = {
+  getTeams: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/teams');
+      return response.data;
+    });
+  },
+  getMyTeams: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/teams/my-teams');
+      return response.data;
+    });
+  },
+  getTeam: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/teams/${id}`);
+      return response.data;
+    });
+  },
+  createTeam: async (data: any) => {
+    return withRetry(async () => {
+      const response = await api.post('/teams', data);
+      return response.data;
+    });
+  },
+  updateTeam: async (id: string, data: any) => {
+    return withRetry(async () => {
+      const response = await api.put(`/teams/${id}`, data);
+      return response.data;
+    });
+  },
+  addMember: async (teamId: string, userId: string, role?: string) => {
+    return withRetry(async () => {
+      const response = await api.post(`/teams/${teamId}/members`, { userId, role });
+      return response.data;
+    });
+  },
+  removeMember: async (teamId: string, userId: string) => {
+    return withRetry(async () => {
+      const response = await api.delete(`/teams/${teamId}/members/${userId}`);
+      return response.data;
+    });
+  },
+  updateMemberRole: async (teamId: string, userId: string, role: string) => {
+    return withRetry(async () => {
+      const response = await api.put(`/teams/${teamId}/members/${userId}/role`, { role });
+      return response.data;
+    });
+  },
+  getTeamProjects: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/teams/${id}/projects`);
+      return response.data;
+    });
+  },
+  getTeamStats: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/teams/${id}/stats`);
+      return response.data;
+    });
+  },
+  deleteTeam: async (id: string) => {
+    return withRetry(async () => {
+      const response = await api.delete(`/teams/${id}`);
       return response.data;
     });
   },

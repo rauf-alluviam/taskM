@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, FolderOpen, Calendar, MoreVertical, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { useTask, Project } from '../contexts/TaskContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { projectAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { projectAPI, teamAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 import ProjectFilters, { ProjectFilters as ProjectFiltersType } from '../components/Filters/ProjectFilters';
@@ -13,13 +14,22 @@ interface ProjectForm {
   name: string;
   description: string;
   department: string;
+  teamId?: string;
+  visibility: 'private' | 'team' | 'organization' | 'public';
 }
 
 const Projects: React.FC = () => {
   const { projects, dispatch } = useTask();
   const { addNotification } = useNotification();
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const teamIdFromUrl = searchParams.get('team');
+  
   const [loading, setLoading] = useState(true);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [filters, setFilters] = useState<ProjectFiltersType>({
     search: '',
     department: '',
@@ -32,11 +42,34 @@ const Projects: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProjectForm>();
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProjectForm>();
 
   useEffect(() => {
     loadProjects();
-  }, []);
+    loadTeams();
+    
+    // Set default team if coming from team page
+    if (teamIdFromUrl) {
+      setValue('teamId', teamIdFromUrl);
+      setValue('visibility', 'team');
+    }
+    
+    // Auto-open create modal if accessing /projects/create
+    if (location.pathname === '/projects/create') {
+      setShowCreateModal(true);
+    }
+  }, [teamIdFromUrl, location.pathname]);
+
+  const loadTeams = async () => {
+    if (!user?.organization) return;
+    
+    try {
+      const data = await teamAPI.getTeams();
+      setTeams(data);
+    } catch (error) {
+      console.error('Failed to load teams:', error);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = () => setDropdownOpen(null);
@@ -94,6 +127,12 @@ const Projects: React.FC = () => {
       dispatch({ type: 'ADD_PROJECT', payload: newProject });
       reset();
       setShowCreateModal(false);
+      
+      // Navigate back to /projects if we came from /projects/create
+      if (location.pathname === '/projects/create') {
+        navigate('/projects', { replace: true });
+      }
+      
       addNotification({
         type: 'success',
         title: 'Project Created',
@@ -135,6 +174,15 @@ const Projects: React.FC = () => {
         message: errorMessage,
         duration: 5000
       });
+    }
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    reset();
+    // If we came from /projects/create route, navigate back to /projects
+    if (location.pathname === '/projects/create') {
+      navigate('/projects', { replace: true });
     }
   };
 
@@ -316,7 +364,7 @@ const Projects: React.FC = () => {
       {/* Create Project Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={handleCloseCreateModal}
         title="Create New Project"
         size="md"
       >
@@ -372,10 +420,56 @@ const Projects: React.FC = () => {
             )}
           </div>
 
+          {/* Team Selection */}
+          {user?.organization && teams.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Team
+              </label>
+              <select {...register('teamId')} className="input w-full">
+                <option value="">No specific team (Organization-wide)</option>
+                {teams.map((team) => (
+                  <option key={team._id} value={team._id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Select a team to create a team-specific project
+              </p>
+            </div>
+          )}
+
+          {/* Visibility Settings */}
+          {user?.organization && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Project Visibility *
+              </label>
+              <select {...register('visibility', { required: 'Visibility is required' })} className="input w-full">
+                <option value="private">Private - Only you and invited members</option>
+                <option value="team">Team - All team members can access</option>
+                <option value="organization">Organization - All organization members can view</option>
+                <option value="public">Public - Anyone can view (if enabled)</option>
+              </select>
+              {errors.visibility && (
+                <p className="mt-1 text-sm text-error-600">{errors.visibility.message}</p>
+              )}
+              <div className="mt-2 text-xs text-gray-500">
+                <div className="space-y-1">
+                  <p>• <strong>Private:</strong> Only project members can access</p>
+                  <p>• <strong>Team:</strong> All team members can participate</p>
+                  <p>• <strong>Organization:</strong> All organization members can view</p>
+                  <p>• <strong>Public:</strong> Anyone with the link can view</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
               type="button"
-              onClick={() => setShowCreateModal(false)}
+              onClick={handleCloseCreateModal}
               className="btn-outline btn-md"
             >
               Cancel

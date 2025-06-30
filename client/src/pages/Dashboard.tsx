@@ -8,18 +8,22 @@ import {
   TrendingUp,
   AlertCircle,
   Clock,
-  Plus
+  Plus,
+  FileText,
+  Building2
 } from 'lucide-react';
 import { useTask } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { taskAPI, projectAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
+import CreateOrganizationModal from '../components/UI/CreateOrganizationModal';
 import { debounce } from '../utils/debounce';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const { tasks, projects, dispatch } = useTask();
   const [loading, setLoading] = useState(true);
+  const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
   const [stats, setStats] = useState({
     totalTasks: 0,
     completedTasks: 0,
@@ -141,8 +145,41 @@ const Dashboard: React.FC = () => {
           Welcome back, {user?.name}! 👋
         </h1>
         <p className="text-primary-100 text-lg">
-          Here's what's happening with your projects today.
+          Here's what's happening with your {user?.organization ? 'team' : 'projects'} today.
         </p>
+        {user?.organization && (
+          <div className="flex items-center space-x-4 mt-4 text-sm">
+            <span className="bg-primary-400 px-3 py-1 rounded-full">
+              {user.organization.name}
+            </span>
+            {user.teams && user.teams.length > 0 && (
+              <span className="text-primary-100">
+                Member of {user.teams.length} team{user.teams.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        )}
+        
+        {/* Create Organization CTA for individual users */}
+        {!user?.organization && (
+          <div className="mt-6 p-4 bg-primary-400 bg-opacity-50 rounded-lg border border-primary-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1">Ready to collaborate?</h3>
+                <p className="text-primary-100 text-sm">
+                  Create an organization to invite team members and collaborate on projects
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCreateOrgModal(true)}
+                className="btn bg-white text-primary-600 hover:bg-gray-100 btn-md"
+              >
+                <Building2 className="w-4 h-4 mr-2" />
+                Create Organization
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -283,7 +320,7 @@ const Dashboard: React.FC = () => {
       {/* Quick Actions */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${user?.organization ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
           <Link to="/tasks" className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all">
             <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
               <CheckSquare className="w-5 h-5 text-primary-600" />
@@ -303,18 +340,68 @@ const Dashboard: React.FC = () => {
               <p className="text-sm text-gray-500">Start a project</p>
             </div>
           </Link>
+
+          {user?.organization && (
+            <>
+              <Link to="/teams/create" className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Create Team</p>
+                  <p className="text-sm text-gray-500">Start a new team</p>
+                </div>
+              </Link>
+              
+              <Link to="/teams" className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">View Teams</p>
+                  <p className="text-sm text-gray-500">Manage teams</p>
+                </div>
+              </Link>
+            </>
+          )}
           
           <Link to="/documents" className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-accent-300 hover:bg-accent-50 transition-all">
             <div className="w-10 h-10 bg-accent-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-accent-600" />
+              <FileText className="w-5 h-5 text-accent-600" />
             </div>
             <div>
-              <p className="font-medium text-gray-900">Team Meeting</p>
-              <p className="text-sm text-gray-500">Schedule meeting</p>
+              <p className="font-medium text-gray-900">New Document</p>
+              <p className="text-sm text-gray-500">Create document</p>
             </div>
           </Link>
+
+          {/* Show this action only for individual users without an organization */}
+          {!user?.organization && (
+            <button 
+              onClick={() => setShowCreateOrgModal(true)} 
+              className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-all w-full"
+            >
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-green-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900">Create Organization</p>
+                <p className="text-sm text-gray-500">Establish your organization</p>
+              </div>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Create Organization Modal */}
+      <CreateOrganizationModal 
+        isOpen={showCreateOrgModal} 
+        onClose={() => setShowCreateOrgModal(false)}
+        onSuccess={() => {
+          // Refresh the page or reload user data to show the new organization
+          window.location.reload();
+        }}
+      />
     </div>
   );
 };

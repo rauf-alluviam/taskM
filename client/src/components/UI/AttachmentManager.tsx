@@ -111,7 +111,7 @@ const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const uploadFile = async (file: File, description?: string) => {
     setUploading(true);
     try {
-      const result = await attachmentAPI.uploadAttachment(
+      const result = await attachmentAPI.upload(
         file,
         attachedTo,
         attachedToId,
