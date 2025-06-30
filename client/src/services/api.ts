@@ -436,6 +436,12 @@ export const attachmentAPI = {
 
 // Organization API
 export const organizationAPI = {
+  getAllOrganizations: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/organizations');
+      return response.data;
+    });
+  },
   getMyOrganization: async () => {
     return withRetry(async () => {
       const response = await api.get('/organizations/my-organization');

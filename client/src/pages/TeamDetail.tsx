@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { teamAPI, projectAPI } from '../services/api';
+import { teamAPI, projectAPI, organizationAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 import { useForm } from 'react-hook-form';
@@ -65,6 +65,11 @@ interface UpdateRoleForm {
   role: 'member' | 'viewer';
 }
 
+interface AddMemberForm {
+  userId: string;
+  role: 'member' | 'viewer';
+}
+
 const TeamDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -74,14 +79,18 @@ const TeamDetail: React.FC = () => {
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpdateRoleModal, setShowUpdateRoleModal] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+  const [organizationMembers, setOrganizationMembers] = useState<any[]>([]);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<UpdateRoleForm>();
+  const { register: registerMember, handleSubmit: handleSubmitMember, reset: resetMember, formState: { errors: memberErrors } } = useForm<AddMemberForm>();
 
   useEffect(() => {
     if (id) {
       loadTeamDetail();
+      loadOrganizationMembers();
     }
   }, [id]);
 
@@ -164,6 +173,43 @@ const TeamDetail: React.FC = () => {
     setShowUpdateRoleModal(true);
   };
 
+  const loadOrganizationMembers = async () => {
+    if (!user?.organization?._id) {
+      setOrganizationMembers([]);
+      return;
+    }
+    
+    try {
+      const members = await organizationAPI.getMembers(user.organization._id);
+      setOrganizationMembers(members.members || []);
+    } catch (error) {
+      console.error('Failed to load organization members:', error);
+      setOrganizationMembers([]);
+    }
+  };
+
+  const onAddMember = async (data: AddMemberForm) => {
+    if (!team) return;
+
+    try {
+      await teamAPI.addMember(team._id, data.userId, data.role);
+      addNotification({
+        type: 'success',
+        title: 'Member Added',
+        message: 'Team member added successfully',
+      });
+      resetMember();
+      setShowAddMemberModal(false);
+      loadTeamDetail(); // Refresh team data
+    } catch (error: any) {
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: error.response?.data?.message || 'Failed to add member',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -239,7 +285,10 @@ const TeamDetail: React.FC = () => {
         <div className="flex items-center space-x-3">
           {canManageTeam && (
             <>
-              <button className="btn-outline btn-md">
+              <button 
+                onClick={() => setShowAddMemberModal(true)}
+                className="btn-outline btn-md"
+              >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Add Member
               </button>
@@ -301,7 +350,10 @@ const TeamDetail: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Team Members</h2>
               {canManageTeam && (
-                <button className="btn-primary btn-sm">
+                <button 
+                  onClick={() => setShowAddMemberModal(true)}
+                  className="btn-primary btn-sm"
+                >
                   <UserPlus className="w-4 h-4 mr-2" />
                   Add Member
                 </button>
@@ -524,6 +576,83 @@ const TeamDetail: React.FC = () => {
               className="btn-primary btn-md"
             >
               Update Role
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Member Modal */}
+      <Modal
+        isOpen={showAddMemberModal}
+        onClose={() => {
+          setShowAddMemberModal(false);
+          resetMember();
+        }}
+        title={`Add Member to ${team?.name}`}
+        size="md"
+      >
+        <form onSubmit={handleSubmitMember(onAddMember)} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Select Member *
+            </label>
+            <select 
+              {...registerMember('userId', { required: 'Please select a member' })} 
+              className="input w-full"
+            >
+              <option value="">Choose a member...</option>
+              {(organizationMembers || [])
+                .filter(member => 
+                  !team?.members?.some(teamMember => teamMember.user._id === member._id)
+                )
+                .map((member) => (
+                  <option key={member._id} value={member._id}>
+                    {member.name} - {member.email}
+                  </option>
+                ))}
+            </select>
+            {memberErrors.userId && (
+              <p className="mt-1 text-sm text-red-600">{memberErrors.userId.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Role *
+            </label>
+            <select {...registerMember('role', { required: 'Role is required' })} className="input w-full">
+              <option value="member">Member</option>
+              <option value="viewer">Viewer</option>
+            </select>
+            {memberErrors.role && (
+              <p className="mt-1 text-sm text-red-600">{memberErrors.role.message}</p>
+            )}
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-blue-900 mb-2">Role Permissions:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• <strong>Member:</strong> Can create and edit tasks, participate in projects</li>
+              <li>• <strong>Viewer:</strong> Can view projects and tasks only</li>
+            </ul>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddMemberModal(false);
+                resetMember();
+              }}
+              className="btn-outline btn-md"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary btn-md"
+            >
+              Add Member
             </button>
           </div>
         </form>

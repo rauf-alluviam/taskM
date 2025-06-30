@@ -31,6 +31,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    ...(user?.role === 'super_admin' ? [
+      { name: 'All Organizations', href: '/organizations', icon: Building2 },
+    ] : []),
     ...(hasOrganization ? [
       { name: 'Organization', href: '/organization', icon: Building2 },
       { name: 'Teams', href: '/teams', icon: Users },

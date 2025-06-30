@@ -21,7 +21,23 @@ router.get('/', authenticate, async (req, res) => {
       .populate('admins', 'name email')
       .sort({ createdAt: -1 });
 
-    res.json(organizations);
+    // Add member count and project count for each organization
+    const organizationsWithStats = await Promise.all(
+      organizations.map(async (org) => {
+        const memberCount = await User.countDocuments({ organization: org._id, isActive: true });
+        const teamCount = await Team.countDocuments({ organization: org._id, isActive: true });
+        const projectCount = await Project.countDocuments({ organization: org._id, isActive: true });
+        
+        return {
+          ...org.toObject(),
+          memberCount,
+          teamCount,
+          projectCount
+        };
+      })
+    );
+
+    res.json(organizationsWithStats);
   } catch (error) {
     console.error('Get organizations error:', error);
     res.status(500).json({ message: 'Server error while fetching organizations' });

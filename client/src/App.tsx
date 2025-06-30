@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import OrganizationDashboard from './pages/OrganizationDashboard';
 import OrganizationSettings from './pages/OrganizationSettings';
 import CreateOrganization from './pages/CreateOrganization';
+import AllOrganizations from './pages/AllOrganizations';
 import Teams from './pages/Teams';
 import TeamDetail from './pages/TeamDetail';
 import LoadingSpinner from './components/UI/LoadingSpinner';
@@ -51,6 +52,7 @@ function App() {
           <Route path="/organization" element={<OrganizationDashboard />} />
           <Route path="/organization/settings" element={<OrganizationSettings />} />
           <Route path="/organization/create" element={<CreateOrganization />} />
+          <Route path="/organizations" element={<AllOrganizations />} />
           <Route path="/teams" element={<Teams />} />
           <Route path="/teams/create" element={<Teams />} />
           <Route path="/teams/:id" element={<TeamDetail />} />
