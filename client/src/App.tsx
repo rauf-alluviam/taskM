@@ -22,6 +22,7 @@ import AllOrganizations from './pages/AllOrganizations';
 import Teams from './pages/Teams';
 import TeamDetail from './pages/TeamDetail';
 import LoadingSpinner from './components/UI/LoadingSpinner';
+import VerifyEmail from './pages/VerifyEmail';
 
 function App() {
   const { user, loading } = useAuth();
@@ -38,6 +39,7 @@ function App() {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );

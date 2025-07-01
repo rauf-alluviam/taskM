@@ -116,6 +116,17 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  // Email verification fields
+  verified_email: {
+    type: Boolean,
+    default: false,
+  },
+  emailVerificationToken: {
+    type: String,
+  },
+  emailVerificationTokenExpires: {
+    type: Date,
+  },
 }, {
   timestamps: true,
 });

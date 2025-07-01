@@ -90,6 +90,18 @@ export const authAPI = {
       return response.data;
     });
   },
+  verifyEmail: async (token: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/auth/verify-email?token=${token}`);
+      return response.data;
+    });
+  },
+  resendVerification: async (email: string) => {
+    return withRetry(async () => {
+      const response = await api.post('/auth/resend-verification', { email });
+      return response.data;
+    });
+  },
 };
 
 export const taskAPI = {

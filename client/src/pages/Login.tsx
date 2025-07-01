@@ -18,9 +18,10 @@ interface RegisterForm extends LoginForm {
 const Login: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, register: registerUser, loading, error, clearError } = useAuth();
+  const { login, register: registerUser, loading, error, clearError, emailVerificationRequired, emailForVerification, resendVerification, clearVerificationState } = useAuth();
   
   const { register, handleSubmit, watch, formState: { errors }, reset } = useForm<RegisterForm>();
+  const [resent, setResent] = useState(false);
 
   const onSubmit = async (data: RegisterForm) => {
     clearError();
@@ -39,6 +40,13 @@ const Login: React.FC = () => {
     setIsLogin(!isLogin);
     reset();
     clearError();
+  };
+
+  const handleResend = async () => {
+    if (emailForVerification) {
+      await resendVerification(emailForVerification);
+      setResent(true);
+    }
   };
 
   return (
@@ -61,6 +69,27 @@ const Login: React.FC = () => {
             {error && (
               <div className="bg-error-50 border border-error-200 rounded-md p-3">
                 <p className="text-sm text-error-600">{error}</p>
+              </div>
+            )}
+            {emailVerificationRequired && emailForVerification && (
+              <div className="bg-warning-50 border border-warning-200 rounded-md p-3 flex flex-col items-center">
+                <p className="text-sm text-warning-700 mb-2">Your email is not verified. Please check your inbox for a verification link.</p>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={handleResend}
+                  disabled={loading || resent}
+                >
+                  {resent ? 'Verification Email Sent' : 'Resend Verification Email'}
+                </button>
+                {resent && <p className="text-xs text-success-600 mt-2">Verification email resent. Please check your inbox.</p>}
+                <button
+                  type="button"
+                  className="text-xs text-gray-500 mt-2 underline"
+                  onClick={() => { clearVerificationState(); setResent(false); }}
+                >
+                  Back to Login
+                </button>
               </div>
             )}
 
