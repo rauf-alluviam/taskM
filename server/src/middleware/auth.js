@@ -18,6 +18,16 @@ export const authenticate = async (req, res, next) => {
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'Invalid token or user not found.' });
     }
+    
+    // Check email verification status
+    if (!user.verified_email && 
+        !req.path.includes('/auth/verify-email') && 
+        !req.path.includes('/auth/resend-verification')) {
+      return res.status(403).json({ 
+        message: 'Your email is not verified. Please verify to continue.',
+        resend: true
+      });
+    }
 
     req.user = user;
     next();

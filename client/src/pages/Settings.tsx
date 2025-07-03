@@ -81,6 +81,9 @@ const Settings: React.FC = () => {
     { id: 'preferences', name: 'Preferences', icon: Palette },
     { id: 'privacy', name: 'Privacy', icon: Shield },
   ] as const;
+  
+  // Check if user has admin role to show email settings link
+  const isAdmin = true; // This should be replaced with actual role check from context
 
   return (
     <div className="space-y-6">

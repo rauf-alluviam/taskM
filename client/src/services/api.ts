@@ -19,7 +19,7 @@ const getRetryDelay = (attempt: number) => INITIAL_RETRY_DELAY * Math.pow(2, att
 const isRetryableError = (error: any) => {
   if (!error.response) return true; // Network errors are retryable
   const status = error.response.status;
-  return status === 429 || status >= 500; // Retry on rate limit and server errors
+  return status >= 500; // Only retry on server errors, not 429
 };
 
 // Retry wrapper function
@@ -57,16 +57,6 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
-    
-    // Log rate limit info for debugging
-    if (error.response?.status === 429) {
-      console.warn('Rate limit exceeded. Response:', error.response.data);
-      const retryAfter = error.response.headers['retry-after'];
-      if (retryAfter) {
-        console.warn(`Retry after: ${retryAfter} seconds`);
-      }
-    }
-    
     throw error;
   }
 );
@@ -91,14 +81,28 @@ export const authAPI = {
     });
   },
   verifyEmail: async (token: string) => {
+    // No retry for email verification to avoid multiple verifications
+    const response = await api.get(`/auth/verify-email?token=${token}`);
+    return response.data;
+  },
+  resendVerification: async (email: string, force: boolean = false) => {
     return withRetry(async () => {
-      const response = await api.get(`/auth/verify-email?token=${token}`);
+      const response = await api.post('/auth/resend-verification', { email, force });
       return response.data;
     });
   },
-  resendVerification: async (email: string) => {
+};
+
+export const emailAPI = {
+  testConnection: async () => {
     return withRetry(async () => {
-      const response = await api.post('/auth/resend-verification', { email });
+      const response = await api.get('/email/test-connection');
+      return response.data;
+    });
+  },
+  sendTestEmail: async (data: { recipient: string; subject?: string; content?: string }) => {
+    return withRetry(async () => {
+      const response = await api.post('/email/send-test', data);
       return response.data;
     });
   },

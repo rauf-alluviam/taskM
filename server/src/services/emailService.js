@@ -1,23 +1,89 @@
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT),
-    secure: process.env.SMTP_SECURE === 'true', // false for 587, true for 465
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+// Determine if we should use a real email service or the mock service
+// Use real emails in production and when explicitly set to false
+const USE_MOCK_EMAIL = process.env.USE_MOCK_EMAIL === 'true';
+
+// Log email configuration (for debugging)
+console.log('📧 Email configuration:', {
+  useMock: USE_MOCK_EMAIL,
+  host: process.env.MAIL_SERVER,
+  port: process.env.MAIL_PORT,
+  secure: process.env.MAIL_PORT === '465',
+  user: process.env.MAIL_USERNAME,
+  from: process.env.MAIL_FROM || process.env.FROM_EMAIL
+});
+
+// Create transporter based on configuration
+let transporter;
+
+if (USE_MOCK_EMAIL) {
+  // Create logs directory if it doesn't exist
+  const logsDir = path.join(process.cwd(), 'email_logs');
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
+  
+  console.log('📧 Using MOCK email service. Emails will be logged to:', logsDir);
+  
+  // Mock transporter that logs emails to files instead of sending them
+  transporter = {
+    async sendMail(mailOptions) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `email-${timestamp}-${mailOptions.to}.html`;
+      const filePath = path.join(logsDir, filename);
+      
+      const logData = {
+        timestamp: new Date().toISOString(),
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html
+      };
+      
+      // Save email content to file
+      fs.writeFileSync(filePath, mailOptions.html);
+      
+      // Save email metadata to a JSON file
+      fs.writeFileSync(
+        filePath + '.json', 
+        JSON.stringify(logData, null, 2)
+      );
+      
+      console.log(`📧 Mock email sent to ${mailOptions.to} (Subject: ${mailOptions.subject})`);
+      console.log(`📄 Email content saved to ${filePath}`);
+      
+      return {
+        messageId: `mock-${timestamp}@taskm.local`,
+        mock: true
+      };
     },
-    // Additional options for Office365
+    async verify() {
+      return true;
+    }
+  };
+} else {
+  // Real transporter using configured SMTP settings
+  transporter = nodemailer.createTransport({
+    host: process.env.MAIL_SERVER || process.env.SMTP_HOST,
+    port: parseInt(process.env.MAIL_PORT || process.env.SMTP_PORT || '587'),
+    secure: process.env.MAIL_PORT === '465', // true for 465, false for other ports
+    auth: {
+      user: process.env.MAIL_USERNAME || process.env.SMTP_USER,
+      pass: process.env.MAIL_PASSWORD || process.env.SMTP_PASS,
+    },
     tls: {
-      ciphers: 'SSLv3',
       rejectUnauthorized: false
     }
   });
-  
+}
 
-const FROM_EMAIL = process.env.FROM_EMAIL ;
-const DOMAIN = process.env.DOMAIN;
+const FROM_EMAIL = process.env.MAIL_FROM || process.env.FROM_EMAIL || 'noreply@taskm.com';
+const DOMAIN = process.env.DOMAIN || 'http://localhost:3000';
 
 const testConnection = async () => {
     try {

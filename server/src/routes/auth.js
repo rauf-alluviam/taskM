@@ -16,6 +16,7 @@ router.post('/register', [
   body('name').trim().isLength({ min: 2 }),
 ], async (req, res) => {
   try {
+    console.log('📝 Registration request:', req.body);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -34,29 +35,39 @@ router.post('/register', [
       email,
       password,
       name,
-      role: ['admin', 'manager', 'member'].includes(role) ? role : 'member',
+      role: ['admin', 'manager', 'member', 'viewer'].includes(role) ? role : 'member',
+      verified_email: false, // Explicitly set to false (though it's the default)
     });
 
-    // Generate email verification token
+    // Generate secure random email verification token
     const token = crypto.randomBytes(32).toString('hex');
     user.emailVerificationToken = token;
     user.emailVerificationTokenExpires = Date.now() + 1000 * 60 * 60; // 1 hour
     await user.save();
 
-    // Send verification email
-    await emailService.sendVerificationEmail(user.email, token);
+    console.log(`📧 Sending verification email to ${user.email}...`);
+    try {
+      // Send verification email
+      await emailService.sendVerificationEmail(user.email, token);
+      console.log(`✅ Verification email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      // Delete the user if email sending fails to maintain data consistency
+      await User.findByIdAndDelete(user._id);
+      return res.status(500).json({ 
+        message: 'Failed to send verification email. Please try again.',
+        error: emailError.message 
+      });
+    }
 
-    // Generate JWT token
-    const tokenJWT = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '7d' }
-    );
-
+    // DO NOT generate JWT token for unverified users
+    // They must verify email first before they can log in
+    
     res.status(201).json({
-      message: 'User created successfully. Please verify your email.',
-      user: user.toJSON(),
-      token,
+      message: 'Registration successful. Please check your email to verify your account before logging in.',
+      email: user.email,
+      verificationSent: true,
+      // No token provided - user must verify email first
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -159,37 +170,106 @@ router.put('/profile', authenticate, [
 
 // Email verification route
 router.get('/verify-email', async (req, res) => {
-  const { token } = req.query;
-  if (!token) return res.status(400).json({ message: 'Invalid or missing token.' });
-  const user = await User.findOne({ emailVerificationToken: token, emailVerificationTokenExpires: { $gt: Date.now() } });
-  if (!user) return res.status(400).json({ message: 'Invalid or expired token.' });
-  user.verified_email = true;
-  user.emailVerificationToken = undefined;
-  user.emailVerificationTokenExpires = undefined;
-  await user.save();
-  res.json({ message: 'Email verified successfully. You can now log in.' });
+  try {
+    const { token } = req.query;
+    
+    if (!token) {
+      return res.status(400).json({ message: 'Invalid or missing token.' });
+    }
+    
+    // Find user with valid token
+    const user = await User.findOne({ 
+      emailVerificationToken: token, 
+      emailVerificationTokenExpires: { $gt: Date.now() } 
+    });
+    
+    if (!user) {
+      // Check if token exists but expired
+      const expiredUser = await User.findOne({ emailVerificationToken: token });
+      if (expiredUser) {
+        return res.status(400).json({ 
+          message: 'Verification token has expired. Please request a new one.',
+          expired: true
+        });
+      }
+      return res.status(400).json({ message: 'Invalid verification token.' });
+    }
+    
+    // Mark email as verified
+    user.verified_email = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationTokenExpires = undefined;
+    await user.save();
+    
+    // Generate a JWT token so the user can be logged in immediately
+    const tokenJWT = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
+    );
+    
+    res.json({ 
+      message: 'Email verified successfully. You can now log in.',
+      verified: true,
+      token: tokenJWT
+    });
+  } catch (error) {
+    console.error('Error verifying email:', error);
+    res.status(500).json({ message: 'Server error during email verification.' });
+  }
 });
 
 // Resend verification email
 router.post('/resend-verification', async (req, res) => {
-  const { email } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: 'User not found.' });
-  if (user.verified_email) return res.status(400).json({ message: 'Email already verified.' });
-  // Limit resend: only allow if last token expired or not sent in last 5 min
-  if (user.emailVerificationTokenExpires && user.emailVerificationTokenExpires > Date.now() && user.emailVerificationToken) {
-    const timeLeft = user.emailVerificationTokenExpires - Date.now();
-    if (timeLeft > 1000 * 60 * 5) {
-      return res.status(429).json({ message: 'Please wait before requesting another verification email.' });
+  try {
+    console.log('📧 Resend verification email request:', req.body);
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
     }
+    
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    if (user.verified_email) return res.status(400).json({ message: 'Email already verified.' });
+    
+   
+
+    // Generate new token
+    const token = crypto.randomBytes(32).toString('hex');
+    user.emailVerificationToken = token;
+    user.emailVerificationTokenExpires = Date.now() + 1000 * 60 * 60; // 1 hour
+    
+    // Try to send verification email before saving the token
+    try {
+      console.log(`📧 Sending verification email to ${user.email}...`);
+      await emailService.sendVerificationEmail(user.email, token);
+      console.log(`✅ Verification email sent to ${user.email}`);
+      
+      // Only save the token if the email was sent successfully
+      await user.save();
+      
+      res.json({ 
+        message: 'Verification email sent successfully.',
+        expiresAt: user.emailVerificationTokenExpires,
+      });
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError);
+      res.status(500).json({ 
+        message: 'Failed to send verification email',
+        error: emailError.message,
+        // Don't apply rate limiting for server errors
+        //canRetryImmediately: true
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error resending verification email:', error);
+    res.status(500).json({ 
+      message: 'Failed to resend verification email',
+      error: error.message,
+      // Don't apply rate limiting for server errors
+      canRetryImmediately: true
+    });
   }
-  // Generate new token
-  const token = crypto.randomBytes(32).toString('hex');
-  user.emailVerificationToken = token;
-  user.emailVerificationTokenExpires = Date.now() + 1000 * 60 * 60; // 1 hour
-  await user.save();
-  await emailService.sendVerificationEmail(user.email, token);
-  res.json({ message: 'Verification email resent.' });
 });
 
 export default router;

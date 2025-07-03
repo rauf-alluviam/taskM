@@ -175,7 +175,7 @@ Organizations
 ```bash
 # Email configuration for invitations
 SMTP_HOST=your-smtp-host
-SMTP_PORT=587
+SMTP_PORT=2525
 SMTP_USER=your-email
 SMTP_PASS=your-password
 

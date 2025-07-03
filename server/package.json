@@ -22,6 +22,8 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.3"
+    "@types/nodemailer": "^6.4.17",
+    "nodemon": "^3.0.3",
+    "smtp-server": "^3.14.0"
   }
 }

@@ -22,6 +22,8 @@ import subtaskRoutes from './routes/subtasks.js';
 import attachmentRoutes from './routes/attachments.js';
 import organizationRoutes from './routes/organizations.js';
 import teamRoutes from './routes/teams.js';
+// Import email routes
+import emailRoutes from './routes/email.js';
 
 dotenv.config();
 
@@ -72,9 +74,7 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Connect to MongoDB
-// ...existing code...
-// Connect to MongoDB
+
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/taskflow', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -98,6 +98,7 @@ app.use('/api/subtasks', subtaskRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/teams', teamRoutes);
+app.use('/api/email', emailRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

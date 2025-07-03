@@ -29,7 +29,10 @@ const Login: React.FC = () => {
       if (isLogin) {
         await login(data.email, data.password);
       } else {
-        await registerUser(data.email, data.password, data.name);
+        const result = await registerUser(data.email, data.password, data.name);
+        // Don't automatically redirect to dashboard after registration
+        // User will get verification email and need to verify first
+        console.log('Registration successful:', result);
       }
     } catch (err) {
       // Error is handled by context

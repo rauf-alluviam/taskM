@@ -71,7 +71,14 @@ interface AuthContextType extends AuthState {
   register: (email: string, password: string, name: string, role?: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
-  resendVerification: (email: string) => Promise<void>;
+  resendVerification: (email: string, force?: boolean) => Promise<{
+    success: boolean, 
+    rateLimited?: boolean, 
+    waitTimeSeconds?: number,
+    canRetryImmediately?: boolean,
+    serverError?: boolean,
+    message?: string
+  }>;
   clearVerificationState: () => void;
 }
 
@@ -125,11 +132,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Connect socket with authentication
       socketService.connect(token);
     } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.resend) {
+      if (error.response?.data?.resend) {
+        // This means email is not verified
         dispatch({ type: 'EMAIL_VERIFICATION_REQUIRED', payload: email });
-        dispatch({ type: 'SET_ERROR', payload: error.response.data.message });
+        dispatch({ type: 'SET_ERROR', payload: error.response.data.message || 'Your email is not verified. Please verify to continue.' });
       } else {
-        dispatch({ type: 'SET_ERROR', payload: error.message || 'Login failed' });
+        dispatch({ type: 'SET_ERROR', payload: error.response?.data?.message || error.message || 'Login failed' });
       }
     }
   };
@@ -137,11 +145,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (email: string, password: string, name: string, role = 'member') => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const { user, token } = await authAPI.register(email, password, name, role);
-      localStorage.setItem('token', token);
-      dispatch({ type: 'SET_USER', payload: user });
+      const response = await authAPI.register(email, password, name, role);
+      
+      // New flow: User is NOT automatically logged in after registration
+      // They must verify their email first
+      if (response.verificationSent) {
+        localStorage.setItem('pendingVerificationEmail', email);
+        // Don't set user or token - they need to verify email first
+        return { 
+          success: true, 
+          verificationSent: true, 
+          email: response.email || email,
+          message: response.message 
+        };
+      }
+      
+      // Fallback for cases where verification is not required (shouldn't happen in production)
+      if (response.token) {
+        localStorage.setItem('token', response.token);
+        dispatch({ type: 'SET_USER', payload: response.user });
+      }
+      
+      return { success: true, verificationSent: false };
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Registration failed' });
+      throw error;
     }
   };
 
@@ -155,13 +183,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'SET_ERROR', payload: null });
   };
 
-  const resendVerification = async (email: string) => {
+  const resendVerification = async (email: string, force: boolean = false) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      await authAPI.resendVerification(email);
+      await authAPI.resendVerification(email, force);
       dispatch({ type: 'SET_LOADING', payload: false });
+      return { success: true };
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to resend verification email' });
+      // Check if it's a rate limit error
+      if (error.response?.status === 429) {
+        const waitTimeSeconds = error.response.data.waitTimeSeconds || 300; // Default to 5 minutes
+        dispatch({ type: 'SET_ERROR', payload: error.response.data.message || 'Please wait before requesting another verification email.' });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return { 
+          success: false, 
+          rateLimited: true, 
+          waitTimeSeconds: waitTimeSeconds 
+        };
+      } else if (error.response?.status === 500 && error.response.data.canRetryImmediately) {
+        // Server error but can retry immediately
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to send verification email. Please try again.' });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return { 
+          success: false, 
+          canRetryImmediately: true,
+          serverError: true,
+          message: error.response.data.error
+        };
+      } else if (error.response?.status === 500 && error.response.data.canRetryImmediately) {
+        // Server error but can retry immediately
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to send verification email. Please try again.' });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return { 
+          success: false, 
+          canRetryImmediately: true,
+          serverError: true,
+          message: error.response.data.error
+        };
+      } else {
+        dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to resend verification email' });
+        return { success: false };
+      }
     }
   };
 
