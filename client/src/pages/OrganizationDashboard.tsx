@@ -66,7 +66,7 @@ interface Member {
 
 interface InviteForm {
   email: string;
-  role: 'org_admin' | 'team_lead' | 'member' | 'viewer';
+  role: 'org_admin' | 'team_lead' | 'member';
 }
 
 const OrganizationDashboard: React.FC = () => {
@@ -524,7 +524,6 @@ const OrganizationDashboard: React.FC = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="text-sm font-medium text-blue-900 mb-2">Role Permissions:</h4>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• <strong>Viewer:</strong> Can view projects and tasks only</li>
               <li>• <strong>Member:</strong> Can create and edit tasks, participate in projects</li>
               <li>• <strong>Team Lead:</strong> Can manage team members and team projects</li>
               <li>• <strong>Organization Admin:</strong> Can manage all aspects of the organization</li>

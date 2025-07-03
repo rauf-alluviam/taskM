@@ -232,7 +232,7 @@ router.put('/:id', authenticate, [
 // Add member to team
 router.post('/:id/members', authenticate, [
   body('userId').isMongoId().withMessage('Valid user ID is required'),
-  body('role').optional().isIn(['member', 'viewer']).withMessage('Valid role is required'),
+  body('role').optional().isIn(['member']).withMessage('Valid role is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -342,7 +342,7 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
 
 // Update member role
 router.put('/:id/members/:userId/role', authenticate, [
-  body('role').isIn(['lead', 'member', 'viewer']).withMessage('Valid role is required'),
+  body('role').isIn(['lead', 'member']).withMessage('Valid role is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

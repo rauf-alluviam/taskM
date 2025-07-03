@@ -124,6 +124,72 @@ const testConnection = async () => {
         throw error;
       }
     },
+
+    async sendInvitationEmail(email, organizationName, inviterName, token, message = '') {
+      try {
+        const inviteUrl = `${DOMAIN}/invite/${token}`;
+        const mailOptions = {
+          from: FROM_EMAIL,
+          to: email,
+          subject: `You're invited to join ${organizationName} on TaskFlow`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #2563eb; margin-bottom: 10px;">TaskFlow Invitation</h1>
+                <p style="color: #64748b; font-size: 16px;">You've been invited to collaborate</p>
+              </div>
+              
+              <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h2 style="color: #1e293b; margin-bottom: 15px;">Join ${organizationName}</h2>
+                <p style="color: #475569; margin-bottom: 15px;">
+                  <strong>${inviterName}</strong> has invited you to join <strong>${organizationName}</strong> on TaskFlow.
+                </p>
+                ${message ? `
+                  <div style="background-color: #e0f2fe; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                    <p style="margin: 0; color: #0277bd; font-style: italic;">"${message}"</p>
+                  </div>
+                ` : ''}
+              </div>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${inviteUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; display: inline-block;">
+                  Accept Invitation
+                </a>
+              </div>
+              
+              <div style="background-color: #fef7cd; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                <h3 style="color: #92400e; margin-bottom: 10px; font-size: 14px;">What you can do:</h3>
+                <ul style="color: #a16207; margin: 0; padding-left: 20px; font-size: 14px;">
+                  <li>Collaborate on projects and tasks</li>
+                  <li>Join teams and contribute to discussions</li>
+                  <li>Access shared documents and resources</li>
+                  <li>Track progress and stay organized</li>
+                </ul>
+              </div>
+              
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+                <p style="color: #64748b; font-size: 14px; margin-bottom: 10px;">
+                  If the button doesn't work, copy and paste this link in your browser:
+                </p>
+                <p style="word-break: break-all; color: #2563eb; font-size: 14px;">
+                  ${inviteUrl}
+                </p>
+                <p style="color: #94a3b8; font-size: 12px; margin-top: 20px;">
+                  This invitation will expire in 7 days. If you have any questions, contact ${inviterName} or your system administrator.
+                </p>
+              </div>
+            </div>
+          `
+        };
+        
+        const result = await transporter.sendMail(mailOptions);
+        console.log('✅ Invitation email sent successfully:', result.messageId);
+        return result;
+      } catch (error) {
+        console.error('❌ Invitation email sending failed:', error);
+        throw error;
+      }
+    },
     
     // Test connection method
     testConnection

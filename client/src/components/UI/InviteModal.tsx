@@ -8,7 +8,7 @@ import LoadingSpinner from './LoadingSpinner';
 
 interface InviteFormData {
   emails: string;
-  role: 'member' | 'team_lead' | 'viewer';
+  role: 'member' | 'team_lead';
   message?: string;
 }
 
@@ -166,7 +166,6 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
                   >
                     <option value="member">Member - Can participate in teams and projects</option>
                     <option value="team_lead">Team Lead - Can manage teams and projects</option>
-                    <option value="viewer">Viewer - Read-only access</option>
                   </select>
                   {errors.role && (
                     <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>

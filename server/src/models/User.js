@@ -79,7 +79,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
       type: String,
-      enum: ['lead', 'member', 'viewer'],
+      enum: ['lead', 'member'],
       default: 'member',
     },
     joinedAt: {
@@ -126,6 +126,30 @@ const userSchema = new mongoose.Schema({
   },
   emailVerificationTokenExpires: {
     type: Date,
+  },
+  // Pending invitation fields
+  pendingInvitation: {
+    organization: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+    },
+    role: {
+      type: String,
+      enum: ['member', 'team_lead'],
+    },
+    token: {
+      type: String,
+    },
+    expires: {
+      type: Date,
+    },
+    invitedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    invitedAt: {
+      type: Date,
+    },
   },
 }, {
   timestamps: true,

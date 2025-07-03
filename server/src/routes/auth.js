@@ -272,4 +272,96 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
+// Accept invitation
+router.post('/accept-invitation/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { name, password } = req.body;
+
+    if (!name || !password) {
+      return res.status(400).json({ message: 'Name and password are required' });
+    }
+
+    // Find user with pending invitation
+    const user = await User.findOne({
+      'pendingInvitation.token': token,
+      'pendingInvitation.expires': { $gt: new Date() }
+    }).populate('pendingInvitation.organization', 'name')
+      .populate('pendingInvitation.invitedBy', 'name email');
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired invitation token' });
+    }
+
+    const Organization = (await import('../models/Organization.js')).default;
+    const organization = await Organization.findById(user.pendingInvitation.organization);
+    
+    if (!organization) {
+      return res.status(400).json({ message: 'Organization no longer exists' });
+    }
+
+    // Update user with invitation details
+    user.name = name;
+    user.password = password;
+    user.organization = user.pendingInvitation.organization;
+    user.role = user.pendingInvitation.role;
+    user.userType = 'organization_member';
+    user.status = 'active';
+    user.verified_email = true; // Auto-verify invited users
+    user.pendingInvitation = undefined;
+
+    await user.save();
+
+    // Generate JWT token
+    const jwt = (await import('jsonwebtoken')).default;
+    const authToken = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
+    );
+
+    // Return user data and token
+    const userResponse = await User.findById(user._id, '-password')
+      .populate('organization', 'name _id')
+      .populate('teams.team', 'name _id');
+
+    res.json({
+      token: authToken,
+      user: userResponse,
+      message: `Welcome to ${organization.name}!`
+    });
+  } catch (error) {
+    console.error('Accept invitation error:', error);
+    res.status(500).json({ message: 'Server error while accepting invitation' });
+  }
+});
+
+// Get invitation details
+router.get('/invitation/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const user = await User.findOne({
+      'pendingInvitation.token': token,
+      'pendingInvitation.expires': { $gt: new Date() }
+    }).populate('pendingInvitation.organization', 'name description')
+      .populate('pendingInvitation.invitedBy', 'name email');
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired invitation token' });
+    }
+
+    res.json({
+      email: user.email,
+      organization: user.pendingInvitation.organization,
+      role: user.pendingInvitation.role,
+      invitedBy: user.pendingInvitation.invitedBy,
+      invitedAt: user.pendingInvitation.invitedAt
+    });
+  } catch (error) {
+    console.error('Get invitation details error:', error);
+    res.status(500).json({ message: 'Server error while fetching invitation details' });
+  }
+});
+
 export default router;

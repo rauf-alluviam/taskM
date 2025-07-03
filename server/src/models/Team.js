@@ -35,7 +35,7 @@ const teamSchema = new mongoose.Schema({
     },
     role: {
       type: String,
-      enum: ['lead', 'member', 'viewer'],
+      enum: ['lead', 'member'],
       default: 'member',
     },
     joinedAt: {
@@ -65,7 +65,7 @@ const teamSchema = new mongoose.Schema({
   settings: {
     defaultProjectRole: {
       type: String,
-      enum: ['viewer', 'member', 'admin'],
+      enum: ['member', 'admin'],
       default: 'member',
     },
     requireApprovalForJoin: {

@@ -19,6 +19,7 @@ import OrganizationDashboard from './pages/OrganizationDashboard';
 import OrganizationSettings from './pages/OrganizationSettings';
 import CreateOrganization from './pages/CreateOrganization';
 import AllOrganizations from './pages/AllOrganizations';
+import AcceptInvitation from './pages/AcceptInvitation';
 import Teams from './pages/Teams';
 import TeamDetail from './pages/TeamDetail';
 import LoadingSpinner from './components/UI/LoadingSpinner';
@@ -40,6 +41,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/invite/:token" element={<AcceptInvitation />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );

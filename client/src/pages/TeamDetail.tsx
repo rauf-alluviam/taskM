@@ -573,7 +573,6 @@ const TeamDetail: React.FC = () => {
             </label>
             <select {...register('role', { required: 'Role is required' })} className="input w-full">
               <option value="member">Member</option>
-              <option value="viewer">Viewer</option>
             </select>
             {errors.role && (
               <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>
@@ -584,7 +583,6 @@ const TeamDetail: React.FC = () => {
             <h4 className="text-sm font-medium text-blue-900 mb-2">Role Permissions:</h4>
             <ul className="text-sm text-blue-700 space-y-1">
               <li>• <strong>Member:</strong> Can create and edit tasks, participate in projects</li>
-              <li>• <strong>Viewer:</strong> Can view projects and tasks only</li>
             </ul>
           </div>
 
@@ -677,7 +675,6 @@ const TeamDetail: React.FC = () => {
           <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600">
             <h4 className="font-medium mb-2">Role Permissions:</h4>
             <ul className="space-y-1 text-xs">
-              <li><strong>Viewer:</strong> View team, projects, and tasks</li>
               <li><strong>Member:</strong> All viewer permissions + participate in projects</li>
             </ul>
           </div>

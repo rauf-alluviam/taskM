@@ -1,10 +1,12 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import crypto from 'crypto';
 import Organization from '../models/Organization.js';
 import User from '../models/User.js';
 import Team from '../models/Team.js';
 import Project from '../models/Project.js';
 import { authenticate } from '../middleware/auth.js';
+import emailService from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -408,40 +410,133 @@ router.get('/:id/stats', authenticate, async (req, res) => {
   }
 });
 
-// Delete organization (owner only)
-router.delete('/:id', authenticate, async (req, res) => {
+// Invite members to organization
+router.post('/:id/invite', authenticate, [
+  body('emails').isArray().withMessage('Emails array is required'),
+  body('role').isIn(['member', 'team_lead']).withMessage('Valid role is required'),
+  body('message').optional().trim(),
+], async (req, res) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
     const organization = await Organization.findById(req.params.id);
     if (!organization) {
       return res.status(404).json({ message: 'Organization not found' });
     }
 
-    // Only organization owner can delete
-    if (!organization.owner.equals(req.user._id) && req.user.role !== 'super_admin') {
+    // Check if user can invite members
+    if (!organization.isAdmin(req.user._id) && req.user.role !== 'super_admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // TODO: Implement soft delete and data cleanup
-    // For now, just mark as inactive
-    organization.isActive = false;
-    await organization.save();
+    const { emails, role, message } = req.body;
+    const inviteResults = [];
 
-    // Update all members to individual users
-    await User.updateMany(
-      { organization: req.params.id },
-      { 
-        $unset: { organization: 1 },
-        $set: { 
-          userType: 'individual',
-          role: 'member'
+    // Validate email service is available
+    if (!emailService || typeof emailService.sendInvitationEmail !== 'function') {
+      console.error('Email service is not properly configured');
+      return res.status(500).json({ message: 'Email service is not available' });
+    }
+
+    for (const email of emails) {
+      try {
+        // Check if user already exists and is part of this organization
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser && existingUser.organization && existingUser.organization.equals(organization._id)) {
+          inviteResults.push({
+            email,
+            status: 'already_member',
+            message: 'User is already a member'
+          });
+          continue;
         }
-      }
-    );
 
-    res.json({ message: 'Organization deleted successfully' });
+        // Generate invite token using crypto
+        let inviteToken;
+        try {
+          inviteToken = crypto.randomBytes(32).toString('hex');
+        } catch (cryptoError) {
+          console.error('Crypto error:', cryptoError);
+          throw new Error('Failed to generate invite token');
+        }
+
+        const inviteExpires = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
+
+        if (existingUser) {
+          // Update existing user with pending invitation
+          existingUser.pendingInvitation = {
+            organization: organization._id,
+            role,
+            token: inviteToken,
+            expires: inviteExpires,
+            invitedBy: req.user._id,
+            invitedAt: new Date()
+          };
+          await existingUser.save();
+        } else {
+          // Create pending user record
+          const pendingUser = new User({
+            email: email.toLowerCase(),
+            name: email.split('@')[0], // Temporary name
+            status: 'pending',
+            verified_email: false,
+            pendingInvitation: {
+              organization: organization._id,
+              role,
+              token: inviteToken,
+              expires: inviteExpires,
+              invitedBy: req.user._id,
+              invitedAt: new Date()
+            }
+          });
+          await pendingUser.save();
+        }
+
+        // Send invitation email
+        try {
+          await emailService.sendInvitationEmail(
+            email,
+            organization.name,
+            req.user.name,
+            inviteToken,
+            message
+          );
+
+          inviteResults.push({
+            email,
+            status: 'sent',
+            message: 'Invitation sent successfully'
+          });
+        } catch (emailError) {
+          console.error(`Failed to send invitation to ${email}:`, emailError);
+          inviteResults.push({
+            email,
+            status: 'failed',
+            message: 'Failed to send invitation email'
+          });
+        }
+
+      } catch (emailError) {
+        console.error(`Failed to process invitation for ${email}:`, emailError);
+        inviteResults.push({
+          email,
+          status: 'failed',
+          message: 'Failed to process invitation'
+        });
+      }
+    }
+
+    res.json({
+      inviteResults,
+      message: `Sent ${inviteResults.filter(r => r.status === 'sent').length} invitation(s)`
+    });
+
   } catch (error) {
-    console.error('Delete organization error:', error);
-    res.status(500).json({ message: 'Server error while deleting organization' });
+    console.error('Invite members error:', error);
+    res.status(500).json({ message: 'Server error while sending invitations' });
   }
 });
 

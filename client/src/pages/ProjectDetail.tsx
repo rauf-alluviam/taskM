@@ -259,8 +259,6 @@ const ProjectDetail: React.FC = () => {
         return <Crown className="w-4 h-4 text-yellow-500" />;
       case 'member':
         return <User className="w-4 h-4 text-blue-500" />;
-      case 'viewer':
-        return <Shield className="w-4 h-4 text-gray-500" />;
       default:
         return <User className="w-4 h-4 text-gray-500" />;
     }

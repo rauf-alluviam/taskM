@@ -36,7 +36,7 @@ interface Team {
       name: string;
       email: string;
     };
-    role: 'lead' | 'member' | 'viewer';
+    role: 'lead' | 'member';
     joinedAt: string;
   }>;
   projects: string[];
@@ -56,7 +56,7 @@ interface TeamForm {
 
 interface AddMemberForm {
   userId: string;
-  role: 'member' | 'viewer';
+  role: 'member';
 }
 
 const Teams: React.FC = () => {
@@ -231,8 +231,6 @@ const Teams: React.FC = () => {
         return <Shield className="w-4 h-4 text-blue-600" />;
       case 'member':
         return <User className="w-4 h-4 text-gray-600" />;
-      case 'viewer':
-        return <User className="w-4 h-4 text-gray-400" />;
       default:
         return <User className="w-4 h-4 text-gray-600" />;
     }
@@ -491,7 +489,6 @@ const Teams: React.FC = () => {
             <select {...register('leadId')} className="input w-full">
               <option value="">Select a team lead (optional)</option>
               {(organizationMembers || [])
-                .filter(member => member.role !== 'viewer')
                 .map((member) => (
                   <option key={member._id} value={member._id}>
                     {member.name} - {member.email}
@@ -564,7 +561,6 @@ const Teams: React.FC = () => {
             </label>
             <select {...registerMember('role', { required: 'Role is required' })} className="input w-full">
               <option value="member">Member</option>
-              <option value="viewer">Viewer</option>
             </select>
             {memberErrors.role && (
               <p className="mt-1 text-sm text-red-600">{memberErrors.role.message}</p>

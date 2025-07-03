@@ -284,7 +284,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 // Add member to project
 router.post('/:id/members', authenticate, [
   body('userId').isMongoId().withMessage('Valid user ID is required'),
-  body('role').optional().isIn(['org_admin', 'member', 'viewer']).withMessage('Valid role is required'),
+  body('role').optional().isIn(['admin', 'member']).withMessage('Valid role is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -375,7 +375,7 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
 
 // Update member role
 router.put('/:id/members/:userId/role', authenticate, [
-  body('role').isIn(['admin', 'member', 'viewer']).withMessage('Valid role is required'),
+  body('role').isIn(['admin', 'member']).withMessage('Valid role is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

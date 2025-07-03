@@ -124,7 +124,7 @@ const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
-                Domain (Optional)
+                Domain (Required)
               </label>
               <input
                 {...register('domain', {
