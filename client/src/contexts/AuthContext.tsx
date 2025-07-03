@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useReducer, ReactNode } fr
 import { authAPI } from '../services/api';
 import { socketService } from '../services/socket';
 
-interface User {
+export interface User {
   _id: string;
   id: string;
   email: string;

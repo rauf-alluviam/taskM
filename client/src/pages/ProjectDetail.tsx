@@ -290,6 +290,7 @@ const ProjectDetail: React.FC = () => {
         startDate: data.startDate,
         endDate: data.endDate,
         tags: Array.isArray(data.tags) ? data.tags : [],
+        assignedUsers: data.assignedUsers || [],
         projectId: id,
         status: selectedColumn,
       };
@@ -356,6 +357,7 @@ const ProjectDetail: React.FC = () => {
         startDate: data.startDate,
         endDate: data.endDate,
         tags: Array.isArray(data.tags) ? data.tags : data.tags?.split(',').map((tag: string) => tag.trim()).filter(Boolean) || [],
+        assignedUsers: data.assignedUsers || [],
         projectId: id // Ensure the task stays in this project
       };
 
@@ -622,6 +624,16 @@ const ProjectDetail: React.FC = () => {
         loading={creating}
         initialStatus={selectedColumn}
         availableStatuses={project?.kanbanColumns?.map(col => ({ id: col.name, title: col.name })) || []}
+        project={project ? {
+          _id: project._id,
+          createdBy: project.createdBy,
+          members: project.members?.map(m => ({
+            user: { _id: m.user._id },
+            role: m.role
+          })),
+          organization: project.organization?._id,
+          visibility: project.visibility
+        } : undefined}
       />
 
       {/* Edit Task Modal */}
@@ -636,6 +648,16 @@ const ProjectDetail: React.FC = () => {
         task={selectedTask}
         loading={updating}
         availableStatuses={project?.kanbanColumns?.map(col => ({ id: col.name, title: col.name })) || []}
+        project={project ? {
+          _id: project._id,
+          createdBy: project.createdBy,
+          members: project.members?.map(m => ({
+            user: { _id: m.user._id },
+            role: m.role
+          })),
+          organization: project.organization?._id,
+          visibility: project.visibility
+        } : undefined}
       />
 
       {/* Add Member Modal */}

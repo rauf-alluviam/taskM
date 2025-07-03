@@ -150,6 +150,39 @@ const userSchema = new mongoose.Schema({
     invitedAt: {
       type: Date,
     },
+    // Team assignments
+    teamAssignments: [{
+      team: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Team',
+      },
+      role: {
+        type: String,
+        enum: ['lead', 'member'],
+        default: 'member',
+      },
+    }],
+    // Project assignments
+    projectAssignments: [{
+      project: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Project',
+      },
+      role: {
+        type: String,
+        enum: ['admin', 'member'],
+        default: 'member',
+      },
+    }],
+    // Invitation context and message
+    invitationContext: {
+      type: String,
+      trim: true,
+    },
+    message: {
+      type: String,
+      trim: true,
+    },
   },
 }, {
   timestamps: true,

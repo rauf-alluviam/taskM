@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Calendar, Flag, Tag, MoreVertical, User, Paperclip } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
+import UserAvatarList from '../UI/UserAvatarList';
 
 interface KanbanTaskCardProps {
   task: Task;
@@ -151,10 +152,15 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit }) => {
 
           {/* Assigned Users */}
           {task.assignedUsers && task.assignedUsers.length > 0 && (
-            <div className="flex items-center space-x-1">
-              <User className="w-3 h-3" />
-              <span>{task.assignedUsers.length}</span>
-            </div>
+            <UserAvatarList
+              users={
+                task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
+              }
+              maxDisplay={3}
+              size="sm"
+              showNames={false}
+              className="ml-auto"
+            />
           )}
         </div>
       </div>      {/* Click hint overlay */}

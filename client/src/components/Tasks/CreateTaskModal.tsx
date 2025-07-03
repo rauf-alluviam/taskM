@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Plus, Tag, Calendar, Flag, User } from 'lucide-react';
 import Modal from '../UI/Modal';
+import UserSelector from '../UI/UserSelector';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface TaskFormData {
   title: string;
@@ -20,6 +22,16 @@ interface CreateTaskModalProps {
   initialStatus?: string;
   loading?: boolean;
   availableStatuses?: Array<{ id: string; title: string }>;
+  project?: {
+    _id: string;
+    createdBy: string;
+    members?: Array<{
+      user: { _id: string };
+      role: string;
+    }>;
+    organization?: string;
+    visibility?: string;
+  };
 }
 
 const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
@@ -29,16 +41,22 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   initialStatus = 'todo',
   loading = false,
   availableStatuses,
+  project,
 }) => {
+  const { user } = useAuth();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskFormData>({
     defaultValues: {
       status: initialStatus,
       priority: 'medium',
+      assignedUsers: [],
     },
   });
+
+
 
   const priorityOptions = [
     { value: 'low', label: 'Low Priority', color: 'text-green-600', bg: 'bg-green-100' },
@@ -82,10 +100,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   };
 
   const handleFormSubmit = (data: TaskFormData) => {
-    onSubmit({ ...data, tags });
+    onSubmit({ ...data, tags, assignedUsers });
     reset();
     setTags([]);
     setTagInput('');
+    setAssignedUsers([]);
   };
 
   return (
@@ -175,6 +194,26 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               className="input w-full"
             />
           </div>
+        </div>
+
+        {/* Assign Users */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <User className="w-4 h-4 inline mr-1" />
+            Assign to Users
+          </label>
+          <UserSelector
+            selectedUserIds={assignedUsers}
+            onSelectionChange={setAssignedUsers}
+            placeholder="Select users to assign this task..."
+            allowMultiple={true}
+            showAvatars={true}
+            className="w-full"
+            project={project}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Assign this task to team members who will be responsible for completing it.
+          </p>
         </div>
 
         {/* Categories/Tags */}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2, CheckSquare, FolderOpen, ExternalLink } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
+import UserAvatarList from '../UI/UserAvatarList';
 
 interface TaskListViewProps {
   tasks: Task[];
@@ -370,16 +371,17 @@ const TaskListView: React.FC<TaskListViewProps> = ({
 
                 {/* Assigned Users */}
                 <td className="px-4 py-3">
-                  {task.assignedUsers && task.assignedUsers.length > 0 ? (
-                    <div className="flex items-center space-x-1">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-900">
-                        {task.assignedUsers.length} user{task.assignedUsers.length > 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-400">Unassigned</span>
-                  )}
+                  <UserAvatarList
+                    users={
+                      task.assignedUsers && task.assignedUsers.length > 0
+                        ? task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
+                        : []
+                    }
+                    maxDisplay={3}
+                    size="sm"
+                    showNames={false}
+                    className="max-w-32"
+                  />
                 </td>                {/* Actions */}
                 <td className="px-4 py-3">
                   <div className="relative">

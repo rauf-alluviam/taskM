@@ -125,9 +125,54 @@ const testConnection = async () => {
       }
     },
 
-    async sendInvitationEmail(email, organizationName, inviterName, token, message = '') {
+    async sendInvitationEmail(email, organizationName, inviterName, token, invitationData = {}) {
       try {
         const inviteUrl = `${DOMAIN}/invite/${token}`;
+        
+        // Extract invitation data
+        const {
+          message = '',
+          invitationContext = '',
+          teamAssignments = [],
+          projectAssignments = []
+        } = typeof invitationData === 'string' ? { message: invitationData } : invitationData;
+
+        let assignmentSection = '';
+        
+        // Add team assignments section
+        if (teamAssignments.length > 0) {
+          assignmentSection += `
+            <div style="background-color: #f0f9ff; padding: 15px; border-radius: 6px; margin: 15px 0;">
+              <h3 style="color: #0369a1; margin-bottom: 10px; font-size: 16px;">Team Assignments</h3>
+              <ul style="color: #0c4a6e; margin: 0; padding-left: 20px;">
+                ${teamAssignments.map(team => `
+                  <li style="margin-bottom: 5px;">
+                    <strong>${team.name}</strong> (${team.role})
+                    ${team.description ? `<br><em style="color: #64748b; font-size: 13px;">${team.description}</em>` : ''}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          `;
+        }
+
+        // Add project assignments section
+        if (projectAssignments.length > 0) {
+          assignmentSection += `
+            <div style="background-color: #f0fdf4; padding: 15px; border-radius: 6px; margin: 15px 0;">
+              <h3 style="color: #15803d; margin-bottom: 10px; font-size: 16px;">Project Assignments</h3>
+              <ul style="color: #166534; margin: 0; padding-left: 20px;">
+                ${projectAssignments.map(project => `
+                  <li style="margin-bottom: 5px;">
+                    <strong>${project.name}</strong> (${project.role})
+                    ${project.description ? `<br><em style="color: #64748b; font-size: 13px;">${project.description}</em>` : ''}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          `;
+        }
+
         const mailOptions = {
           from: FROM_EMAIL,
           to: email,
@@ -144,11 +189,19 @@ const testConnection = async () => {
                 <p style="color: #475569; margin-bottom: 15px;">
                   <strong>${inviterName}</strong> has invited you to join <strong>${organizationName}</strong> on TaskFlow.
                 </p>
-                ${message ? `
+                ${invitationContext ? `
                   <div style="background-color: #e0f2fe; padding: 15px; border-radius: 6px; margin: 15px 0;">
-                    <p style="margin: 0; color: #0277bd; font-style: italic;">"${message}"</p>
+                    <h4 style="margin: 0 0 10px 0; color: #0277bd;">Why you're being invited:</h4>
+                    <p style="margin: 0; color: #0277bd;">${invitationContext}</p>
                   </div>
                 ` : ''}
+                ${message ? `
+                  <div style="background-color: #fff3cd; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                    <h4 style="margin: 0 0 10px 0; color: #856404;">Personal Message:</h4>
+                    <p style="margin: 0; color: #856404; font-style: italic;">"${message}"</p>
+                  </div>
+                ` : ''}
+                ${assignmentSection}
               </div>
               
               <div style="text-align: center; margin: 30px 0;">

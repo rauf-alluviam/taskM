@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Mail, Send, X, UserPlus, Copy, Check } from 'lucide-react';
+import { Mail, Send, X, UserPlus, Copy, Check, Users, FolderOpen, Plus, Minus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import { organizationAPI } from '../../services/api';
+import { organizationAPI, teamAPI, projectAPI } from '../../services/api';
 import LoadingSpinner from './LoadingSpinner';
+
+interface TeamAssignment {
+  team: string;
+  role: string;
+}
+
+interface ProjectAssignment {
+  project: string;
+  role: string;
+}
 
 interface InviteFormData {
   emails: string;
   role: 'member' | 'team_lead';
   message?: string;
+  invitationContext?: string;
 }
 
 interface InviteModalProps {
@@ -25,8 +36,43 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
   const [sending, setSending] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [teamAssignments, setTeamAssignments] = useState<TeamAssignment[]>([]);
+  const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<InviteFormData>();
+
+  // Load teams and projects when modal opens
+  useEffect(() => {
+    if (isOpen && user?.organization) {
+      loadTeamsAndProjects();
+    }
+  }, [isOpen, user?.organization]);
+
+  const loadTeamsAndProjects = async () => {
+    if (!user?.organization) return;
+    
+    try {
+      setLoadingData(true);
+      const [teamsData, projectsData] = await Promise.all([
+        teamAPI.getTeams(),
+        projectAPI.getProjects()
+      ]);
+      setTeams(teamsData || []);
+      setProjects(projectsData || []);
+    } catch (error) {
+      console.error('Failed to load teams and projects:', error);
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load teams and projects',
+      });
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   const onSubmit = async (data: InviteFormData) => {
     if (!user?.organization) return;
@@ -43,6 +89,9 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
         emails: emailList,
         role: data.role,
         message: data.message,
+        invitationContext: data.invitationContext,
+        teamAssignments,
+        projectAssignments,
       });
 
       // Generate invite link for sharing
@@ -94,7 +143,37 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
     reset();
     setInviteLink(null);
     setCopySuccess(false);
+    setTeamAssignments([]);
+    setProjectAssignments([]);
     onClose();
+  };
+
+  const addTeamAssignment = () => {
+    setTeamAssignments([...teamAssignments, { team: '', role: 'member' }]);
+  };
+
+  const removeTeamAssignment = (index: number) => {
+    setTeamAssignments(teamAssignments.filter((_, i) => i !== index));
+  };
+
+  const updateTeamAssignment = (index: number, field: 'team' | 'role', value: string) => {
+    const updated = [...teamAssignments];
+    updated[index][field] = value;
+    setTeamAssignments(updated);
+  };
+
+  const addProjectAssignment = () => {
+    setProjectAssignments([...projectAssignments, { project: '', role: 'member' }]);
+  };
+
+  const removeProjectAssignment = (index: number) => {
+    setProjectAssignments(projectAssignments.filter((_, i) => i !== index));
+  };
+
+  const updateProjectAssignment = (index: number, field: 'project' | 'role', value: string) => {
+    const updated = [...projectAssignments];
+    updated[index][field] = value;
+    setProjectAssignments(updated);
   };
 
   if (!isOpen) return null;
@@ -104,7 +183,7 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleClose} />
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
           {/* Header */}
           <div className="bg-white px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -124,7 +203,7 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
           </div>
 
           {/* Form */}
-          <div className="bg-white px-6 py-4">
+          <div className="bg-white px-6 py-4 max-h-96 overflow-y-auto">
             {!inviteLink ? (
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 {/* Email Addresses */}
@@ -185,6 +264,148 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
                   />
                 </div>
 
+                {/* Invitation Context */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Invitation Context (Optional)
+                  </label>
+                  <textarea
+                    {...register('invitationContext')}
+                    className="textarea w-full"
+                    rows={2}
+                    placeholder="Explain why you're inviting them (e.g., 'We need your expertise in UI/UX design')"
+                  />
+                </div>
+
+                {/* Team Assignments */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-900">
+                      Team Assignments (Optional)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addTeamAssignment}
+                      disabled={loadingData || teams.length === 0}
+                      className="btn-outline btn-sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Team
+                    </button>
+                  </div>
+                  
+                  {loadingData ? (
+                    <div className="flex items-center justify-center py-4">
+                      <LoadingSpinner size="sm" />
+                      <span className="ml-2 text-sm text-gray-500">Loading teams...</span>
+                    </div>
+                  ) : teams.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No teams available for assignment
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {teamAssignments.map((assignment, index) => (
+                        <div key={index} className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                          <Users className="w-4 h-4 text-blue-600" />
+                          <select
+                            value={assignment.team}
+                            onChange={(e) => updateTeamAssignment(index, 'team', e.target.value)}
+                            className="input flex-1"
+                          >
+                            <option value="">Select a team</option>
+                            {teams.map((team) => (
+                              <option key={team._id} value={team._id}>
+                                {team.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={assignment.role}
+                            onChange={(e) => updateTeamAssignment(index, 'role', e.target.value)}
+                            className="input w-32"
+                          >
+                            <option value="member">Member</option>
+                            <option value="lead">Team Lead</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => removeTeamAssignment(index)}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Project Assignments */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-900">
+                      Project Assignments (Optional)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addProjectAssignment}
+                      disabled={loadingData || projects.length === 0}
+                      className="btn-outline btn-sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Project
+                    </button>
+                  </div>
+                  
+                  {loadingData ? (
+                    <div className="flex items-center justify-center py-4">
+                      <LoadingSpinner size="sm" />
+                      <span className="ml-2 text-sm text-gray-500">Loading projects...</span>
+                    </div>
+                  ) : projects.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No projects available for assignment
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {projectAssignments.map((assignment, index) => (
+                        <div key={index} className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                          <FolderOpen className="w-4 h-4 text-green-600" />
+                          <select
+                            value={assignment.project}
+                            onChange={(e) => updateProjectAssignment(index, 'project', e.target.value)}
+                            className="input flex-1"
+                          >
+                            <option value="">Select a project</option>
+                            {projects.map((project) => (
+                              <option key={project._id} value={project._id}>
+                                {project.name} {project.department && `(${project.department})`}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={assignment.role}
+                            onChange={(e) => updateProjectAssignment(index, 'role', e.target.value)}
+                            className="input w-32"
+                          >
+                            <option value="viewer">Viewer</option>
+                            <option value="member">Member</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => removeProjectAssignment(index)}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Preview */}
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Invitation Preview</h4>
@@ -193,7 +414,43 @@ const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose, onInvitesSen
                       <strong>{user?.name}</strong> has invited you to join{' '}
                       <strong>{user?.organization?.name}</strong> on TaskFlow.
                     </p>
-                    <p>You'll be added as a <strong>Member</strong> with access to collaborate on projects and teams.</p>
+                    <p className="mb-3">You'll be added as a <strong>Member</strong> with access to collaborate on projects and teams.</p>
+                    
+                    {teamAssignments.length > 0 && (
+                      <div className="mb-3">
+                        <p className="font-medium text-blue-800 mb-1">Team Assignments:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          {teamAssignments
+                            .filter(assignment => assignment.team)
+                            .map((assignment, index) => {
+                              const team = teams.find(t => t._id === assignment.team);
+                              return (
+                                <li key={index} className="text-blue-700 text-xs">
+                                  <strong>{team?.name || 'Unknown Team'}</strong> ({assignment.role})
+                                </li>
+                              );
+                            })}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {projectAssignments.length > 0 && (
+                      <div className="mb-3">
+                        <p className="font-medium text-green-800 mb-1">Project Assignments:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          {projectAssignments
+                            .filter(assignment => assignment.project)
+                            .map((assignment, index) => {
+                              const project = projects.find(p => p._id === assignment.project);
+                              return (
+                                <li key={index} className="text-green-700 text-xs">
+                                  <strong>{project?.name || 'Unknown Project'}</strong> ({assignment.role})
+                                </li>
+                              );
+                            })}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
 

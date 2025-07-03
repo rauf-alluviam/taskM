@@ -20,6 +20,24 @@ interface InvitationDetails {
     email: string;
   };
   invitedAt: string;
+  teamAssignments?: Array<{
+    team: {
+      _id: string;
+      name: string;
+      description?: string;
+    };
+    role: string;
+  }>;
+  projectAssignments?: Array<{
+    project: {
+      _id: string;
+      name: string;
+      description?: string;
+    };
+    role: string;
+  }>;
+  invitationContext?: string;
+  message?: string;
 }
 
 interface AcceptInvitationForm {
@@ -71,6 +89,12 @@ const AcceptInvitation: React.FC = () => {
         password: data.password
       });
 
+      // Store assignment information for onboarding
+      if (response.data.assignments) {
+        sessionStorage.setItem('invitationAssignments', JSON.stringify(response.data.assignments));
+        sessionStorage.setItem('showOnboarding', 'true');
+      }
+
       // Log the user in with the returned token and user data
       login(response.data.user, response.data.token);
       
@@ -80,8 +104,8 @@ const AcceptInvitation: React.FC = () => {
         message: response.data.message,
       });
 
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Redirect to dashboard with onboarding flag
+      navigate('/dashboard?onboarding=true');
     } catch (error: any) {
       addNotification({
         type: 'error',
@@ -202,6 +226,82 @@ const AcceptInvitation: React.FC = () => {
             </div>
           </div>
 
+          {/* Invitation Context */}
+          {invitation.invitationContext && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-medium text-amber-900 mb-2">
+                Why you're being invited:
+              </h4>
+              <p className="text-sm text-amber-800">{invitation.invitationContext}</p>
+            </div>
+          )}
+
+          {/* Personal Message */}
+          {invitation.message && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-medium text-purple-900 mb-2">
+                Personal Message:
+              </h4>
+              <p className="text-sm text-purple-800 italic">"{invitation.message}"</p>
+            </div>
+          )}
+
+          {/* Team Assignments */}
+          {invitation.teamAssignments && invitation.teamAssignments.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-medium text-blue-900 mb-3">
+                Team Assignments:
+              </h4>
+              <div className="space-y-2">
+                {invitation.teamAssignments.map((assignment, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">
+                        {assignment.team.name}
+                      </p>
+                      {assignment.team.description && (
+                        <p className="text-xs text-blue-600">
+                          {assignment.team.description}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      {assignment.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Project Assignments */}
+          {invitation.projectAssignments && invitation.projectAssignments.length > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-medium text-green-900 mb-3">
+                Project Assignments:
+              </h4>
+              <div className="space-y-2">
+                {invitation.projectAssignments.map((assignment, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-800">
+                        {assignment.project.name}
+                      </p>
+                      {assignment.project.description && (
+                        <p className="text-xs text-green-600">
+                          {assignment.project.description}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                      {assignment.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Accept Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
@@ -298,6 +398,18 @@ const AcceptInvitation: React.FC = () => {
               <ArrowRight className="w-3 h-3 mr-2" />
               You'll be added to {invitation.organization.name}
             </li>
+            {invitation.teamAssignments && invitation.teamAssignments.length > 0 && (
+              <li className="flex items-center">
+                <ArrowRight className="w-3 h-3 mr-2" />
+                You'll be assigned to {invitation.teamAssignments.length} team{invitation.teamAssignments.length > 1 ? 's' : ''}
+              </li>
+            )}
+            {invitation.projectAssignments && invitation.projectAssignments.length > 0 && (
+              <li className="flex items-center">
+                <ArrowRight className="w-3 h-3 mr-2" />
+                You'll be part of {invitation.projectAssignments.length} project{invitation.projectAssignments.length > 1 ? 's' : ''}
+              </li>
+            )}
             <li className="flex items-center">
               <ArrowRight className="w-3 h-3 mr-2" />
               You can start collaborating right away

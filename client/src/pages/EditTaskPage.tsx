@@ -21,10 +21,13 @@ import {
 import { taskAPI, attachmentAPI } from '../services/api';
 import { Task } from '../contexts/TaskContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
+import UserSelector from '../components/UI/UserSelector';
 import SubtaskManager from '../components/Tasks/SubtaskManager';
 import AttachmentManager from '../components/UI/AttachmentManager';
 import VoiceEnabledDescription from '../components/UI/VoiceEnabledDescription';
+import { PermissionHelper } from '../utils/permissions';
 
 interface TaskFormData {
   title: string;
@@ -57,6 +60,7 @@ const EditTaskPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addNotification } = useNotification();
+  const { user } = useAuth();
 
   const [task, setTask] = useState<Task | null>(null);
   const [history, setHistory] = useState<TaskHistoryItem[]>([]);
@@ -67,7 +71,13 @@ const EditTaskPage: React.FC = () => {
   const [historyTotal, setHistoryTotal] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [attachments, setAttachments] = useState<any[]>([]);
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);  const [attachments, setAttachments] = useState<any[]>([]);
+
+  // Check if user can edit task
+  const canEditTask = user && task ? PermissionHelper.canEditTask({
+    user,
+    task,
+  }) : false;
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isDirty } } = useForm<TaskFormData>();
 
@@ -105,6 +115,7 @@ const EditTaskPage: React.FC = () => {
       setValue('endDate', foundTask.endDate ? new Date(foundTask.endDate).toISOString().split('T')[0] : '');
       setValue('assignedUsers', foundTask.assignedUsers?.map((user: any) => user._id) || []);
       setTags(foundTask.tags || []);
+      setAssignedUsers(foundTask.assignedUsers?.map((user: any) => user._id) || []);
 
       // Load attachments
       loadAttachments(foundTask._id);
@@ -165,6 +176,7 @@ const EditTaskPage: React.FC = () => {
       const updateData = {
         ...data,
         tags,
+        assignedUsers,
         startDate: data.startDate || undefined,
         endDate: data.endDate || undefined,
       };
@@ -428,6 +440,26 @@ const EditTaskPage: React.FC = () => {
                       className="input w-full"
                     />
                   </div>
+                </div>
+
+                {/* Assign Users */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <User className="w-4 h-4 inline mr-1" />
+                    Assign to Users
+                  </label>
+                  <UserSelector
+                    selectedUserIds={assignedUsers}
+                    onSelectionChange={setAssignedUsers}
+                    placeholder="Select users to assign this task..."
+                    allowMultiple={true}
+                    showAvatars={true}
+                    className="w-full"
+                    task={task}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Assign this task to team members who will be responsible for completing it.
+                  </p>
                 </div>
 
                 {/* Tags */}

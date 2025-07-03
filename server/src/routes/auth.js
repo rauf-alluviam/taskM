@@ -308,8 +308,72 @@ router.post('/accept-invitation/:token', async (req, res) => {
     user.userType = 'organization_member';
     user.status = 'active';
     user.verified_email = true; // Auto-verify invited users
+    
+    // Store team and project assignments for processing
+    const teamAssignments = user.pendingInvitation.teamAssignments || [];
+    const projectAssignments = user.pendingInvitation.projectAssignments || [];
+    
     user.pendingInvitation = undefined;
+    await user.save();
 
+    // Process team assignments
+    const Team = (await import('../models/Team.js')).default;
+    const assignedTeams = [];
+    
+    for (const assignment of teamAssignments) {
+      try {
+        const team = await Team.findById(assignment.team);
+        if (team) {
+          // Add user to team
+          if (!team.isMember(user._id)) {
+            team.addMember(user._id, assignment.role);
+            await team.save();
+          }
+          
+          // Add team to user's teams array
+          user.teams.push({
+            team: team._id,
+            role: assignment.role,
+            joinedAt: new Date()
+          });
+          
+          assignedTeams.push({
+            _id: team._id,
+            name: team.name,
+            role: assignment.role
+          });
+        }
+      } catch (error) {
+        console.error(`Error assigning user to team ${assignment.team}:`, error);
+      }
+    }
+
+    // Process project assignments
+    const Project = (await import('../models/Project.js')).default;
+    const assignedProjects = [];
+    
+    for (const assignment of projectAssignments) {
+      try {
+        const project = await Project.findById(assignment.project);
+        if (project) {
+          // Add user to project
+          if (!project.isMember(user._id)) {
+            project.addMember(user._id, assignment.role, user.pendingInvitation?.invitedBy);
+            await project.save();
+          }
+          
+          assignedProjects.push({
+            _id: project._id,
+            name: project.name,
+            role: assignment.role
+          });
+        }
+      } catch (error) {
+        console.error(`Error assigning user to project ${assignment.project}:`, error);
+      }
+    }
+
+    // Save user with team assignments
     await user.save();
 
     // Generate JWT token
@@ -320,7 +384,7 @@ router.post('/accept-invitation/:token', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Return user data and token
+    // Return user data and token with assignment details
     const userResponse = await User.findById(user._id, '-password')
       .populate('organization', 'name _id')
       .populate('teams.team', 'name _id');
@@ -328,7 +392,16 @@ router.post('/accept-invitation/:token', async (req, res) => {
     res.json({
       token: authToken,
       user: userResponse,
-      message: `Welcome to ${organization.name}!`
+      message: `Welcome to ${organization.name}!`,
+      assignments: {
+        teams: assignedTeams,
+        projects: assignedProjects
+      },
+      onboarding: {
+        showWelcome: true,
+        hasTeamAssignments: assignedTeams.length > 0,
+        hasProjectAssignments: assignedProjects.length > 0
+      }
     });
   } catch (error) {
     console.error('Accept invitation error:', error);
@@ -345,7 +418,9 @@ router.get('/invitation/:token', async (req, res) => {
       'pendingInvitation.token': token,
       'pendingInvitation.expires': { $gt: new Date() }
     }).populate('pendingInvitation.organization', 'name description')
-      .populate('pendingInvitation.invitedBy', 'name email');
+      .populate('pendingInvitation.invitedBy', 'name email')
+      .populate('pendingInvitation.teamAssignments.team', 'name description')
+      .populate('pendingInvitation.projectAssignments.project', 'name description');
 
     if (!user) {
       return res.status(400).json({ message: 'Invalid or expired invitation token' });
@@ -356,7 +431,11 @@ router.get('/invitation/:token', async (req, res) => {
       organization: user.pendingInvitation.organization,
       role: user.pendingInvitation.role,
       invitedBy: user.pendingInvitation.invitedBy,
-      invitedAt: user.pendingInvitation.invitedAt
+      invitedAt: user.pendingInvitation.invitedAt,
+      teamAssignments: user.pendingInvitation.teamAssignments || [],
+      projectAssignments: user.pendingInvitation.projectAssignments || [],
+      invitationContext: user.pendingInvitation.invitationContext,
+      message: user.pendingInvitation.message
     });
   } catch (error) {
     console.error('Get invitation details error:', error);

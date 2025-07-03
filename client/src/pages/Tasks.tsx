@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Calendar, Flag, Tag } from 'lucide-react';
+import { Plus, Calendar, Flag, Tag, User } from 'lucide-react';
 import { useTask } from '../contexts/TaskContext';
 import { taskAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 import TaskFilters from '../components/Filters/TaskFilters';
+import UserSelector from '../components/UI/UserSelector';
+import { useAuth } from '../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 
 interface TaskForm {
@@ -14,6 +16,7 @@ interface TaskForm {
   startDate?: string;
   endDate?: string;
   tags: string;
+  assignedUsers: string[];
   status: string;
 }
 
@@ -30,10 +33,12 @@ interface TaskFiltersState {
 }
 
 const Tasks: React.FC = () => {
+  const { user } = useAuth();
   const { tasks, dispatch } = useTask();
   const [loading, setLoading] = useState(true);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [creating, setCreating] = useState(false);  const [filters, setFilters] = useState<TaskFiltersState>({
+  const [creating, setCreating] = useState(false);
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);  const [filters, setFilters] = useState<TaskFiltersState>({
     status: 'all',
     priority: 'all',
     search: '',
@@ -46,6 +51,8 @@ const Tasks: React.FC = () => {
   });
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskForm>();
+
+
 
   useEffect(() => {
     loadTasks();
@@ -69,11 +76,13 @@ const Tasks: React.FC = () => {
       const taskData = {
         ...data,
         tags: data.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+        assignedUsers,
       };
       
       const newTask = await taskAPI.createTask(taskData);
       dispatch({ type: 'ADD_TASK', payload: newTask });
       reset();
+      setAssignedUsers([]);
       setShowTaskModal(false);
     } catch (error) {
       console.error('Failed to create task:', error);
@@ -343,6 +352,25 @@ const Tasks: React.FC = () => {
               className="input w-full"
               placeholder="urgent, frontend, bug (comma separated)"
             />
+          </div>
+
+          {/* Assign Users */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              <User className="w-4 h-4 inline mr-1" />
+              Assign to Users
+            </label>
+            <UserSelector
+              selectedUserIds={assignedUsers}
+              onSelectionChange={setAssignedUsers}
+              placeholder="Select users to assign this task..."
+              allowMultiple={true}
+              showAvatars={true}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Assign this task to team members who will be responsible for completing it.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { 
   CheckSquare, 
   FolderOpen, 
@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { taskAPI, projectAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import CreateOrganizationModal from '../components/UI/CreateOrganizationModal';
+import OnboardingTour from '../components/UI/OnboardingTour';
 import { debounce } from '../utils/debounce';
 
 const Dashboard: React.FC = () => {
@@ -24,6 +25,9 @@ const Dashboard: React.FC = () => {
   const { tasks, projects, dispatch } = useTask();
   const [loading, setLoading] = useState(true);
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingAssignments, setOnboardingAssignments] = useState(null);
+  const [searchParams] = useSearchParams();
   const [stats, setStats] = useState({
     totalTasks: 0,
     completedTasks: 0,
@@ -94,6 +98,25 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     debouncedLoadDashboardData();
   }, [debouncedLoadDashboardData]);
+
+  // Handle onboarding from URL params or session storage
+  useEffect(() => {
+    const onboardingParam = searchParams.get('onboarding');
+    const showOnboardingFromSession = sessionStorage.getItem('showOnboarding');
+    const assignmentsFromSession = sessionStorage.getItem('invitationAssignments');
+    
+    if (onboardingParam === 'true' || showOnboardingFromSession === 'true') {
+      if (assignmentsFromSession) {
+        try {
+          const assignments = JSON.parse(assignmentsFromSession);
+          setOnboardingAssignments(assignments);
+        } catch (error) {
+          console.error('Failed to parse onboarding assignments:', error);
+        }
+      }
+      setShowOnboarding(true);
+    }
+  }, [searchParams]);
 
   const recentTasks = tasks.slice(0, 5);
   const recentProjects = projects.slice(0, 3);
@@ -401,6 +424,13 @@ const Dashboard: React.FC = () => {
           // Refresh the page or reload user data to show the new organization
           window.location.reload();
         }}
+      />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        assignments={onboardingAssignments}
       />
     </div>
   );

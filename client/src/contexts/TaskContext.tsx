@@ -12,7 +12,13 @@ export interface Task {
   projectId?: string;
   attachments: string[];
   voiceNote?: string;
-  assignedUsers: string[];
+  assignedUsers: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    avatarUrl?: string;
+  }> | string[];
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

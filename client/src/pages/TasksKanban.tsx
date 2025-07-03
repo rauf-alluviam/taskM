@@ -268,6 +268,7 @@ const TasksPage: React.FC = () => {
       const taskData = {
         ...data,
         tags: data.tags || [],
+        assignedUsers: data.assignedUsers || [],
       };
       
       const updatedTask = await taskAPI.updateTask(selectedTask._id, taskData);
@@ -661,7 +662,7 @@ const TasksPage: React.FC = () => {
             onTaskUpdate={handleTaskUpdate}
           />
         )}
-      </div>{/* Create Task Modal */}
+      </div>      {/* Create Task Modal */}
       <CreateTaskModal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
@@ -669,7 +670,8 @@ const TasksPage: React.FC = () => {
         initialStatus={selectedStatus}
         loading={creating}
         availableStatuses={columns.map(col => ({ id: col.id, title: col.title }))}
-      />      {/* Edit Task Modal */}
+        project={undefined} // Basic project info from TasksKanban doesn't include members/permissions
+      />{/* Edit Task Modal */}
       <EditTaskModal
         isOpen={showEditModal}
         onClose={() => {
@@ -681,6 +683,7 @@ const TasksPage: React.FC = () => {
         task={selectedTask}
         loading={updating}
         availableStatuses={columns.map(col => ({ id: col.id, title: col.title }))}
+        project={undefined} // Basic project info from TasksKanban doesn't include members/permissions
       />
 
       {/* Column Manager Modal */}

@@ -19,13 +19,66 @@ router.get('/', authenticate, async (req, res) => {
     if (priority) filter.priority = priority;
     if (assignedTo) filter.assignedUsers = assignedTo;
 
-    // Users can see tasks they created or are assigned to
+    // Enhanced access control: Users can see tasks they have access to
     const userFilter = {
       $or: [
         { createdBy: req.user._id },
         { assignedUsers: req.user._id },
       ],
     };
+
+    // If admin, can see all tasks
+    if (req.user.role === 'admin' || req.user.role === 'super_admin') {
+      // Admin can see all tasks, no additional filtering needed
+    } else {
+      // For project-specific requests, check project membership
+      if (projectId) {
+        const project = await Project.findById(projectId);
+        if (project) {
+          // Check if user has access to this project
+          const hasProjectAccess = project.createdBy.equals(req.user._id) ||
+                                  project.isMember(req.user._id) ||
+                                  (project.organization && req.user.organization && 
+                                   project.organization.equals(req.user.organization) && 
+                                   project.visibility === 'organization') ||
+                                  project.visibility === 'public';
+
+          if (hasProjectAccess) {
+            // User has project access, so they can see all tasks in this project
+            // Remove the user filter for this case
+            const tasks = await Task.find(filter)
+              .populate('createdBy', 'name email')
+              .populate('assignedUsers', 'name email')
+              .populate('projectId', 'name')
+              .populate('subtasks')
+              .sort({ createdAt: -1 });
+
+            return res.json(tasks);
+          } else {
+            // User doesn't have project access, return empty array
+            return res.json([]);
+          }
+        }
+      } else {
+        // For general task listing (no specific project), include tasks from projects user is a member of
+        const userProjects = await Project.find({
+          $or: [
+            { createdBy: req.user._id },
+            { 'members.user': req.user._id },
+            ...(req.user.organization ? [{
+              organization: req.user.organization,
+              visibility: 'organization'
+            }] : []),
+            { visibility: 'public' }
+          ]
+        }).select('_id');
+
+        const projectIds = userProjects.map(p => p._id);
+        
+        // Add project access to user filter
+        userFilter.$or.push({ projectId: { $in: projectIds } });
+      }
+    }
 
     const tasks = await Task.find({ ...filter, ...userFilter })
       .populate('createdBy', 'name email')
@@ -53,11 +106,35 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Check if user has access to this task
-    const hasAccess = task.createdBy._id.equals(req.user._id) ||
-                     task.assignedUsers.some(user => user._id.equals(req.user._id));
+    // Enhanced access check: Check if user has access to this task
+    let hasAccess = false;
 
-    if (!hasAccess && req.user.role !== 'admin') {
+    // Admin access
+    if (req.user.role === 'admin' || req.user.role === 'super_admin') {
+      hasAccess = true;
+    }
+    // Task creator access
+    else if (task.createdBy._id.equals(req.user._id)) {
+      hasAccess = true;
+    }
+    // Assigned user access
+    else if (task.assignedUsers.some(user => user._id.equals(req.user._id))) {
+      hasAccess = true;
+    }
+    // Project member access
+    else if (task.projectId) {
+      const project = await Project.findById(task.projectId);
+      if (project) {
+        hasAccess = project.createdBy.equals(req.user._id) ||
+                   project.isMember(req.user._id) ||
+                   (project.organization && req.user.organization && 
+                    project.organization.equals(req.user.organization) && 
+                    project.visibility === 'organization') ||
+                   project.visibility === 'public';
+      }
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -104,7 +181,7 @@ router.post('/', authenticate, [
       }
 
       const hasProjectAccess = project.createdBy.equals(req.user._id) ||
-                              project.members.includes(req.user._id);
+                              project.members(req.user._id);
 
       if (!hasProjectAccess && req.user.role !== 'admin') {
         return res.status(403).json({ message: 'Access denied to project' });
@@ -172,10 +249,29 @@ router.put('/:id', authenticate, [
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Check if user has permission to update this task
-    const canUpdate = task.createdBy.equals(req.user._id) ||
-                     task.assignedUsers.some(user => user._id.equals(req.user._id)) ||
-                     req.user.role === 'admin';
+    // Enhanced permission check: Check if user has permission to update this task
+    let canUpdate = false;
+
+    // Admin access
+    if (req.user.role === 'admin' || req.user.role === 'super_admin') {
+      canUpdate = true;
+    }
+    // Task creator access
+    else if (task.createdBy.equals(req.user._id)) {
+      canUpdate = true;
+    }
+    // Assigned user access
+    else if (task.assignedUsers.some(user => user._id.equals(req.user._id))) {
+      canUpdate = true;
+    }
+    // Project member access
+    else if (task.projectId) {
+      const project = await Project.findById(task.projectId);
+      if (project) {
+        canUpdate = project.createdBy.equals(req.user._id) ||
+                   project.isMember(req.user._id);
+      }
+    }
 
     if (!canUpdate) {
       return res.status(403).json({ message: 'Access denied' });
@@ -367,8 +463,26 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Only task creator or admin can delete
-    const canDelete = task.createdBy.equals(req.user._id) || req.user.role === 'admin';
+    // Enhanced permission check: Check if user can delete this task
+    let canDelete = false;
+
+    // Admin access
+    if (req.user.role === 'admin' || req.user.role === 'super_admin') {
+      canDelete = true;
+    }
+    // Task creator access
+    else if (task.createdBy.equals(req.user._id)) {
+      canDelete = true;
+    }
+    // Project admin access (only project admins can delete tasks, not regular members)
+    else if (task.projectId) {
+      const project = await Project.findById(task.projectId);
+      if (project) {
+        canDelete = project.createdBy.equals(req.user._id) ||
+                   project.isAdmin(req.user._id);
+      }
+    }
+
     if (!canDelete) {
       return res.status(403).json({ message: 'Access denied' });
     }

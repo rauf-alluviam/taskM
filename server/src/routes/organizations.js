@@ -415,6 +415,9 @@ router.post('/:id/invite', authenticate, [
   body('emails').isArray().withMessage('Emails array is required'),
   body('role').isIn(['member', 'team_lead']).withMessage('Valid role is required'),
   body('message').optional().trim(),
+  body('teamAssignments').optional().isArray().withMessage('Team assignments must be an array'),
+  body('projectAssignments').optional().isArray().withMessage('Project assignments must be an array'),
+  body('invitationContext').optional().trim(),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -432,8 +435,32 @@ router.post('/:id/invite', authenticate, [
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const { emails, role, message } = req.body;
+    const { emails, role, message, teamAssignments = [], projectAssignments = [], invitationContext } = req.body;
     const inviteResults = [];
+
+    // Validate team assignments
+    if (teamAssignments.length > 0) {
+      for (const teamAssignment of teamAssignments) {
+        const team = await Team.findById(teamAssignment.team);
+        if (!team || !team.organization.equals(organization._id)) {
+          return res.status(400).json({ 
+            message: `Team ${teamAssignment.team} not found or not part of this organization` 
+          });
+        }
+      }
+    }
+
+    // Validate project assignments
+    if (projectAssignments.length > 0) {
+      for (const projectAssignment of projectAssignments) {
+        const project = await Project.findById(projectAssignment.project);
+        if (!project || !project.organization.equals(organization._id)) {
+          return res.status(400).json({ 
+            message: `Project ${projectAssignment.project} not found or not part of this organization` 
+          });
+        }
+      }
+    }
 
     // Validate email service is available
     if (!emailService || typeof emailService.sendInvitationEmail !== 'function') {
@@ -473,7 +500,17 @@ router.post('/:id/invite', authenticate, [
             token: inviteToken,
             expires: inviteExpires,
             invitedBy: req.user._id,
-            invitedAt: new Date()
+            invitedAt: new Date(),
+            teamAssignments: teamAssignments.map(assignment => ({
+              team: assignment.team,
+              role: assignment.role || 'member'
+            })),
+            projectAssignments: projectAssignments.map(assignment => ({
+              project: assignment.project,
+              role: assignment.role || 'member'
+            })),
+            invitationContext,
+            message
           };
           await existingUser.save();
         } else {
@@ -489,20 +526,50 @@ router.post('/:id/invite', authenticate, [
               token: inviteToken,
               expires: inviteExpires,
               invitedBy: req.user._id,
-              invitedAt: new Date()
+              invitedAt: new Date(),
+              teamAssignments: teamAssignments.map(assignment => ({
+                team: assignment.team,
+                role: assignment.role || 'member'
+              })),
+              projectAssignments: projectAssignments.map(assignment => ({
+                project: assignment.project,
+                role: assignment.role || 'member'
+              })),
+              invitationContext,
+              message
             }
           });
           await pendingUser.save();
         }
 
-        // Send invitation email
+        // Fetch team and project details for the email
+        const teamDetails = await Promise.all(
+          teamAssignments.map(async (assignment) => {
+            const team = await Team.findById(assignment.team).select('name description');
+            return { ...team.toObject(), role: assignment.role || 'member' };
+          })
+        );
+
+        const projectDetails = await Promise.all(
+          projectAssignments.map(async (assignment) => {
+            const project = await Project.findById(assignment.project).select('name description');
+            return { ...project.toObject(), role: assignment.role || 'member' };
+          })
+        );
+
+        // Send invitation email with enhanced details
         try {
           await emailService.sendInvitationEmail(
             email,
             organization.name,
             req.user.name,
             inviteToken,
-            message
+            {
+              message,
+              invitationContext,
+              teamAssignments: teamDetails,
+              projectAssignments: projectDetails
+            }
           );
 
           inviteResults.push({

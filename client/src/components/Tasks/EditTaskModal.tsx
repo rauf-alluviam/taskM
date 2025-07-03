@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Plus, Tag, Calendar, Flag, User, Trash2, List, Paperclip } from 'lucide-react';
 import Modal from '../UI/Modal';
+import UserSelector from '../UI/UserSelector';
 import SubtaskManager from './SubtaskManager';
 import AttachmentManager from '../UI/AttachmentManager';
 import { attachmentAPI } from '../../services/api';
 import { Task } from '../../contexts/TaskContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { PermissionHelper } from '../../utils/permissions';
 
 interface TaskFormData {
   title: string;
@@ -25,6 +28,16 @@ interface EditTaskModalProps {
   task: Task | null;
   loading?: boolean;
   availableStatuses?: Array<{ id: string; title: string }>;
+  project?: {
+    _id: string;
+    createdBy: string;
+    members?: Array<{
+      user: { _id: string };
+      role: string;
+    }>;
+    organization?: string;
+    visibility?: string;
+  };
 }
 
 const EditTaskModal: React.FC<EditTaskModalProps> = ({
@@ -35,9 +48,12 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   task,
   loading = false,
   availableStatuses,
+  project,
 }) => {
+  const { user } = useAuth();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
 
@@ -51,7 +67,9 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
       setValue('status', task.status);
       setValue('startDate', task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '');
       setValue('endDate', task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : '');
+      setValue('assignedUsers', task.assignedUsers?.map((user: any) => user._id || user) || []);
       setTags(task.tags || []);
+      setAssignedUsers(task.assignedUsers?.map((user: any) => user._id || user) || []);
       
       // Load attachments
       loadAttachments();
@@ -115,12 +133,13 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   };
 
   const handleFormSubmit = (data: TaskFormData) => {
-    onSubmit({ ...data, tags });
+    onSubmit({ ...data, tags, assignedUsers });
   };
   const handleClose = () => {
     reset();
     setTags([]);
     setTagInput('');
+    setAssignedUsers([]);
     setAttachments([]);
     onClose();
   };
@@ -220,6 +239,27 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               className="input w-full"
             />
           </div>
+        </div>
+
+        {/* Assign Users */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <User className="w-4 h-4 inline mr-1" />
+            Assign to Users
+          </label>
+          <UserSelector
+            selectedUserIds={assignedUsers}
+            onSelectionChange={setAssignedUsers}
+            placeholder="Select users to assign this task..."
+            allowMultiple={true}
+            showAvatars={true}
+            className="w-full"
+            project={project}
+            task={task}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Assign this task to team members who will be responsible for completing it.
+          </p>
         </div>
 
         {/* Categories/Tags */}

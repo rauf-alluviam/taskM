@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Flag, Tag, MoreVertical, User, Paperclip, Edit, Trash2, CheckSquare, ExternalLink } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
+import UserAvatarList from '../UI/UserAvatarList';
 
 interface KanbanTaskCardProps {
   task: Task;
@@ -260,9 +261,14 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete 
 
           {/* Assigned Users Avatar */}
           {task.assignedUsers && task.assignedUsers.length > 0 && (
-            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
-              {task.assignedUsers.length}
-            </div>
+            <UserAvatarList
+              users={
+                task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
+              }
+              maxDisplay={2}
+              size="sm"
+              showNames={false}
+            />
           )}
         </div>
       </div>
