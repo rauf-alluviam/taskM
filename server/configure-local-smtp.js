@@ -31,14 +31,14 @@ FROM_EMAIL=test@example.com
 DOMAIN=http://localhost:3000
 
 # Original Mail Settings (commented out)
-# MAIL_USERNAME=${process.env.MAIL_USERNAME || 'connect@alluvium.in'}
-# MAIL_PASSWORD=${process.env.MAIL_PASSWORD || 'lygjlhxyltqccqbt'}
-# MAIL_FROM=${process.env.MAIL_FROM || 'connect@alluvium.in'}
-# MAIL_PORT=${process.env.MAIL_PORT || '2525'}
-# MAIL_SERVER=${process.env.MAIL_SERVER || 'smtp-mail.outlook.com'}
-# MAIL_STARTTLS=${process.env.MAIL_STARTTLS || 'True'}
-# MAIL_SSL_TLS=${process.env.MAIL_SSL_TLS || 'False'}
-# MAIL_FROM_NAME=${process.env.MAIL_FROM_NAME || 'Alluvium IoT Solutions Pvt Ltd'}`
+# MAIL_USERNAME=${process.env.MAIL_USERNAME }
+# MAIL_PASSWORD=${process.env.MAIL_PASSWORD }
+# MAIL_FROM=${process.env.MAIL_FROM}
+# MAIL_PORT=${process.env.MAIL_PORT}
+# MAIL_SERVER=${process.env.MAIL_SERVER }
+# MAIL_STARTTLS=${process.env.MAIL_STARTTLS}
+# MAIL_SSL_TLS=${process.env.MAIL_SSL_TLS }
+# MAIL_FROM_NAME=${process.env.MAIL_FROM_NAME }`
   );
 
   // Write to .env.local file
