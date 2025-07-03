@@ -47,10 +47,14 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
   const [isNaming, setIsNaming] = useState(false);
   const [editingAttachment, setEditingAttachment] = useState<string | null>(null);
   const [newAttachmentName, setNewAttachmentName] = useState('');
-  const [waveformData, setWaveformData] = useState<number[]>(Array(20).fill(0));
+  const [waveformData, setWaveformData] = useState<number[]>(Array(32).fill(0));
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -62,6 +66,7 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const animationRef = useRef<number | null>(null);
+  const progressUpdateRef = useRef<number | null>(null);
 
   // Handle recording start
   const startRecording = async () => {
@@ -74,7 +79,10 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
       
-      analyserRef.current.fftSize = 64;
+      analyserRef.current.fftSize = 1024;
+      analyserRef.current.smoothingTimeConstant = 0.3;
+      analyserRef.current.minDecibels = -90;
+      analyserRef.current.maxDecibels = -10;
       const bufferLength = analyserRef.current.frequencyBinCount;
       dataArrayRef.current = new Uint8Array(bufferLength);
       
@@ -120,15 +128,55 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
 
   // Animate waveform during recording
   const animateWaveform = () => {
-    if (!analyserRef.current || !dataArrayRef.current) return;
+    if (!analyserRef.current || !dataArrayRef.current || !isRecording) return;
     
     analyserRef.current.getByteFrequencyData(dataArrayRef.current);
-    const newWaveformData = Array.from(dataArrayRef.current).slice(0, 20);
+    
+    // Create more responsive waveform with real voice detection
+    const barCount = 32;
+    const newWaveformData: number[] = [];
+    
+    // Calculate overall audio level for the pulsing effect
+    let totalLevel = 0;
+    let maxLevel = 0;
+    
+    // Group frequency data into bars with better voice frequency focus
+    for (let i = 0; i < barCount; i++) {
+      // Focus on human voice frequencies (85Hz - 8kHz range)
+      const startFreq = 85 + (i / barCount) * 8000;
+      const endFreq = 85 + ((i + 1) / barCount) * 8000;
+      
+      // Map frequencies to array indices
+      const startIndex = Math.floor((startFreq / 22050) * dataArrayRef.current.length);
+      const endIndex = Math.floor((endFreq / 22050) * dataArrayRef.current.length);
+      
+      // Calculate average amplitude for this frequency range
+      let sum = 0;
+      let count = 0;
+      for (let j = startIndex; j < Math.min(endIndex, dataArrayRef.current.length); j++) {
+        sum += dataArrayRef.current[j];
+        count++;
+      }
+      
+      const average = count > 0 ? sum / count : 0;
+      
+      // Apply logarithmic scaling for better visual response
+      const scaledValue = Math.pow(average / 255, 0.7) * 255;
+      
+      // Add some smoothing and minimum height
+      const finalValue = Math.max(2, scaledValue * 1.5);
+      
+      newWaveformData.push(Math.min(255, finalValue));
+      totalLevel += average;
+      maxLevel = Math.max(maxLevel, average);
+    }
+    
+    // Set overall audio level for pulsing animation
+    setAudioLevel(totalLevel / barCount);
     setWaveformData(newWaveformData);
     
-    if (isRecording) {
-      animationRef.current = requestAnimationFrame(animateWaveform);
-    }
+    // Continue animation
+    animationRef.current = requestAnimationFrame(animateWaveform);
   };
 
   // Handle recording stop
@@ -138,8 +186,13 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
       setIsRecording(false);
       setIsNaming(true);
+      setWaveformData(Array(32).fill(0));
+      setAudioLevel(0);
     }
   };
 
@@ -150,12 +203,17 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
     }
     setIsRecording(false);
     setRecordingTime(0);
     setAudioBlob(null);
     setIsNaming(false);
     setRecordingName('');
+    setWaveformData(Array(32).fill(0));
+    setAudioLevel(0);
   };
 
   // Handle playing/pausing audio for attachments
@@ -164,25 +222,53 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
       // Stop current playing audio
       if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
-        audioPlayerRef.current = null;
+        if (progressUpdateRef.current) {
+          cancelAnimationFrame(progressUpdateRef.current);
+        }
       }
       setCurrentPlayingId(null);
+      setAudioProgress(0);
     } else {
       // Start playing new audio
       if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
+        if (progressUpdateRef.current) {
+          cancelAnimationFrame(progressUpdateRef.current);
+        }
       }
       
       const audio = new Audio(attachment.url);
       audioPlayerRef.current = audio;
       
+      audio.addEventListener("loadedmetadata", () => {
+        setAudioDuration(audio.duration);
+      });
+      
       audio.addEventListener("ended", () => {
         setCurrentPlayingId(null);
-        audioPlayerRef.current = null;
+        setAudioProgress(0);
+        if (progressUpdateRef.current) {
+          cancelAnimationFrame(progressUpdateRef.current);
+        }
       });
+      
+      // Update progress during playback
+      const updateProgress = () => {
+        if (audioPlayerRef.current && !isDragging && 
+            audioPlayerRef.current.duration && 
+            isFinite(audioPlayerRef.current.duration)) {
+          const progress = (audioPlayerRef.current.currentTime / audioPlayerRef.current.duration) * 100;
+          setAudioProgress(isNaN(progress) ? 0 : Math.max(0, Math.min(100, progress)));
+        }
+        if (currentPlayingId === attachment.id) {
+          progressUpdateRef.current = requestAnimationFrame(updateProgress);
+        }
+      };
       
       audio.play();
       setCurrentPlayingId(attachment.id);
+      setAudioProgress(0);
+      updateProgress();
     }
   };
 
@@ -193,18 +279,92 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
     if (!audioPlayerRef.current) {
       const audioUrl = URL.createObjectURL(audioBlob);
       audioPlayerRef.current = new Audio(audioUrl);
+      
+      audioPlayerRef.current.addEventListener("loadedmetadata", () => {
+        setAudioDuration(audioPlayerRef.current!.duration);
+      });
+      
       audioPlayerRef.current.addEventListener("ended", () => {
         setIsPlaying(false);
+        setAudioProgress(0);
+        if (progressUpdateRef.current) {
+          cancelAnimationFrame(progressUpdateRef.current);
+        }
       });
     }
 
     if (isPlaying) {
       audioPlayerRef.current.pause();
       setIsPlaying(false);
+      if (progressUpdateRef.current) {
+        cancelAnimationFrame(progressUpdateRef.current);
+      }
     } else {
       audioPlayerRef.current.play();
       setIsPlaying(true);
+      
+      // Update progress during playback
+      const updateProgress = () => {
+        if (audioPlayerRef.current && !isDragging && 
+            audioPlayerRef.current.duration && 
+            isFinite(audioPlayerRef.current.duration)) {
+          const progress = (audioPlayerRef.current.currentTime / audioPlayerRef.current.duration) * 100;
+          setAudioProgress(isNaN(progress) ? 0 : Math.max(0, Math.min(100, progress)));
+        }
+        if (isPlaying) {
+          progressUpdateRef.current = requestAnimationFrame(updateProgress);
+        }
+      };
+      updateProgress();
     }
+  };
+
+  // Handle seek bar interaction
+  const handleSeekBarClick = (e: React.MouseEvent<HTMLDivElement>, attachment?: VoiceAttachment) => {
+    if (!audioPlayerRef.current) return;
+    
+    // Check if audio is loaded and has valid duration
+    if (!audioPlayerRef.current.duration || 
+        !isFinite(audioPlayerRef.current.duration) || 
+        isNaN(audioPlayerRef.current.duration) ||
+        audioPlayerRef.current.duration <= 0) {
+      return;
+    }
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+    const newTime = (percentage / 100) * audioPlayerRef.current.duration;
+    
+    // Additional validation for the calculated time
+    if (isFinite(newTime) && !isNaN(newTime) && newTime >= 0 && newTime <= audioPlayerRef.current.duration) {
+      audioPlayerRef.current.currentTime = newTime;
+      setAudioProgress(percentage);
+    }
+  };
+
+  // Handle seek bar drag
+  const handleSeekBarMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioPlayerRef.current || 
+        !audioPlayerRef.current.duration || 
+        !isFinite(audioPlayerRef.current.duration)) {
+      return;
+    }
+    setIsDragging(true);
+    handleSeekBarClick(e);
+  };
+
+  const handleSeekBarMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || !audioPlayerRef.current || 
+        !audioPlayerRef.current.duration || 
+        !isFinite(audioPlayerRef.current.duration)) {
+      return;
+    }
+    handleSeekBarClick(e);
+  };
+
+  const handleSeekBarMouseUp = () => {
+    setIsDragging(false);
   };
 
   // Upload voice note to S3 as attachment
@@ -431,8 +591,23 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      if (progressUpdateRef.current) {
+        cancelAnimationFrame(progressUpdateRef.current);
+      }
     };
   }, []);
+
+  // Add global mouse event listeners for seek bar dragging
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+  }, [isDragging]);
 
   return (
     <div className="space-y-3">
@@ -462,19 +637,29 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
 
       {/* Recording indicator with waveform */}
       {isRecording && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="animate-pulse w-2 h-2 bg-red-500 rounded-full"></div>
-              <span className="text-red-600 font-medium text-sm">
-                Recording... {formatTime(recordingTime)}
-              </span>
+        <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg"
+                style={{
+                  boxShadow: `0 0 ${8 + (audioLevel / 255) * 12}px rgba(239, 68, 68, 0.6)`
+                }}
+              ></div>
+              <div className="flex flex-col">
+                <span className="text-red-600 font-semibold text-sm">
+                  Recording...
+                </span>
+                <span className="text-red-500 text-xs font-mono">
+                  {formatTime(recordingTime)}
+                </span>
+              </div>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={cancelRecording}
-                className="p-1 text-red-600 hover:bg-red-100 rounded-full"
+                className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors duration-200 shadow-sm hover:shadow-md"
                 title="Cancel recording"
               >
                 <FaTrash size={14} />
@@ -482,7 +667,7 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
               <button
                 type="button"
                 onClick={stopRecording}
-                className="p-1 text-red-600 hover:bg-red-100 rounded-full"
+                className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors duration-200 shadow-sm hover:shadow-md"
                 title="Stop recording"
               >
                 <FaStop size={14} />
@@ -490,17 +675,54 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
             </div>
           </div>
           
-          {/* Waveform visualization */}
-          <div className="flex items-center justify-center gap-1 h-8">
-            {waveformData.map((value, index) => (
-              <div
-                key={index}
-                className="bg-red-400 w-1 rounded-full transition-all duration-75"
-                style={{
-                  height: `${Math.max(4, (value / 255) * 32)}px`,
-                }}
-              />
-            ))}
+          {/* Enhanced waveform visualization */}
+          <div className="relative">
+            {/* Background glow effect */}
+            <div 
+              className="absolute inset-0 bg-gradient-to-r from-red-200 to-pink-200 rounded-lg opacity-30 blur-sm"
+              style={{
+                transform: `scale(${1 + (audioLevel / 255) * 0.1})`,
+                transition: 'transform 0.1s ease-out'
+              }}
+            ></div>
+            
+            {/* Main waveform container */}
+            <div className="relative bg-white/50 backdrop-blur-sm rounded-lg p-3 border border-red-100">
+              <div className="flex items-center justify-center gap-0.5 h-12 overflow-hidden">
+                {waveformData.map((value, index) => {
+                  const height = Math.max(3, (value / 255) * 48);
+                  const intensity = value / 255;
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="bg-gradient-to-t from-red-500 to-pink-400 rounded-full transition-all duration-75 ease-out"
+                      style={{
+                        width: '3px',
+                        height: `${height}px`,
+                        opacity: 0.7 + intensity * 0.3,
+                        transform: `scaleY(${0.2 + intensity * 0.8}) scaleX(${0.8 + intensity * 0.4})`,
+                        boxShadow: intensity > 0.3 ? `0 0 ${intensity * 12}px rgba(239, 68, 68, ${intensity * 0.6})` : 'none',
+                        animation: intensity > 0.5 ? `pulse 0.3s ease-in-out` : 'none'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              
+              {/* Audio level indicator */}
+              <div className="mt-2 flex justify-center">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-red-600 font-medium">Level:</span>
+                  <div className="w-20 h-1 bg-red-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-red-400 to-pink-500 rounded-full transition-all duration-100"
+                      style={{ width: `${Math.min(100, (audioLevel / 255) * 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -524,6 +746,33 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
               )}
             </button>
           </div>
+          
+          {/* Preview seek bar */}
+          {(isPlaying || audioProgress > 0) && (
+            <div className="mb-3">
+              <div 
+                className="w-full h-2 bg-blue-200 rounded-full cursor-pointer relative overflow-hidden"
+                onClick={handleSeekBarClick}
+                onMouseDown={handleSeekBarMouseDown}
+                onMouseMove={handleSeekBarMouseMove}
+                onMouseUp={handleSeekBarMouseUp}
+                onMouseLeave={handleSeekBarMouseUp}
+              >
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-100"
+                  style={{ width: `${audioProgress}%` }}
+                />
+                <div 
+                  className="absolute top-1/2 w-3 h-3 bg-blue-600 rounded-full shadow-md transform -translate-y-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing"
+                  style={{ left: `${audioProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-blue-600 mt-1">
+                <span>{formatTime(isFinite(audioDuration) ? (audioProgress / 100) * audioDuration : 0)}</span>
+                <span>{formatTime(isFinite(audioDuration) ? audioDuration : 0)}</span>
+              </div>
+            </div>
+          )}
           
           <div className="flex gap-2">
             <input
@@ -613,9 +862,36 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
                   ) : (
                     <div className="flex-1">
                       <span className="text-sm font-medium text-gray-800">{attachment.name}</span>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 mb-1">
                         {formatTime(attachment.duration)} • {(attachment.size / 1024).toFixed(1)}KB
                       </div>
+                      
+                      {/* Seek bar for playing attachment */}
+                      {currentPlayingId === attachment.id && (
+                        <div className="mt-2">
+                          <div 
+                            className="w-full h-1.5 bg-blue-200 rounded-full cursor-pointer relative overflow-hidden"
+                            onClick={(e) => handleSeekBarClick(e, attachment)}
+                            onMouseDown={handleSeekBarMouseDown}
+                            onMouseMove={handleSeekBarMouseMove}
+                            onMouseUp={handleSeekBarMouseUp}
+                            onMouseLeave={handleSeekBarMouseUp}
+                          >
+                            <div 
+                              className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-100"
+                              style={{ width: `${audioProgress}%` }}
+                            />
+                            <div 
+                              className="absolute top-1/2 w-2 h-2 bg-blue-600 rounded-full shadow-sm transform -translate-y-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing"
+                              style={{ left: `${audioProgress}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>{formatTime(isFinite(attachment.duration) ? (audioProgress / 100) * attachment.duration : 0)}</span>
+                            <span>{formatTime(attachment.duration)}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
