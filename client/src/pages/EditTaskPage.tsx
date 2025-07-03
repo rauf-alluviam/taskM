@@ -192,6 +192,121 @@ const EditTaskPage: React.FC = () => {
     }
   };
 
+  // Voice attachment handlers
+  const handleVoiceAttachmentAdd = async (attachment: any) => {
+    try {
+      // Convert the voice attachment to the standard attachment format
+      const newAttachment = {
+        _id: attachment.id,
+        originalName: `${attachment.name}.wav`,
+        mimetype: 'audio/wav',
+        size: attachment.size,
+        url: attachment.url,
+        description: `Voice note: ${attachment.name}`,
+        createdAt: attachment.uploadedAt.toISOString(),
+        attachedTo: 'task',
+        attachedToId: task?._id,
+        // Store duration in a custom field for voice notes
+        voiceDuration: attachment.duration
+      };
+
+      // Add to attachments state immediately for better UX
+      setAttachments(prev => [...prev, newAttachment]);
+      
+      // Reload task history to show the voice attachment addition
+      await loadTaskHistory(1);
+      
+      addNotification({
+        type: 'success',
+        title: 'Voice Note Added',
+        message: `Voice note "${attachment.name}" has been uploaded successfully.`,
+      });
+    } catch (error) {
+      console.error('Error handling voice attachment add:', error);
+    }
+  };
+
+  const handleVoiceAttachmentDelete = async (attachmentId: string) => {
+    try {
+      // Remove from local state immediately for better UX
+      setAttachments(prev => prev.filter(att => att._id !== attachmentId));
+      
+      // Reload task history to show the deletion
+      await loadTaskHistory(1);
+      
+      addNotification({
+        type: 'success',
+        title: 'Voice Note Deleted',
+        message: 'Voice note has been deleted successfully.',
+      });
+    } catch (error) {
+      console.error('Error handling voice attachment delete:', error);
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to delete voice note.',
+      });
+    }
+  };
+
+  const handleVoiceAttachmentRename = async (attachmentId: string, newName: string) => {
+    try {
+      // Update local state immediately for better UX
+      setAttachments(prev => 
+        prev.map(att => 
+          att._id === attachmentId 
+            ? { ...att, originalName: newName, description: `Voice note: ${newName}` }
+            : att
+        )
+      );
+      
+      // Reload task history to show the rename
+      await loadTaskHistory(1);
+      
+      addNotification({
+        type: 'success',
+        title: 'Voice Note Renamed',
+        message: `Voice note renamed to "${newName}".`,
+      });
+    } catch (error) {
+      console.error('Error handling voice attachment rename:', error);
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to rename voice note.',
+      });
+    }
+  };
+
+  // Handle attachment changes and reload task history
+  const handleAttachmentsChange = async (newAttachments: any[]) => {
+    setAttachments(newAttachments);
+    // Reload task history to show attachment changes
+    await loadTaskHistory(1);
+  };
+
+  // Filter voice attachments from all attachments
+  const voiceAttachments = attachments
+    .filter(att => att.mimetype?.startsWith('audio/') || att.description?.startsWith('Voice note:'))
+    .map(att => {
+      // Try to get duration from stored field, ensure it's a valid number
+      let duration = att.voiceDuration || 0;
+      
+      // Ensure duration is a valid, finite number
+      if (!isFinite(duration) || isNaN(duration) || duration < 0) {
+        duration = 0;
+      }
+      
+      return {
+        id: att._id,
+        name: att.description?.replace('Voice note: ', '') || att.originalName,
+        url: att.url,
+        duration: Math.round(duration), // Ensure it's an integer
+        size: att.size,
+        uploadedAt: new Date(att.createdAt),
+      };
+    });
+
   const priorityOptions = [
     { value: 'low', label: 'Low Priority', color: 'text-green-600', bg: 'bg-green-100' },
     { value: 'medium', label: 'Medium Priority', color: 'text-yellow-600', bg: 'bg-yellow-100' },
@@ -363,12 +478,11 @@ const EditTaskPage: React.FC = () => {
                     placeholder="Enter task description..."
                     rows={6}
                     className="min-h-[150px]"
-                    onVoiceNoteAdded={() => {
-                      // Auto-save when voice note is added to capture the change in history
-                      setTimeout(() => {
-                        handleSubmit(onSubmit)();
-                      }, 100);
-                    }}
+                    taskId={id}
+                    voiceAttachments={voiceAttachments}
+                    onVoiceAttachmentAdd={handleVoiceAttachmentAdd}
+                    onVoiceAttachmentDelete={handleVoiceAttachmentDelete}
+                    onVoiceAttachmentRename={handleVoiceAttachmentRename}
                   />
                 </div>
 
@@ -497,7 +611,7 @@ const EditTaskPage: React.FC = () => {
                 attachedTo="task"
                 attachedToId={task._id}
                 attachments={attachments}
-                onAttachmentsChange={setAttachments}
+                onAttachmentsChange={handleAttachmentsChange}
               />
             </div>
           </div>

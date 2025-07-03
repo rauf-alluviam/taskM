@@ -6,6 +6,7 @@ import Attachment from '../models/Attachment.js';
 import Task from '../models/Task.js';
 import Document from '../models/Document.js';
 import Project from '../models/Project.js';
+import TaskHistory from '../models/TaskHistory.js';
 import { uploadToS3, deleteFromS3, getSignedUrl } from '../services/s3Service.js';
 
 const router = express.Router();
@@ -198,6 +199,51 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     await attachment.populate('uploadedBy', 'name email');
     console.log('✅ Attachment populated');
 
+    // Log to task history for any attachment added to a task
+    if (attachedTo === 'task') {
+      try {
+        let action, details, metadata;
+        
+        if (description && description.startsWith('Voice note:')) {
+          // Special handling for voice notes
+          const voiceNoteName = description.replace('Voice note: ', '');
+          action = 'voice_note_added';
+          details = `Added voice note "${voiceNoteName}"`;
+          metadata = {
+            attachmentId: attachment._id,
+            attachmentName: voiceNoteName,
+            fileSize: attachment.size,
+            mimetype: attachment.mimetype
+          };
+        } else {
+          // Regular file attachment
+          action = 'attachment_added';
+          details = `Added attachment "${attachment.originalName}"`;
+          metadata = {
+            attachmentId: attachment._id,
+            fileName: attachment.originalName,
+            fileSize: attachment.size,
+            mimetype: attachment.mimetype
+          };
+        }
+        
+        await TaskHistory.logChange(
+          attachedToId,
+          action,
+          {
+            details: details,
+            metadata: metadata
+          },
+          req.user._id,
+          req.user.name
+        );
+        console.log('✅ Task history logged for attachment addition:', action);
+      } catch (historyError) {
+        console.error('❌ Failed to log task history:', historyError);
+        // Don't fail the request if history logging fails
+      }
+    }
+
     res.status(201).json({
       message: 'File uploaded successfully',
       attachment,
@@ -329,6 +375,49 @@ router.delete('/:attachmentId', authenticate, async (req, res) => {
     attachment.isActive = false;
     await attachment.save();
 
+    // Log to task history for any attachment removed from a task
+    if (attachment.attachedTo === 'task') {
+      try {
+        let details, metadata;
+        
+        if (attachment.description && attachment.description.startsWith('Voice note:')) {
+          // Special handling for voice notes
+          const voiceNoteName = attachment.description.replace('Voice note: ', '');
+          details = `Removed voice note "${voiceNoteName}"`;
+          metadata = {
+            attachmentId: attachment._id,
+            attachmentName: voiceNoteName,
+            fileSize: attachment.size,
+            mimetype: attachment.mimetype
+          };
+        } else {
+          // Regular file attachment
+          details = `Removed attachment "${attachment.originalName}"`;
+          metadata = {
+            attachmentId: attachment._id,
+            fileName: attachment.originalName,
+            fileSize: attachment.size,
+            mimetype: attachment.mimetype
+          };
+        }
+        
+        await TaskHistory.logChange(
+          attachment.attachedToId,
+          'attachment_removed',
+          {
+            details: details,
+            metadata: metadata
+          },
+          req.user._id,
+          req.user.name
+        );
+        console.log('✅ Task history logged for attachment removal');
+      } catch (historyError) {
+        console.error('❌ Failed to log task history:', historyError);
+        // Don't fail the request if history logging fails
+      }
+    }
+
     res.json({ message: 'Attachment deleted successfully' });
   } catch (error) {
     console.error('Delete attachment error:', error);
@@ -360,9 +449,57 @@ router.patch('/:attachmentId', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    const oldDescription = attachment.description;
     attachment.description = description || attachment.description;
     await attachment.save();
     await attachment.populate('uploadedBy', 'name email');
+
+    // Log to task history if description changed for any task attachment
+    if (attachment.attachedTo === 'task' && oldDescription !== description && description) {
+      try {
+        let details, metadata;
+        
+        if (oldDescription && oldDescription.startsWith('Voice note:') &&
+            description && description.startsWith('Voice note:')) {
+          // Voice note rename
+          const oldVoiceNoteName = oldDescription.replace('Voice note: ', '');
+          const newVoiceNoteName = description.replace('Voice note: ', '');
+          details = `Renamed voice note from "${oldVoiceNoteName}" to "${newVoiceNoteName}"`;
+          metadata = {
+            attachmentId: attachment._id,
+            oldName: oldVoiceNoteName,
+            newName: newVoiceNoteName
+          };
+        } else {
+          // Regular attachment description update
+          details = `Updated attachment description for "${attachment.originalName}"`;
+          metadata = {
+            attachmentId: attachment._id,
+            fileName: attachment.originalName,
+            oldDescription: oldDescription || '',
+            newDescription: description
+          };
+        }
+        
+        await TaskHistory.logChange(
+          attachment.attachedToId,
+          'updated',
+          {
+            field: 'attachment_description',
+            oldValue: oldDescription || '',
+            newValue: description,
+            details: details,
+            metadata: metadata
+          },
+          req.user._id,
+          req.user.name
+        );
+        console.log('✅ Task history logged for attachment update');
+      } catch (historyError) {
+        console.error('❌ Failed to log task history:', historyError);
+        // Don't fail the request if history logging fails
+      }
+    }
 
     res.json(attachment);
   } catch (error) {

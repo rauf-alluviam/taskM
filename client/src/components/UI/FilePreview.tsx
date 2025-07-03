@@ -5,7 +5,7 @@ interface FilePreviewProps {
   attachment: {
     _id: string;
     originalName: string;
-    mimetype: string;
+    mimetype?: string;
     size: number;
     url?: string;
     uploadedBy?: {
@@ -36,7 +36,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   canDelete = false,
   className = ''
 }) => {
-  const getFileIcon = (mimetype: string) => {
+  const getFileIcon = (mimetype: string | undefined | null) => {
+    // Check if mimetype is valid
+    if (!mimetype) {
+      return <File className="w-8 h-8 text-gray-600" />;
+    }
+    
     if (mimetype.startsWith('image/')) {
       return <Image className="w-8 h-8 text-green-600" />;
     }
@@ -56,7 +61,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     return <File className="w-8 h-8 text-gray-600" />;
   };
 
-  const getFileTypeLabel = (mimetype: string) => {
+  const getFileTypeLabel = (mimetype: string | undefined | null) => {
+    if (!mimetype) return 'Unknown File Type';
+    
     const typeMap: { [key: string]: string } = {
       'application/pdf': 'PDF Document',
       'application/msword': 'Word Document',
@@ -90,7 +97,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const canPreview = (mimetype: string) => {
+  const canPreview = (mimetype: string | undefined | null) => {
+    if (!mimetype) return false;
+    
     return mimetype.startsWith('image/') || 
            mimetype === 'text/plain' || 
            mimetype === 'text/html' || 
@@ -127,7 +136,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
           )}
           
           {/* Preview for images */}
-          {attachment.mimetype.startsWith('image/') && downloadUrl && (
+          {attachment.mimetype?.startsWith('image/') && downloadUrl && (
             <div className="mt-2">
               <img 
                 src={downloadUrl} 
