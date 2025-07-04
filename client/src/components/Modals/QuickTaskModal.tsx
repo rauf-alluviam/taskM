@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import Modal from '../UI/Modal';
+import UserSelector from '../UI/UserSelector';
 import { taskAPI } from '../../services/api';
 import { useTask } from '../../contexts/TaskContext';
-import { Calendar, Flag, Tag, Users } from 'lucide-react';
+import { Calendar, Flag, Tag, User } from 'lucide-react';
 
 interface QuickTaskModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ interface QuickTaskForm {
 const QuickTaskModal: React.FC<QuickTaskModalProps> = ({ isOpen, onClose }) => {
   const { dispatch } = useTask();
   const [loading, setLoading] = useState(false);
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<QuickTaskForm>();
 
   const onSubmit = async (data: QuickTaskForm) => {
@@ -30,12 +32,14 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({ isOpen, onClose }) => {
       const taskData = {
         ...data,
         tags: data.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+        assignedUsers,
         status: 'todo',
       };
       
       const newTask = await taskAPI.createTask(taskData);
       dispatch({ type: 'ADD_TASK', payload: newTask });
       reset();
+      setAssignedUsers([]);
       onClose();
     } catch (error) {
       console.error('Failed to create task:', error);
@@ -106,6 +110,25 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({ isOpen, onClose }) => {
               placeholder="urgent, frontend, bug"
             />
           </div>
+        </div>
+
+        {/* Assign Users */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            <User className="w-4 h-4 inline mr-1" />
+            Assign to Users
+          </label>
+          <UserSelector
+            selectedUserIds={assignedUsers}
+            onSelectionChange={setAssignedUsers}
+            placeholder="Select users to assign this task..."
+            allowMultiple={true}
+            showAvatars={true}
+            className="w-full"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Assign this task to team members who will be responsible for completing it.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

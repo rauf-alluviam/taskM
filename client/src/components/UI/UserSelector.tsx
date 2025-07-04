@@ -94,10 +94,38 @@ const UserSelector: React.FC<UserSelectorProps> = ({
       let availableUsers = response.users || [];
       
       console.log('UserSelector: Raw users from API:', availableUsers.length);
-      console.log('UserSelector: All users:', availableUsers);
+      console.log('UserSelector: Current user for context:', currentUser);
+      console.log('UserSelector: Project context:', project);
+      console.log('UserSelector: Task context:', task);
       
-      // Temporarily disable permission filtering to make dropdowns work
-      // TODO: Fix user status/role filtering logic later
+      // Apply permission-based filtering if we have current user context
+      if (currentUser && availableUsers.length > 0) {
+        try {
+          // Use PermissionHelper to filter assignable users
+          const { PermissionHelper } = await import('../../utils/permissions');
+          const permissionContext = {
+            user: currentUser,
+            project,
+            task
+          };
+          
+          const assignableUsers = PermissionHelper.getAssignableUsers(permissionContext, availableUsers);
+          console.log('UserSelector: After permission filtering:', assignableUsers.length, 'users');
+          availableUsers = assignableUsers;
+        } catch (error) {
+          console.warn('UserSelector: Permission filtering failed, using all users:', error);
+          // Fall back to basic filtering
+          availableUsers = availableUsers.filter(u => 
+            u.status === 'active' && u.role !== 'viewer'
+          );
+        }
+      } else {
+        // Basic filtering when no permission context
+        availableUsers = availableUsers.filter(u => 
+          u.status === 'active' && u.role !== 'viewer'
+        );
+        console.log('UserSelector: After basic filtering:', availableUsers.length, 'users');
+      }
       
       setUsers(availableUsers);
     } catch (error) {

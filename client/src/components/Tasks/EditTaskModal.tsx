@@ -3,12 +3,15 @@ import { useForm } from 'react-hook-form';
 import { X, Plus, Tag, Calendar, Flag, User, Trash2, List, Paperclip } from 'lucide-react';
 import Modal from '../UI/Modal';
 import UserSelector from '../UI/UserSelector';
+import UserAvatarList from '../UI/UserAvatarList';
 import SubtaskManager from './SubtaskManager';
 import AttachmentManager from '../UI/AttachmentManager';
 import { attachmentAPI } from '../../services/api';
 import { Task } from '../../contexts/TaskContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { PermissionHelper } from '../../utils/permissions';
+import { TaskValidator } from '../../utils/taskValidation';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface TaskFormData {
   title: string;
@@ -51,11 +54,20 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   project,
 }) => {
   const { user } = useAuth();
+  const { addNotification } = useNotification();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // Check if user can assign tasks
+  const canAssignTasks = user && task ? PermissionHelper.canAssignTasks({
+    user,
+    project,
+    task
+  }) : false;
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<TaskFormData>();
   useEffect(() => {
@@ -132,8 +144,42 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     }
   };
 
-  const handleFormSubmit = (data: TaskFormData) => {
-    onSubmit({ ...data, tags, assignedUsers });
+  const handleFormSubmit = async (data: TaskFormData) => {
+    setValidationErrors([]);
+    
+    try {
+      // Prepare task data
+      const taskData = { 
+        ...data, 
+        tags, 
+        assignedUsers: canAssignTasks ? assignedUsers : (task?.assignedUsers?.map((u: any) => u._id || u) || [])
+      };
+      
+      // Validate task data
+      const validation = await TaskValidator.validateTaskData(taskData);
+      
+      if (!validation.isValid) {
+        setValidationErrors(validation.errors);
+        addNotification({
+          type: 'error',
+          title: 'Validation Error',
+          message: validation.errors[0],
+          duration: 5000
+        });
+        return;
+      }
+      
+      // Submit if validation passes
+      onSubmit(taskData);
+    } catch (error) {
+      console.error('Task validation failed:', error);
+      addNotification({
+        type: 'error',
+        title: 'Validation Failed',
+        message: 'Unable to validate task data. Please try again.',
+        duration: 5000
+      });
+    }
   };
   const handleClose = () => {
     reset();
@@ -141,6 +187,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     setTagInput('');
     setAssignedUsers([]);
     setAttachments([]);
+    setValidationErrors([]);
     onClose();
   };
 
@@ -155,6 +202,31 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Edit Task">
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+        {/* Validation Errors */}
+        {validationErrors.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Please fix the following errors:
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <ul className="list-disc list-inside space-y-1">
+                    {validationErrors.map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -241,26 +313,51 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </div>
         </div>
 
-        {/* Assign Users */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <User className="w-4 h-4 inline mr-1" />
-            Assign to Users
-          </label>
-          <UserSelector
-            selectedUserIds={assignedUsers}
-            onSelectionChange={setAssignedUsers}
-            placeholder="Select users to assign this task..."
-            allowMultiple={true}
-            showAvatars={true}
-            className="w-full"
-            project={project}
-            task={task}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Assign this task to team members who will be responsible for completing it.
-          </p>
-        </div>
+        {/* Assign Users - Only show if user has permission */}
+        {canAssignTasks && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <User className="w-4 h-4 inline mr-1" />
+              Assign to Users
+            </label>
+            <UserSelector
+              selectedUserIds={assignedUsers}
+              onSelectionChange={setAssignedUsers}
+              placeholder="Select users to assign this task..."
+              allowMultiple={true}
+              showAvatars={true}
+              className="w-full"
+              project={project}
+              task={task}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Assign this task to team members who will be responsible for completing it.
+            </p>
+          </div>
+        )}
+
+        {/* Show assigned users as read-only if user cannot assign */}
+        {!canAssignTasks && task.assignedUsers && task.assignedUsers.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <User className="w-4 h-4 inline mr-1" />
+              Assigned Users
+            </label>
+            <div className="p-3 bg-gray-50 rounded-md">
+              <UserAvatarList
+                users={
+                  task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
+                }
+                maxDisplay={5}
+                size="sm"
+                showNames={true}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              You don't have permission to modify task assignments.
+            </p>
+          </div>
+        )}
 
         {/* Categories/Tags */}
         <div>

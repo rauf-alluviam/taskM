@@ -401,6 +401,13 @@ export const userAPI = {
       return response.data;
     });
   },
+  // Validate that user IDs exist and are assignable
+  validateAssignableUsers: async (userIds: string[]) => {
+    return withRetry(async () => {
+      const response = await api.post('/users/validate-assignable', { userIds });
+      return response.data;
+    });
+  },
   updateUser: async (userId: string, userData: any) => {
     return withRetry(async () => {
       const response = await api.put(`/users/${userId}`, userData);

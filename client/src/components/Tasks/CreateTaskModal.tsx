@@ -4,6 +4,9 @@ import { X, Plus, Tag, Calendar, Flag, User } from 'lucide-react';
 import Modal from '../UI/Modal';
 import UserSelector from '../UI/UserSelector';
 import { useAuth } from '../../contexts/AuthContext';
+import { PermissionHelper } from '../../utils/permissions';
+import { TaskValidator } from '../../utils/taskValidation';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface TaskFormData {
   title: string;
@@ -44,9 +47,18 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   project,
 }) => {
   const { user } = useAuth();
+  const { addNotification } = useNotification();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // Check if user can assign tasks
+  const canAssignTasks = user ? PermissionHelper.canAssignTasks({
+    user,
+    project,
+    task: undefined // No task yet since we're creating
+  }) : false;
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TaskFormData>({
     defaultValues: {
@@ -99,17 +111,72 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
   };
 
-  const handleFormSubmit = (data: TaskFormData) => {
-    onSubmit({ ...data, tags, assignedUsers });
-    reset();
-    setTags([]);
-    setTagInput('');
-    setAssignedUsers([]);
+  const handleFormSubmit = async (data: TaskFormData) => {
+    setValidationErrors([]);
+    
+    try {
+      // Prepare task data
+      const taskData = { 
+        ...data, 
+        tags, 
+        assignedUsers: canAssignTasks ? assignedUsers : [] 
+      };
+      
+      // Validate task data
+      const validation = await TaskValidator.validateTaskData(taskData);
+      
+      if (!validation.isValid) {
+        setValidationErrors(validation.errors);
+        addNotification({
+          type: 'error',
+          title: 'Validation Error',
+          message: validation.errors[0],
+          duration: 5000
+        });
+        return;
+      }
+      
+      // Submit if validation passes
+      onSubmit(taskData);
+      reset();
+      setTags([]);
+      setTagInput('');
+      setAssignedUsers([]);
+      setValidationErrors([]);
+    } catch (error) {
+      console.error('Task validation failed:', error);
+      addNotification({
+        type: 'error',
+        title: 'Validation Failed',
+        message: 'Unable to validate task data. Please try again.',
+        duration: 5000
+      });
+    }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Task">
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+        {/* Validation Errors */}
+        {validationErrors.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Please fix the following errors:
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <ul className="list-disc list-inside space-y-1">
+                    {validationErrors.map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -196,25 +263,27 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </div>
         </div>
 
-        {/* Assign Users */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <User className="w-4 h-4 inline mr-1" />
-            Assign to Users
-          </label>
-          <UserSelector
-            selectedUserIds={assignedUsers}
-            onSelectionChange={setAssignedUsers}
-            placeholder="Select users to assign this task..."
-            allowMultiple={true}
-            showAvatars={true}
-            className="w-full"
-            project={project}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Assign this task to team members who will be responsible for completing it.
-          </p>
-        </div>
+        {/* Assign Users - Only show if user has permission */}
+        {canAssignTasks && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <User className="w-4 h-4 inline mr-1" />
+              Assign to Users
+            </label>
+            <UserSelector
+              selectedUserIds={assignedUsers}
+              onSelectionChange={setAssignedUsers}
+              placeholder="Select users to assign this task..."
+              allowMultiple={true}
+              showAvatars={true}
+              className="w-full"
+              project={project}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Assign this task to team members who will be responsible for completing it.
+            </p>
+          </div>
+        )}
 
         {/* Categories/Tags */}
         <div>

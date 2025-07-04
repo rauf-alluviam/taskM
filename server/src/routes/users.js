@@ -317,4 +317,72 @@ router.delete('/:id', authenticate, admin, async (req, res) => {
   }
 });
 
+// Validate assignable users
+router.post('/validate-assignable', authenticate, async (req, res) => {
+  try {
+    const { userIds } = req.body;
+    
+    if (!userIds || !Array.isArray(userIds)) {
+      return res.status(400).json({ message: 'userIds array is required' });
+    }
+    
+    // Remove duplicates and validate format
+    const uniqueUserIds = [...new Set(userIds)];
+    const validObjectIds = uniqueUserIds.filter(id => 
+      id && typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)
+    );
+    
+    if (validObjectIds.length !== uniqueUserIds.length) {
+      return res.json({
+        valid: false,
+        invalidUsers: uniqueUserIds.filter(id => 
+          !id || typeof id !== 'string' || !id.match(/^[0-9a-fA-F]{24}$/)
+        ),
+        message: 'Some user IDs are not valid ObjectIds'
+      });
+    }
+    
+    // Check if users exist and are assignable
+    const users = await User.find(
+      { _id: { $in: validObjectIds } },
+      '_id name email status role isActive'
+    );
+    
+    const foundUserIds = users.map(u => u._id.toString());
+    const notFoundUserIds = validObjectIds.filter(id => !foundUserIds.includes(id));
+    
+    // Check for inactive or non-assignable users
+    const inactiveUsers = users
+      .filter(u => u.status !== 'active' || u.isActive === false || u.role === 'viewer')
+      .map(u => u._id.toString());
+    
+    const isValid = notFoundUserIds.length === 0 && inactiveUsers.length === 0;
+    
+    const response = {
+      valid: isValid,
+      totalRequested: userIds.length,
+      validUsers: users
+        .filter(u => u.status === 'active' && u.isActive !== false && u.role !== 'viewer')
+        .map(u => ({ _id: u._id, name: u.name, email: u.email }))
+    };
+    
+    if (notFoundUserIds.length > 0) {
+      response.invalidUsers = notFoundUserIds;
+    }
+    
+    if (inactiveUsers.length > 0) {
+      response.inactiveUsers = inactiveUsers;
+    }
+    
+    if (!isValid) {
+      response.message = 'Some users cannot be assigned to tasks';
+    }
+    
+    res.json(response);
+  } catch (error) {
+    console.error('Validate assignable users error:', error);
+    res.status(500).json({ message: 'Server error while validating users' });
+  }
+});
+
 export default router;
