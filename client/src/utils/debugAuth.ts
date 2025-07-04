@@ -44,7 +44,7 @@ export const debugAuth = () => {
 // Function to test API authentication
 export const testApiAuth = async () => {
   try {
-    const response = await fetch(`${(import.meta as any).env.VITE_API_URL || 'http://localhost:5001/api'}/auth/verify`, {
+    const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/auth/verify`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,

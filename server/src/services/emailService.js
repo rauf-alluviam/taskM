@@ -83,7 +83,7 @@ if (USE_MOCK_EMAIL) {
 }
 
 const FROM_EMAIL = process.env.MAIL_FROM || process.env.FROM_EMAIL || 'noreply@taskm.com';
-const DOMAIN = process.env.DOMAIN || 'http://localhost:3000';
+const DOMAIN = process.env.DOMAIN || 'http://task-flow-ai.s3-website.ap-south-1.amazonaws.com';
 
 const testConnection = async () => {
     try {

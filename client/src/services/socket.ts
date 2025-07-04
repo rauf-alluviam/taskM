@@ -6,7 +6,7 @@ class SocketService {
   private maxReconnectAttempts = 5;
   private connectionTimeout: NodeJS.Timeout | null = null;
     connect(token?: string) {
-    const serverUrl = (import.meta as any).env.VITE_SOCKET_URL || 'http://localhost:5001';
+    const serverUrl = (import.meta as any).env.VITE_SOCKET_URL;
     
     console.log('🔌 Attempting to connect to socket server:', serverUrl);
     console.log('🔧 Environment check:', {
@@ -103,7 +103,7 @@ class SocketService {
 
   // Test connection method for debugging
   async testConnection(): Promise<boolean> {
-    const serverUrl = (import.meta as any).env.VITE_SOCKET_URL || 'http://localhost:5001';
+    const serverUrl = (import.meta as any).env.VITE_SOCKET_URL;
     console.log('🧪 Testing connection to:', serverUrl);
     
     try {

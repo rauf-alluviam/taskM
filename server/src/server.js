@@ -32,10 +32,11 @@ const server = createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      process.env.CLIENT_URL || 'http://localhost:3000',
+      process.env.CLIENT_URL || 'http://task-flow-ai.s3-website.ap-south-1.amazonaws.com',
       'http://localhost:5173', // Vite default
       'http://localhost:3000', // React default
       'http://localhost:3001', // Alternative React port
+      'http://task-flow-ai.s3-website.ap-south-1.amazonaws.com', // Production URL
     ],
     credentials: true,
     methods: ['GET', 'POST'],
@@ -48,10 +49,11 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 app.use(cors({
   origin: [
-    process.env.CLIENT_URL || 'http://localhost:3000',
+    process.env.CLIENT_URL || 'http://task-flow-ai.s3-website.ap-south-1.amazonaws.com',
     'http://localhost:5173', // Vite default
     'http://localhost:3000', // React default
     'http://localhost:3001', // Alternative React port
+    'http://task-flow-ai.s3-website.ap-south-1.amazonaws.com' // Production URL
   ],
   credentials: true,
 }));
@@ -172,7 +174,7 @@ app.set('io', io);
 // Start server with graceful shutdown
 const httpServer = server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 API Health Check: http://localhost:${PORT}/api/health`);
+  // console.log(`📊 API Health Check: http://localhost:${PORT}/api/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔌 WebSocket server ready`);
 }).on('error', (err) => {
