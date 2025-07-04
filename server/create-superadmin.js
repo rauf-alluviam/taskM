@@ -169,8 +169,8 @@ async function createSuperAdmin() {
     } else {
       // Default super admin credentials
       name = 'Super Administrator';
-      email = 'admin@taskflow.com';
-      password = 'admin123';
+      email = 'jeeya2808@gmail.com';
+      password = 'admin@123';
       
       console.log('🔧 Creating default super admin with credentials:');
       console.log(`   Name: ${name}`);
@@ -253,7 +253,6 @@ async function createSuperAdmin() {
     console.log('   • Access analytics and system-wide data');
     console.log('   • Perform all administrative tasks');
     console.log('');
-    console.log('🚀 You can now login with these credentials at: http://localhost:5173');
 
   } catch (error) {
     console.error('❌ Error creating super admin:', error.message);

@@ -31,22 +31,27 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    ...(user?.role === 'super_admin' ? [
-      { name: 'All Organizations', href: '/organizations', icon: Building2 },
-    ] : []),
-    ...(hasOrganization ? [
-      { name: 'Organization', href: '/organization', icon: Building2 },
-      { name: 'Teams', href: '/teams', icon: Users },
-    ] : [
-      { name: 'Create Organization', href: '/organization/create', icon: Building2 },
-    ]),
-    { name: 'Projects', href: '/projects', icon: FolderOpen },
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
+    { name: 'Projects', href: '/projects', icon: FolderOpen },
+    { name: 'Teams', href: '/teams', icon: Users },
     { name: 'Documents', href: '/documents', icon: FileText },
     ...(isAdmin ? [
       { name: 'User Management', href: '/users', icon: UserCog },
       { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     ] : []),
+    ...(user?.role === 'super_admin' ? [
+      { name: 'All Organizations', href: '/organizations', icon: Building2 },
+    ] : []),
+    ...(hasOrganization ? [
+      { name: 'Organization', href: '/organization', icon: Building2 },
+
+    ] : [
+      { name: 'Create Organization', href: '/organization/create', icon: Building2 },
+    ]),
+   
+
+ 
+    
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 

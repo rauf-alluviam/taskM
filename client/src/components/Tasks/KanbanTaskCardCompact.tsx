@@ -31,6 +31,10 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete 
     isDragging,
   } = useSortable({ id: task._id });
 
+  // Add tracking for double click
+  const [clickCount, setClickCount] = useState(0);
+  const [clickTimer, setClickTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -99,7 +103,29 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.card-content')) {
       e.stopPropagation();
-      onEdit?.(task);
+      
+      setClickCount(prev => prev + 1);
+      
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+      }
+      
+      const timer = setTimeout(() => {
+        if (clickCount === 0) {
+          // Single click action
+          onEdit?.(task);
+        }
+        setClickCount(0);
+      }, 250); // 250ms threshold for double click detection
+      
+      setClickTimer(timer);
+      
+      if (clickCount === 1) {
+        // Double click detected - navigate to full editor
+        clearTimeout(clickTimer as ReturnType<typeof setTimeout>);
+        setClickCount(0);
+        navigate(`/tasks/${task._id}/edit`);
+      }
     }
   };
   const handleActionClick = (e: React.MouseEvent) => {
