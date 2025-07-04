@@ -124,7 +124,16 @@ router.post('/', authenticate, [
   body('name').trim().isLength({ min: 1 }).withMessage('Project name is required'),
   body('description').optional().trim(),
   body('department').trim().isLength({ min: 1 }).withMessage('Department is required'),
-  body('teamId').optional().isMongoId().withMessage('Valid team ID required'),
+  body('teamId').optional().custom((value) => {
+    // Allow empty string, null, undefined, or valid MongoDB ObjectId
+    if (!value || value === '' || value === null || value === undefined) {
+      return true;
+    }
+    if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+      throw new Error('Valid team ID required');
+    }
+    return true;
+  }),
   body('visibility').optional().isIn(['private', 'team', 'organization', 'public']),
   body('kanbanColumns').optional().isArray(),
 ], async (req, res) => {
@@ -138,7 +147,7 @@ router.post('/', authenticate, [
       name,
       description,
       department,
-      teamId,
+      teamId: rawTeamId,
       visibility = 'team',
       members = [],
       kanbanColumns = [
@@ -151,6 +160,9 @@ router.post('/', authenticate, [
       color = '#3B82F6',
       icon = 'folder'
     } = req.body;
+
+    // Convert empty string to null for teamId
+    const teamId = rawTeamId && rawTeamId !== '' ? rawTeamId : null;
 
     let projectType = 'individual';
     let organization = null;
@@ -218,11 +230,210 @@ router.post('/', authenticate, [
 
 // Update project
 router.put('/:id', authenticate, [
-  body('name').optional().trim().isLength({ min: 1 }),
+  body('name').optional().trim().isLength({ min: 1 }).withMessage('Project name must not be empty'),
   body('description').optional().trim(),
-  body('department').optional().trim().isLength({ min: 1 }),
-  body('members').optional().isArray(),
-  body('kanbanColumns').optional().isArray(),
+  body('department').optional().trim().isLength({ min: 1 }).withMessage('Department must not be empty'),
+  body('teamId').optional().custom((value) => {
+    // Allow empty string, null, undefined, or valid MongoDB ObjectId
+    if (!value || value === '' || value === null || value === undefined) {
+      return true;
+    }
+    if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+      throw new Error('Valid team ID required');
+    }
+    return true;
+  }),
+  body('visibility').optional().isIn(['private', 'team', 'organization', 'public']).withMessage('Invalid visibility option'),
+  body('status').optional().isIn(['active', 'paused', 'completed', 'archived']).withMessage('Invalid status'),
+  body('kanbanColumns').optional().isArray().withMessage('Kanban columns must be an array'),
+  body('tags').optional().isArray().withMessage('Tags must be an array'),
+  body('color').optional().isHexColor().withMessage('Color must be a valid hex color'),
+  body('icon').optional().trim(),
+  body('startDate').optional().isISO8601().withMessage('Invalid start date format'),
+  body('endDate').optional().isISO8601().withMessage('Invalid end date format'),
+  body('settings').optional().isObject().withMessage('Settings must be an object'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const project = await Project.findById(req.params.id)
+      .populate('createdBy', 'name email')
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email');
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Enhanced permission checking
+    let canUpdate = false;
+
+    // Super admin can update any project
+    if (req.user.role === 'super_admin') {
+      canUpdate = true;
+    }
+    // Project creator can update
+    else if (project.createdBy._id.equals(req.user._id)) {
+      canUpdate = true;
+    }
+    // Project admins can update
+    else if (project.isAdmin(req.user._id)) {
+      canUpdate = true;
+    }
+    // Organization admins can update organization projects
+    else if (project.organization && req.user.organization && 
+             project.organization._id.equals(req.user.organization) && 
+             req.user.isOrganizationAdmin()) {
+      canUpdate = true;
+    }
+
+    if (!canUpdate) {
+      return res.status(403).json({ message: 'Access denied - insufficient permissions to edit this project' });
+    }
+
+    const {
+      name,
+      description,
+      department,
+      teamId,
+      visibility,
+      status,
+      kanbanColumns,
+      tags,
+      color,
+      icon,
+      startDate,
+      endDate,
+      settings
+    } = req.body;
+
+    // Prepare update object
+    const updateData = {};
+
+    // Basic fields
+    if (name !== undefined) updateData.name = name.trim();
+    if (description !== undefined) updateData.description = description;
+    if (department !== undefined) updateData.department = department.trim();
+    if (visibility !== undefined) updateData.visibility = visibility;
+    if (status !== undefined) updateData.status = status;
+    if (tags !== undefined) updateData.tags = tags;
+    if (color !== undefined) updateData.color = color;
+    if (icon !== undefined) updateData.icon = icon;
+    if (startDate !== undefined) updateData.startDate = startDate;
+    if (endDate !== undefined) updateData.endDate = endDate;
+    if (settings !== undefined) {
+      updateData.settings = { ...project.settings, ...settings };
+    }
+
+    // Handle team assignment (only if user has org admin rights or is super admin)
+    if (teamId !== undefined && (req.user.role === 'super_admin' || 
+        (req.user.organization && req.user.isOrganizationAdmin()))) {
+      
+      if (teamId && teamId !== '') {
+        const Team = (await import('../models/Team.js')).default;
+        const teamDoc = await Team.findById(teamId);
+        if (!teamDoc) {
+          return res.status(404).json({ message: 'Team not found' });
+        }
+
+        // Validate team belongs to same organization
+        if (project.organization && !teamDoc.organization.equals(project.organization._id)) {
+          return res.status(400).json({ message: 'Team must belong to the same organization' });
+        }
+
+        updateData.team = teamId;
+        updateData.projectType = 'team';
+      } else {
+        updateData.team = null;
+        updateData.projectType = project.organization ? 'organization' : 'individual';
+      }
+    }
+
+    // Handle kanban columns with validation
+    if (kanbanColumns !== undefined) {
+      if (!Array.isArray(kanbanColumns)) {
+        return res.status(400).json({ message: 'Kanban columns must be an array' });
+      }
+
+      updateData.kanbanColumns = kanbanColumns.map((col, index) => {
+        if (!col.name || col.name.trim() === '') {
+          throw new Error(`Column at index ${index} must have a name`);
+        }
+        return {
+          name: col.name.trim(),
+          order: col.order !== undefined ? col.order : index
+        };
+      });
+    }
+
+    // Validate date range
+    if (updateData.startDate && updateData.endDate) {
+      const start = new Date(updateData.startDate);
+      const end = new Date(updateData.endDate);
+      if (start >= end) {
+        return res.status(400).json({ message: 'End date must be after start date' });
+      }
+    }
+
+    // Validate visibility changes
+    if (updateData.visibility) {
+      // If changing to organization visibility, ensure project belongs to an organization
+      if (updateData.visibility === 'organization' && !project.organization) {
+        return res.status(400).json({ message: 'Cannot set organization visibility for non-organization project' });
+      }
+      // If changing to team visibility, ensure project has a team
+      if (updateData.visibility === 'team' && !project.team && !updateData.team) {
+        return res.status(400).json({ message: 'Cannot set team visibility without a team assignment' });
+      }
+    }
+
+    // Perform the update
+    const updatedProject = await Project.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    )
+      .populate('createdBy', 'name email')
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email');
+
+    res.json({
+      message: 'Project updated successfully',
+      project: updatedProject
+    });
+
+  } catch (error) {
+    console.error('Update project error:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
+      return res.status(400).json({ 
+        message: 'Validation failed',
+        errors: validationErrors 
+      });
+    }
+
+    // Handle custom errors
+    if (error.message && error.message.includes('Column at index')) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    res.status(500).json({ message: 'Server error while updating project' });
+  }
+});
+
+// Update project settings specifically
+router.patch('/:id/settings', authenticate, [
+  body('settings').isObject().withMessage('Settings must be an object'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -235,24 +446,188 @@ router.put('/:id', authenticate, [
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Check if user has permission to update this project
-    const canUpdate = project.createdBy.equals(req.user._id) || req.user.role === 'admin';
+    // Check permissions
+    const canUpdate = project.isAdmin(req.user._id) || 
+                     req.user.role === 'super_admin' ||
+                     (req.user.organization && req.user.isOrganizationAdmin());
+    
     if (!canUpdate) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    const { settings } = req.body;
+    
+    // Merge with existing settings
+    const updatedSettings = { ...project.settings, ...settings };
+
     const updatedProject = await Project.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      { settings: updatedSettings },
       { new: true, runValidators: true }
     )
       .populate('createdBy', 'name email')
-      .populate('members', 'name email');
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email');
 
-    res.json(updatedProject);
+    res.json({
+      message: 'Project settings updated successfully',
+      project: updatedProject
+    });
+
   } catch (error) {
-    console.error('Update project error:', error);
-    res.status(500).json({ message: 'Server error while updating project' });
+    console.error('Update project settings error:', error);
+    res.status(500).json({ message: 'Server error while updating project settings' });
+  }
+});
+
+// Update project status
+router.patch('/:id/status', authenticate, [
+  body('status').isIn(['active', 'paused', 'completed', 'archived']).withMessage('Invalid status'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check permissions
+    const canUpdate = project.isAdmin(req.user._id) || 
+                     req.user.role === 'super_admin' ||
+                     (req.user.organization && req.user.isOrganizationAdmin());
+    
+    if (!canUpdate) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { status } = req.body;
+
+    const updatedProject = await Project.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    )
+      .populate('createdBy', 'name email')
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email');
+
+    res.json({
+      message: 'Project status updated successfully',
+      project: updatedProject
+    });
+
+  } catch (error) {
+    console.error('Update project status error:', error);
+    res.status(500).json({ message: 'Server error while updating project status' });
+  }
+});
+
+// Update kanban columns
+router.patch('/:id/kanban-columns', authenticate, [
+  body('kanbanColumns').isArray().withMessage('Kanban columns must be an array'),
+  body('kanbanColumns.*.name').trim().isLength({ min: 1 }).withMessage('Column name is required'),
+  body('kanbanColumns.*.order').isNumeric().withMessage('Column order must be numeric'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check permissions
+    const canUpdate = project.isAdmin(req.user._id) || 
+                     req.user.role === 'super_admin' ||
+                     (req.user.organization && req.user.isOrganizationAdmin());
+    
+    if (!canUpdate) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { kanbanColumns } = req.body;
+
+    // Validate and format columns
+    const formattedColumns = kanbanColumns.map((col, index) => ({
+      name: col.name.trim(),
+      order: col.order !== undefined ? col.order : index
+    }));
+
+    const updatedProject = await Project.findByIdAndUpdate(
+      req.params.id,
+      { kanbanColumns: formattedColumns },
+      { new: true, runValidators: true }
+    )
+      .populate('createdBy', 'name email')
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email');
+
+    res.json({
+      message: 'Kanban columns updated successfully',
+      project: updatedProject
+    });
+
+  } catch (error) {
+    console.error('Update kanban columns error:', error);
+    res.status(500).json({ message: 'Server error while updating kanban columns' });
+  }
+});
+
+// Archive/Unarchive project
+router.patch('/:id/archive', authenticate, [
+  body('archived').isBoolean().withMessage('Archived must be a boolean value'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check permissions
+    const canUpdate = project.isAdmin(req.user._id) || 
+                     req.user.role === 'super_admin' ||
+                     (req.user.organization && req.user.isOrganizationAdmin());
+    
+    if (!canUpdate) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { archived } = req.body;
+    const status = archived ? 'archived' : 'active';
+
+    const updatedProject = await Project.findByIdAndUpdate(
+      req.params.id,
+      { status, isActive: !archived },
+      { new: true, runValidators: true }
+    )
+      .populate('createdBy', 'name email')
+      .populate('organization', 'name')
+      .populate('team', 'name')
+      .populate('members.user', 'name email');
+
+    res.json({
+      message: `Project ${archived ? 'archived' : 'unarchived'} successfully`,
+      project: updatedProject
+    });
+
+  } catch (error) {
+    console.error('Archive project error:', error);
+    res.status(500).json({ message: 'Server error while archiving project' });
   }
 });
 

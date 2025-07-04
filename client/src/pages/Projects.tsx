@@ -8,6 +8,7 @@ import { projectAPI, teamAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 import ProjectFilters, { ProjectFilters as ProjectFiltersType } from '../components/Filters/ProjectFilters';
+import EditProjectModal from '../components/Modals/EditProjectModal';
 import { useForm } from 'react-hook-form';
 
 interface ProjectForm {
@@ -38,6 +39,8 @@ const Projects: React.FC = () => {
     sortOrder: 'desc',
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
