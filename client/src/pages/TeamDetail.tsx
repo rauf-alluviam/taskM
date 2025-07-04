@@ -20,6 +20,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { teamAPI, projectAPI, organizationAPI, userAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
+import UserSelector from '../components/UI/UserSelector';
 import { useForm } from 'react-hook-form';
 import { debounce } from '../utils/debounce';
 
@@ -67,7 +68,7 @@ interface UpdateRoleForm {
 }
 
 interface AddMemberForm {
-  userId: string;
+  userIds: string[];
   role: 'member' | 'viewer';
 }
 
@@ -83,29 +84,16 @@ const TeamDetail: React.FC = () => {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
-  const [organizationMembers, setOrganizationMembers] = useState<any[]>([]);
-  const [memberSearch, setMemberSearch] = useState('');
-  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<UpdateRoleForm>();
   const { register: registerMember, handleSubmit: handleSubmitMember, reset: resetMember, formState: { errors: memberErrors } } = useForm<AddMemberForm>();
 
-  const debouncedMemberSearch = debounce((searchTerm: string) => {
-    loadOrganizationMembers(searchTerm);
-  }, 300);
-
   useEffect(() => {
     if (id) {
       loadTeamDetail();
-      loadOrganizationMembers();
     }
   }, [id]);
-
-  useEffect(() => {
-    if (showAddMemberModal && team) {
-      debouncedMemberSearch(memberSearch);
-    }
-  }, [memberSearch, showAddMemberModal, team]);
 
   useEffect(() => {
     const handleClickOutside = () => setDropdownOpen(null);
@@ -186,51 +174,30 @@ const TeamDetail: React.FC = () => {
     setShowUpdateRoleModal(true);
   };
 
-  const loadOrganizationMembers = async (search?: string) => {
-    if (!team) {
-      setOrganizationMembers([]);
-      return;
-    }
-    try {
-      setLoadingMembers(true);
-      const response = await userAPI.getAllUsersForSelection();
-      const allUsers = response.users || [];
-      const existingMemberIds = team.members?.map(member => member.user._id || member.user) || [];
-      let availableUsers = allUsers.filter((user: { _id: string | { _id: string; name: string; email: string; }; }) => !existingMemberIds.includes(user._id));
-      if (search && search.trim()) {
-        const searchLower = search.toLowerCase();
-        availableUsers = availableUsers.filter((user: { name: string; email: string; }) =>
-          user.name?.toLowerCase().includes(searchLower) ||
-          user.email?.toLowerCase().includes(searchLower)
-        );
-      }
-      availableUsers = availableUsers.slice(0, 50);
-      setOrganizationMembers(availableUsers);
-    } catch (error) {
-      setOrganizationMembers([]);
-    } finally {
-      setLoadingMembers(false);
-    }
-  };
-
   const onAddMember = async (data: AddMemberForm) => {
-    if (!team) return;
+    if (!team || !selectedUserIds || selectedUserIds.length === 0) return;
 
     try {
-      await teamAPI.addMember(team._id, data.userId, data.role);
+      // Add members one by one
+      for (const userId of selectedUserIds) {
+        await teamAPI.addMember(team._id, userId, data.role);
+      }
+      
       addNotification({
         type: 'success',
-        title: 'Member Added',
-        message: 'Team member added successfully',
+        title: 'Member(s) Added',
+        message: `${selectedUserIds.length} member(s) added successfully`,
       });
+      
       resetMember();
+      setSelectedUserIds([]);
       setShowAddMemberModal(false);
       loadTeamDetail(); // Refresh team data
     } catch (error: any) {
       addNotification({
         type: 'error',
         title: 'Error',
-        message: error.response?.data?.message || 'Failed to add member',
+        message: error.response?.data?.message || 'Failed to add member(s)',
       });
     }
   };
@@ -609,7 +576,7 @@ const TeamDetail: React.FC = () => {
         isOpen={showAddMemberModal}
         onClose={() => {
           setShowAddMemberModal(false);
-          setMemberSearch('');
+          setSelectedUserIds([]);
           resetMember();
         }}
         title={`Add Member to ${team?.name}`}
@@ -617,45 +584,23 @@ const TeamDetail: React.FC = () => {
         <form onSubmit={handleSubmitMember(onAddMember)} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search Users
+              Select Users
             </label>
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
-              className="input-field mb-3"
+            <UserSelector
+              selectedUserIds={selectedUserIds}
+              onSelectionChange={(userIds) => {
+                setSelectedUserIds(userIds);
+              }}
+              placeholder="Search and select users to add..."
+              allowMultiple={true}
+              showAvatars={true}
+              className="w-full"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select User
-              {loadingMembers && (
-                <span className="ml-2 text-xs text-gray-500">(Loading...)</span>
-              )}
-            </label>
-            <select
-              {...registerMember('userId', { required: 'Please select a user' })}
-              className="input-field"
-              disabled={loadingMembers}
-            >
-              <option value="">
-                {loadingMembers
-                  ? 'Loading users...'
-                  : organizationMembers.length === 0
-                    ? 'No available users found'
-                    : 'Choose a user...'}
-              </option>
-              {organizationMembers.map((member) => (
-                <option key={member._id} value={member._id}>
-                  {member.name} ({member.email})
-                </option>
-              ))}
-            </select>
-            {memberErrors.userId && (
-              <p className="mt-1 text-sm text-red-600">{memberErrors.userId.message}</p>
+            {selectedUserIds.length === 0 && (
+              <p className="mt-1 text-sm text-red-600">Please select at least one user</p>
             )}
           </div>
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Role
@@ -672,27 +617,33 @@ const TeamDetail: React.FC = () => {
               <p className="mt-1 text-sm text-red-600">{memberErrors.role.message}</p>
             )}
           </div>
+          
           <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600">
             <h4 className="font-medium mb-2">Role Permissions:</h4>
             <ul className="space-y-1 text-xs">
               <li><strong>Member:</strong> All viewer permissions + participate in projects</li>
             </ul>
           </div>
+          
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={() => {
                 setShowAddMemberModal(false);
-                setMemberSearch('');
+                setSelectedUserIds([]);
                 resetMember();
               }}
               className="btn-outline"
             >
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
+            <button 
+              type="submit" 
+              className="btn-primary"
+              disabled={selectedUserIds.length === 0}
+            >
               <UserPlus className="w-4 h-4 mr-2" />
-              Add Member
+              Add Member{selectedUserIds.length > 1 ? 's' : ''}
             </button>
           </div>
         </form>

@@ -25,13 +25,14 @@ import Modal from '../components/UI/Modal';
 import EditTaskModal from '../components/Tasks/EditTaskModal';
 import CreateTaskModal from '../components/Tasks/CreateTaskModal';
 import KanbanBoard from '../components/Tasks/KanbanBoard';
+import UserSelector from '../components/UI/UserSelector';
 import { useForm } from 'react-hook-form';
 import { debounce } from '../utils/debounce';
 import { debugAuth, testApiAuth } from '../utils/debugAuth';
 
 // Add interfaces for member management
 interface AddMemberForm {
-  userId: string;
+  userIds: string[];
   role: 'admin' | 'member' | 'viewer';
 }
 
@@ -58,9 +59,7 @@ const ProjectDetail: React.FC = () => {
   const [showUpdateRoleModal, setShowUpdateRoleModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
-  const [organizationMembers, setOrganizationMembers] = useState<any[]>([]);
-  const [memberSearch, setMemberSearch] = useState('');
-  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   // Form hooks for member management
   const { register: registerMember, handleSubmit: handleSubmitMember, reset: resetMember, formState: { errors: memberErrors } } = useForm<AddMemberForm>();
@@ -101,23 +100,6 @@ const ProjectDetail: React.FC = () => {
       ]);
       setProject(projectData);
       dispatch({ type: 'SET_TASKS', payload: tasksData });
-      
-      // Load available users after project is loaded
-      if (projectData) {
-        try {
-          const response = await userAPI.getAllUsersForSelection();
-          const allUsers = response.users || [];
-          
-          // Filter out existing project members
-          const existingMemberIds = projectData.members?.map(member => member.user._id || member.user) || [];
-          const availableUsers = allUsers.filter(user => !existingMemberIds.includes(user._id));
-          
-          setOrganizationMembers(availableUsers.slice(0, 50)); // Limit to 50 for performance
-        } catch (error) {
-          console.error('Failed to load users:', error);
-          setOrganizationMembers([]);
-        }
-      }
     } catch (error) {
       console.error('Failed to load project data:', error);
     } finally {
@@ -126,79 +108,30 @@ const ProjectDetail: React.FC = () => {
   };
 
   // Member management functions
-  const loadOrganizationMembers = async (search?: string) => {
-    if (!project) {
-      console.log('❌ Cannot load members: missing project');
-      setOrganizationMembers([]);
-      return;
-    }
-    
+  const onAddMember = async (data: AddMemberForm) => {
+    if (!project || !selectedUserIds || selectedUserIds.length === 0) return;
+
     try {
-      setLoadingMembers(true);
-      console.log('🔍 Loading all users for member selection');
-      
-      // Get all users using simplified API
-      const response = await userAPI.getAllUsersForSelection();
-      const allUsers = response.users || [];
-      
-      // Get existing project member IDs for filtering
-      const existingMemberIds = project.members?.map(member => member.user._id || member.user) || [];
-      
-      // Filter out existing project members
-      let availableUsers = allUsers.filter(user => !existingMemberIds.includes(user._id));
-      
-      // Apply search filter if provided
-      if (search && search.trim()) {
-        const searchLower = search.toLowerCase();
-        availableUsers = availableUsers.filter(user => 
-          user.name?.toLowerCase().includes(searchLower) ||
-          user.email?.toLowerCase().includes(searchLower)
-        );
+      // Add members one by one
+      for (const userId of selectedUserIds) {
+        await projectAPI.addMember(project._id, userId, data.role);
       }
       
-      // Limit to 50 users for dropdown performance
-      availableUsers = availableUsers.slice(0, 50);
-      
-      console.log('✅ Available users loaded:', availableUsers);
-      setOrganizationMembers(availableUsers);
-    } catch (error) {
-      console.error('❌ Failed to load users:', error);
-      setOrganizationMembers([]);
-    } finally {
-      setLoadingMembers(false);
-    }
-  };
-
-  // Debounced search for members
-  const debouncedMemberSearch = debounce((searchTerm: string) => {
-    loadOrganizationMembers(searchTerm);
-  }, 300);
-
-  // Effect to handle search
-  useEffect(() => {
-    if (showAddMemberModal && project) {
-      debouncedMemberSearch(memberSearch);
-    }
-  }, [memberSearch, showAddMemberModal, project]);
-
-  const onAddMember = async (data: AddMemberForm) => {
-    if (!project) return;
-
-    try {
-      await projectAPI.addMember(project._id, data.userId, data.role);
       addNotification({
         type: 'success',
-        title: 'Member Added',
-        message: 'Project member added successfully',
+        title: 'Member(s) Added',
+        message: `${selectedUserIds.length} member(s) added successfully`,
       });
+      
       resetMember();
+      setSelectedUserIds([]);
       setShowAddMemberModal(false);
       loadProjectData(); // Refresh project data
     } catch (error: any) {
       addNotification({
         type: 'error',
         title: 'Error',
-        message: error.response?.data?.message || 'Failed to add member',
+        message: error.response?.data?.message || 'Failed to add member(s)',
       });
     }
   };
@@ -226,13 +159,18 @@ const ProjectDetail: React.FC = () => {
   };
 
   const openUpdateRoleModal = (member: any) => {
+    // Only proceed if member has a valid user object
+    if (!member.user) {
+      console.warn('Cannot open update role modal: member.user is null');
+      return;
+    }
     setSelectedMember(member);
     setRoleValue('role', member.role);
     setShowUpdateRoleModal(true);
   };
 
   const onUpdateRole = async (data: UpdateRoleForm) => {
-    if (!selectedMember || !project) return;
+    if (!selectedMember || !selectedMember.user || !project) return;
 
     try {
       await projectAPI.updateMemberRole(project._id, selectedMember.user._id, data.role);
@@ -403,7 +341,7 @@ const ProjectDetail: React.FC = () => {
   // Permission checks
   const canManageMembers = user && project && (
     project.createdBy === user._id ||
-    project.members?.some(m => m.user._id === user._id && m.role === 'admin') ||
+    project.members?.some(m => m.user?._id === user._id && m.role === 'admin') ||
     user.role === 'super_admin' ||
     (user.organization && user.role === 'org_admin')
   );
@@ -510,7 +448,9 @@ const ProjectDetail: React.FC = () => {
 
         <div className="space-y-3">
           {project.members && project.members.length > 0 ? (
-            project.members.map((member) => (
+            project.members
+              .filter(member => member.user) // Filter out members with null user objects
+              .map((member) => (
               <div
                 key={member.user._id}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
@@ -627,7 +567,7 @@ const ProjectDetail: React.FC = () => {
         project={project ? {
           _id: project._id,
           createdBy: project.createdBy,
-          members: project.members?.map(m => ({
+          members: project.members?.filter(m => m.user).map(m => ({
             user: { _id: m.user._id },
             role: m.role
           })),
@@ -651,7 +591,7 @@ const ProjectDetail: React.FC = () => {
         project={project ? {
           _id: project._id,
           createdBy: project.createdBy,
-          members: project.members?.map(m => ({
+          members: project.members?.filter(m => m.user).map(m => ({
             user: { _id: m.user._id },
             role: m.role
           })),
@@ -665,7 +605,7 @@ const ProjectDetail: React.FC = () => {
         isOpen={showAddMemberModal}
         onClose={() => {
           setShowAddMemberModal(false);
-          setMemberSearch('');
+          setSelectedUserIds([]);
           resetMember();
         }}
         title="Add Project Member"
@@ -673,45 +613,30 @@ const ProjectDetail: React.FC = () => {
         <form onSubmit={handleSubmitMember(onAddMember)} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search Users
+              Select Users
             </label>
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
-              className="input-field mb-3"
+            <UserSelector
+              selectedUserIds={selectedUserIds}
+              onSelectionChange={(userIds) => {
+                setSelectedUserIds(userIds);
+              }}
+              placeholder="Search and select users to add..."
+              allowMultiple={true}
+              showAvatars={true}
+              className="w-full"
+              project={project ? {
+                _id: project._id,
+                createdBy: project.createdBy,
+                members: project.members?.filter(m => m.user).map(m => ({
+                  user: { _id: m.user._id },
+                  role: m.role
+                })),
+                organization: project.organization?._id,
+                visibility: project.visibility
+              } : undefined}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select User
-              {loadingMembers && (
-                <span className="ml-2 text-xs text-gray-500">(Loading...)</span>
-              )}
-            </label>
-            <select
-              {...registerMember('userId', { required: 'Please select a user' })}
-              className="input-field"
-              disabled={loadingMembers}
-            >
-              <option value="">
-                {loadingMembers 
-                  ? 'Loading users...' 
-                  : organizationMembers.length === 0 
-                    ? 'No available users found'
-                    : 'Choose a user...'
-                }
-              </option>
-              {organizationMembers.map((member) => (
-                <option key={member._id} value={member._id}>
-                  {member.name} ({member.email})
-                </option>
-              ))}
-            </select>
-            {memberErrors.userId && (
-              <p className="mt-1 text-sm text-red-600">{memberErrors.userId.message}</p>
+            {selectedUserIds.length === 0 && (
+              <p className="mt-1 text-sm text-red-600">Please select at least one user</p>
             )}
           </div>
 
@@ -747,16 +672,20 @@ const ProjectDetail: React.FC = () => {
               type="button"
               onClick={() => {
                 setShowAddMemberModal(false);
-                setMemberSearch('');
+                setSelectedUserIds([]);
                 resetMember();
               }}
               className="btn-outline"
             >
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
+            <button 
+              type="submit" 
+              className="btn-primary"
+              disabled={selectedUserIds.length === 0}
+            >
               <UserPlus className="w-4 h-4 mr-2" />
-              Add Member
+              Add Member{selectedUserIds.length > 1 ? 's' : ''}
             </button>
           </div>
         </form>
@@ -771,7 +700,7 @@ const ProjectDetail: React.FC = () => {
         }}
         title="Update Member Role"
       >
-        {selectedMember && (
+        {selectedMember && selectedMember.user && (
           <form onSubmit={handleSubmitRole(onUpdateRole)} className="space-y-4">
             <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
               <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center">
