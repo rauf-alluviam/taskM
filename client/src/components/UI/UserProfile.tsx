@@ -7,7 +7,7 @@ interface UserProfileData {
   name: string;
   email: string;
   mobile?: string;
-  organization?: string;
+  organization?: string | { _id: string; name: string };
   role: string;
   avatar?: string;
   avatarUrl?: string;
@@ -47,7 +47,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
         name: userData.name || '',
         email: userData.email || '',
         mobile: userData.mobile || '',
-        organization: userData.organization || '',
+        organization: typeof userData.organization === 'object' && userData.organization !== null 
+          ? (userData.organization as any).name || ''
+          : userData.organization || '',
       });
     } catch (error) {
       setError('Failed to load user profile');
@@ -79,7 +81,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
       name: user?.name || '',
       email: user?.email || '',
       mobile: user?.mobile || '',
-      organization: user?.organization || '',
+      organization: typeof user?.organization === 'object' && user?.organization !== null 
+        ? (user?.organization as any).name || ''
+        : user?.organization || '',
     });
     setEditing(false);
     setError(null);
@@ -361,7 +365,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
               ) : (
                 <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
                   <Building className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-900">{user.organization || 'Not provided'}</span>
+                  <span className="text-gray-900">
+                    {typeof user.organization === 'object' && user.organization !== null 
+                      ? (user.organization as any).name || 'Not provided'
+                      : user.organization || 'Not provided'
+                    }
+                  </span>
                 </div>
               )}
             </div>

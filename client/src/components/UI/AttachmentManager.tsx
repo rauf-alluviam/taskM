@@ -3,6 +3,7 @@ import { Upload, X, File, Download, Trash2, Edit2, Check, AlertCircle, Eye } fro
 import { attachmentAPI } from '../../services/api';
 import { useNotification } from '../../contexts/NotificationContext';
 import FilePreview from './FilePreview';
+import Modal from './Modal';
 
 interface Attachment {
   _id: string;
@@ -42,7 +43,16 @@ const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const [previewingFile, setPreviewingFile] = useState<Attachment | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [downloadUrls, setDownloadUrls] = useState<{ [key: string]: string }>({});
-  const [newDescription, setNewDescription] = useState('');  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [newDescription, setNewDescription] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    attachmentId: string;
+    attachmentName: string;
+  }>({
+    isOpen: false,
+    attachmentId: '',
+    attachmentName: ''
+  });  const fileInputRef = useRef<HTMLInputElement>(null);
   const { addNotification } = useNotification();
 
   // Preload download URLs for image attachments for preview
@@ -172,17 +182,27 @@ const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     }
   };
 
-  const isPreviewable = (mimetype: string) => {
+  const isPreviewable = (mimetype: string | undefined | null) => {
+    if (!mimetype) return false;
     return mimetype.startsWith('image/') || 
            mimetype === 'application/pdf' ||
            mimetype.startsWith('text/');
   };
 
   const handleDelete = async (attachmentId: string) => {
-    if (!window.confirm('Are you sure you want to delete this attachment?')) {
-      return;
-    }
+    const attachment = attachments.find(a => a._id === attachmentId);
+    if (!attachment) return;
 
+    setDeleteConfirmation({
+      isOpen: true,
+      attachmentId,
+      attachmentName: attachment.originalName
+    });
+  };
+
+  const confirmDelete = async () => {
+    const { attachmentId } = deleteConfirmation;
+    
     try {
       await attachmentAPI.deleteAttachment(attachmentId);
       onAttachmentsChange(attachments.filter(a => a._id !== attachmentId));
@@ -198,6 +218,12 @@ const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         type: 'error',
         title: 'Delete Failed',
         message: error.response?.data?.message || 'Failed to delete attachment',
+      });
+    } finally {
+      setDeleteConfirmation({
+        isOpen: false,
+        attachmentId: '',
+        attachmentName: ''
       });
     }
   };
@@ -353,6 +379,39 @@ const AttachmentManager: React.FC<AttachmentManagerProps> = ({
             </div>          </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false, attachmentId: '', attachmentName: '' })}
+        title="Delete Attachment"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Are you sure you want to delete{' '}
+            <span className="font-medium text-gray-900">
+              {deleteConfirmation.attachmentName}
+            </span>
+            ? This action cannot be undone.
+          </p>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setDeleteConfirmation({ isOpen: false, attachmentId: '', attachmentName: '' })}
+              className="btn-outline btn-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="btn-sm bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* File Preview Modal */}
       {previewingFile && previewUrl && (
