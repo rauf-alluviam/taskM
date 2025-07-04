@@ -68,7 +68,15 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role?: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    name: string,
+    role?: string
+  ) => Promise<
+    | { success: boolean; verificationSent: boolean; email?: any; message?: any }
+    | { success: boolean; verificationSent: boolean; email?: undefined; message?: undefined }
+  >;
   logout: () => void;
   clearError: () => void;
   resendVerification: (email: string, force?: boolean) => Promise<{
@@ -174,9 +182,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    // Check if there's a redirect URL stored in session storage
+    const redirectUrl = sessionStorage.getItem('redirectAfterLogout');
+    
+    // Clear auth data
     localStorage.removeItem('token');
     socketService.disconnect();
     dispatch({ type: 'LOGOUT' });
+    
+    // Handle redirect if specified
+    if (redirectUrl) {
+      sessionStorage.removeItem('redirectAfterLogout');
+      // We don't navigate here to avoid issues with component unmounting
+      // The component that called logout will handle the redirect
+    }
   };
 
   const clearError = () => {

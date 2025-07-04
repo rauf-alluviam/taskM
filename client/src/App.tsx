@@ -48,6 +48,8 @@ function App() {
       ) : (
         <Layout>
           <Routes>
+            {/* Allow invitation links to work even when logged in */}
+            <Route path="/invite/:token" element={<AcceptInvitation />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/organization" element={<OrganizationDashboard />} />

@@ -520,6 +520,8 @@ router.post('/:id/invite', authenticate, [
             name: email.split('@')[0], // Temporary name
             status: 'pending',
             verified_email: false,
+            // Add a placeholder password that will be replaced when the user accepts the invite
+            password: crypto.randomBytes(16).toString('hex'),
             pendingInvitation: {
               organization: organization._id,
               role,

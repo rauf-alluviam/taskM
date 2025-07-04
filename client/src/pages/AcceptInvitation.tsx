@@ -49,22 +49,27 @@ interface AcceptInvitationForm {
 const AcceptInvitation: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, logout } = useAuth();
   const { addNotification } = useNotification();
   
   const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false);
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<AcceptInvitationForm>();
   const password = watch('password');
 
   useEffect(() => {
     if (token) {
+      // Check if user is already logged in
+      if (user) {
+        setAlreadyLoggedIn(true);
+      }
       loadInvitationDetails();
     }
-  }, [token]);
+  }, [token, user]);
 
   const loadInvitationDetails = async () => {
     try {
@@ -95,8 +100,10 @@ const AcceptInvitation: React.FC = () => {
         sessionStorage.setItem('showOnboarding', 'true');
       }
 
-      // Log the user in with the returned token and user data
-      login(response.data.user, response.data.token);
+      // Log the user in with the returned token and user data (if not already logged in)
+      if (!alreadyLoggedIn) {
+        login(response.data.user, response.data.token);
+      }
       
       addNotification({
         type: 'success',
@@ -136,6 +143,74 @@ const AcceptInvitation: React.FC = () => {
         <div className="text-center">
           <LoadingSpinner size="lg" />
           <p className="mt-4 text-gray-600">Loading invitation details...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Handle case where user is already logged in and invitation is for their email
+  if (alreadyLoggedIn && invitation && user && user.email === invitation.email) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check className="w-8 h-8 text-green-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            You're Already a Member
+          </h2>
+          <p className="text-gray-600 mb-6">
+            You're already logged in as <strong>{user.email}</strong> and are part of <strong>{invitation.organization.name}</strong>. 
+            No further action is needed.
+          </p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="btn-primary btn-md"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  // Handle case where user is already logged in but invitation is for a different email
+  if (alreadyLoggedIn && invitation && user && user.email !== invitation.email) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-amber-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Account Mismatch
+          </h2>
+          <p className="text-gray-600 mb-6">
+            You're currently logged in as <strong>{user.email}</strong> but this invitation is for <strong>{invitation.email}</strong>. 
+            Please log out first or use a different browser to accept this invitation.
+          </p>
+          <div className="flex space-x-4 justify-center">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="btn-outline btn-md"
+            >
+              Return to Dashboard
+            </button>
+            <button
+              onClick={() => {
+                // Log out and redirect back to this invitation link
+                const currentUrl = window.location.href;
+                sessionStorage.setItem('redirectAfterLogout', currentUrl);
+                // Use the logout function from the auth context
+                logout();
+                // Reload the page to reflect the logged out state
+                setTimeout(() => window.location.href = currentUrl, 100);
+              }}
+              className="btn-primary btn-md"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
     );

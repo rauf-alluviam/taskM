@@ -31,7 +31,10 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      // Password is not required for pending users (those with invitation)
+      return this.status !== 'pending';
+    },
     minlength: 6,
   },
   // Enhanced role system
