@@ -27,6 +27,27 @@ import emailRoutes from './routes/email.js';
 
 dotenv.config();
 
+// Validate critical environment variables
+const requiredEnvVars = ['JWT_SECRET', 'MONGODB_URI'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars);
+  console.error('💡 Please set these in your .env file or environment');
+  process.exit(1);
+}
+
+// Use a consistent JWT secret with no fallback in production
+const JWT_SECRET = process.env.JWT_SECRET;
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'fallback-secret') {
+  console.error('❌ Production environment detected but using fallback JWT secret!');
+  console.error('💡 Please set a secure JWT_SECRET environment variable');
+  process.exit(1);
+}
+
+console.log('✅ Environment variables validated');
+console.log(`🔐 JWT Secret: ${JWT_SECRET ? 'Set' : 'Missing'} (${JWT_SECRET?.substring(0, 4)}...)`);
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -125,8 +146,9 @@ app.use('*', (req, res) => {
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (token) {
-    jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, decoded) => {
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
       if (err) {
+        console.error('Socket.io JWT verification failed:', err.message);
         return next(new Error('Authentication error'));
       }
       socket.userId = decoded.userId;

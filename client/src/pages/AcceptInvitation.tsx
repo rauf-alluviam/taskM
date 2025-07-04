@@ -5,7 +5,7 @@ import { Building2, UserPlus, Check, AlertCircle, ArrowRight } from 'lucide-reac
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
-import axios from 'axios';
+import { authAPI } from '../services/api';
 
 interface InvitationDetails {
   email: string;
@@ -74,8 +74,8 @@ const AcceptInvitation: React.FC = () => {
   const loadInvitationDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/auth/invitation/${token}`);
-      setInvitation(response.data);
+      const response = await authAPI.getInvitationDetails(token!);
+      setInvitation(response);
     } catch (error: any) {
       console.error('Failed to load invitation details:', error);
       setError(error.response?.data?.message || 'Invalid or expired invitation');
@@ -89,26 +89,23 @@ const AcceptInvitation: React.FC = () => {
     
     setAccepting(true);
     try {
-      const response = await axios.post(`/api/auth/accept-invitation/${token}`, {
-        name: data.name,
-        password: data.password
-      });
+      const response = await authAPI.acceptInvitation(token, data.name, data.password);
 
       // Store assignment information for onboarding
-      if (response.data.assignments) {
-        sessionStorage.setItem('invitationAssignments', JSON.stringify(response.data.assignments));
+      if (response.assignments) {
+        sessionStorage.setItem('invitationAssignments', JSON.stringify(response.assignments));
         sessionStorage.setItem('showOnboarding', 'true');
       }
 
       // Log the user in with the returned token and user data (if not already logged in)
       if (!alreadyLoggedIn) {
-        login(response.data.user, response.data.token);
+        login(response.user, response.token);
       }
       
       addNotification({
         type: 'success',
         title: 'Welcome!',
-        message: response.data.message,
+        message: response.message,
       });
 
       // Redirect to dashboard with onboarding flag

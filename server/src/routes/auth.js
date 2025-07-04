@@ -9,6 +9,13 @@ import emailService from '../services/emailService.js';
 
 const router = express.Router();
 
+// Validate JWT_SECRET on module load
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ JWT_SECRET environment variable is required');
+  process.exit(1);
+}
+
 // Register
 router.post('/register', [
   body('email').isEmail().normalizeEmail(),
@@ -113,7 +120,7 @@ router.post('/login', [
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'fallback-secret',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -204,7 +211,7 @@ router.get('/verify-email', async (req, res) => {
     // Generate a JWT token so the user can be logged in immediately
     const tokenJWT = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'fallback-secret',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
     
@@ -277,12 +284,14 @@ router.post('/accept-invitation/:token', async (req, res) => {
   try {
     const { token } = req.params;
     const { name, password } = req.body;
+    console.log('🎯 Accepting invitation with token:', token.substring(0, 8) + '...');
 
     if (!name || !password) {
       return res.status(400).json({ message: 'Name and password are required' });
     }
 
     // Find user with pending invitation
+    console.log(`🔍 Looking for invitation token: ${token.substring(0, 8)}...`);
     const user = await User.findOne({
       'pendingInvitation.token': token,
       'pendingInvitation.expires': { $gt: new Date() }
@@ -290,8 +299,32 @@ router.post('/accept-invitation/:token', async (req, res) => {
       .populate('pendingInvitation.invitedBy', 'name email');
 
     if (!user) {
+      console.log('❌ No user found with valid invitation token for acceptance');
+      
+      // Check if token exists but expired
+      const expiredUser = await User.findOne({ 'pendingInvitation.token': token });
+      if (expiredUser) {
+        console.log('⏰ Token found but expired during acceptance:', {
+          email: expiredUser.email,
+          expired: new Date(expiredUser.pendingInvitation.expires),
+          now: new Date()
+        });
+        return res.status(400).json({ message: 'Invitation token has expired' });
+      }
+      
+      console.log('🔍 Token not found in database - checking for partial matches...');
+      const allTokens = await User.find(
+        { 'pendingInvitation.token': { $exists: true } }, 
+        { email: 1, 'pendingInvitation.token': 1 }
+      );
+      console.log(`📊 Found ${allTokens.length} pending invitations in database`);
+      
       return res.status(400).json({ message: 'Invalid or expired invitation token' });
     }
+
+    console.log(`✅ Found valid invitation for user: ${user.email}`);
+
+    console.log('✅ Processing invitation acceptance for user:', user.email);
 
     const Organization = (await import('../models/Organization.js')).default;
     const organization = await Organization.findById(user.pendingInvitation.organization);
@@ -377,10 +410,9 @@ router.post('/accept-invitation/:token', async (req, res) => {
     await user.save();
 
     // Generate JWT token
-    const jwt = (await import('jsonwebtoken')).default;
     const authToken = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'fallback-secret',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -413,6 +445,7 @@ router.post('/accept-invitation/:token', async (req, res) => {
 router.get('/invitation/:token', async (req, res) => {
   try {
     const { token } = req.params;
+    console.log('🔍 Looking up invitation token:', token.substring(0, 8) + '...');
 
     const user = await User.findOne({
       'pendingInvitation.token': token,
@@ -423,9 +456,24 @@ router.get('/invitation/:token', async (req, res) => {
       .populate('pendingInvitation.projectAssignments.project', 'name description');
 
     if (!user) {
+      console.log('❌ No user found with valid invitation token for details');
+      
+      // Check if token exists but expired
+      const expiredUser = await User.findOne({ 'pendingInvitation.token': token });
+      if (expiredUser) {
+        console.log('⏰ Token found but expired during details lookup:', {
+          email: expiredUser.email,
+          expired: new Date(expiredUser.pendingInvitation.expires),
+          now: new Date()
+        });
+        return res.status(400).json({ message: 'Invitation token has expired' });
+      }
+      
+      console.log('🔍 Token not found in database during details lookup');
       return res.status(400).json({ message: 'Invalid or expired invitation token' });
     }
 
+    console.log(`✅ Found invitation details for user: ${user.email}`);
     res.json({
       email: user.email,
       organization: user.pendingInvitation.organization,

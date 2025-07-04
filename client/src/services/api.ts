@@ -13,7 +13,7 @@ interface ImportMeta {
 
 // const API_BASE_URL = (import.meta as any).env.VITE_APP_URL ;
 const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://15.207.11.214:5003/api'; 
-
+// const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://localhost:5003/api'; 
 const API_TIMEOUT = (import.meta as any).env.VITE_API_TIMEOUT || 10000;
 
 const api = axios.create({
@@ -22,6 +22,8 @@ const api = axios.create({
 });
 
 console.log('🌐 API Base URL:', API_BASE_URL);
+console.log('🌍 Environment:', import.meta.env.MODE);
+console.log('🔧 All Vite Env Variables:', import.meta.env);
 
 
 // Retry configuration
@@ -104,6 +106,19 @@ export const authAPI = {
   resendVerification: async (email: string, force: boolean = false) => {
     return withRetry(async () => {
       const response = await api.post('/auth/resend-verification', { email, force });
+      return response.data;
+    });
+  },
+  // Invitation API methods
+  getInvitationDetails: async (token: string) => {
+    return withRetry(async () => {
+      const response = await api.get(`/auth/invitation/${token}`);
+      return response.data;
+    });
+  },
+  acceptInvitation: async (token: string, name: string, password: string) => {
+    return withRetry(async () => {
+      const response = await api.post(`/auth/accept-invitation/${token}`, { name, password });
       return response.data;
     });
   },
