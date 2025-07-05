@@ -44,8 +44,22 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     'blocked': 'text-red-700'
   };
 
-  const getColumnColor = () => columnColors[id as keyof typeof columnColors] || 'bg-gray-100 border-gray-300';
-  const getHeaderColor = () => headerColors[id as keyof typeof headerColors] || 'text-gray-700';  return (
+  const getColumnColor = () => {
+    // First use the color prop if it exists
+    if (color) {
+      // If color is just the background class, add a matching border
+      if (color.startsWith('bg-')) {
+        const colorName = color.replace('bg-', '');
+        return `${color} border-${colorName.replace('-100', '-300')}`;
+      }
+      return color;
+    }
+    // Fall back to column ID mapping for legacy support
+    return columnColors[id as keyof typeof columnColors] || 'bg-gray-100 border-gray-300';
+  };
+  const getHeaderColor = () => headerColors[id as keyof typeof headerColors] || 'text-gray-700';  
+  
+  return (
     <div className={`w-72 rounded-lg border transition-colors ${getColumnColor()} ${isOver ? 'border-blue-400 bg-blue-50' : ''}`}>
       {/* Compact Column Header */}
       <div className="px-3 py-2 border-b border-gray-200">

@@ -12,8 +12,8 @@ interface ImportMeta {
 }
 
 // const API_BASE_URL = (import.meta as any).env.VITE_APP_URL ;
-const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://15.207.11.214:5003/api'; 
-// const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://localhost:5003/api'; 
+// const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://15.207.11.214:5003/api'; 
+const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://localhost:5003/api'; 
 const API_TIMEOUT = (import.meta as any).env.VITE_API_TIMEOUT || 10000;
 
 const api = axios.create({
@@ -22,8 +22,8 @@ const api = axios.create({
 });
 
 console.log('🌐 API Base URL:', API_BASE_URL);
-console.log('🌍 Environment:', import.meta.env.MODE);
-console.log('🔧 All Vite Env Variables:', import.meta.env);
+// console.log('🌍 Environment:', import.meta.env.MODE);
+// console.log('🔧 All Vite Env Variables:', import.meta.env);
 
 
 // Retry configuration
@@ -58,10 +58,17 @@ const withRetry = async (fn: () => Promise<any>, retries = MAX_RETRIES): Promise
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  const isAuthRoute = config.url?.includes('/auth/login') || 
+                      config.url?.includes('/auth/register') || 
+                      config.url?.includes('/auth/verify-email') ||
+                      config.url?.includes('/auth/resend-verification') ||
+                      config.url?.includes('/auth/accept-invitation') ||
+                      config.url?.includes('/auth/invitation');
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
     console.log('🔑 Adding auth token to request:', config.url, `Bearer ${token.substring(0, 20)}...`);
-  } else {
+  } else if (!isAuthRoute) {
     console.log('❌ No token found for request:', config.url);
   }
   return config;

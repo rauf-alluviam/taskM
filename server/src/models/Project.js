@@ -10,6 +10,10 @@ const kanbanColumnSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  color: {
+    type: String,
+    default: null
+  },
 }, { _id: true });
 
 const projectSchema = new mongoose.Schema({

@@ -132,11 +132,17 @@ const TasksPage: React.FC = () => {
           duration: 3000
         });
       });      socketService.onColumnsUpdate((serverColumns) => {
-        const clientColumns = serverColumns.map((col: any) => ({
-          id: col._id || col.name.toLowerCase().replace(/\s+/g, '-'),
-          title: col.name,
-          color: getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-'))
-        }));
+        const clientColumns = serverColumns.map((col: any) => {
+          // Ensure the color is properly preserved from server response for real-time updates
+          const columnId = col.name.toLowerCase().replace(/\s+/g, '-');
+          const columnColor = col.color || getColorForColumn(columnId);
+          
+          return {
+            id: col._id || columnId,
+            title: col.name,
+            color: columnColor
+          };
+        });
         setColumns(clientColumns);
         addNotification({
           type: 'info',
@@ -159,11 +165,17 @@ const TasksPage: React.FC = () => {
       
       console.log('🏛️ Server columns:', serverColumns);
         // Convert server format to client format
-      const clientColumns = serverColumns.map((col: any) => ({
-        id: col.name.toLowerCase().replace(/\s+/g, '-'), // Use status name, not database ID
-        title: col.name,
-        color: getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-'))
-      }));
+      const clientColumns = serverColumns.map((col: any) => {
+        // Ensure the color is properly preserved from server response
+        const columnColor = col.color || getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-'));
+        console.log(`Column '${col.name}' color from server:`, col.color, "using:", columnColor);
+        
+        return {
+          id: col.name.toLowerCase().replace(/\s+/g, '-'), // Use status name, not database ID
+          title: col.name,
+          color: columnColor // Use server color if available, fallback to default
+        };
+      });
       
       console.log('🎨 Client columns:', clientColumns);
       setColumns(clientColumns);
@@ -304,6 +316,22 @@ const TasksPage: React.FC = () => {
   const handleAddColumn = async (newColumn: { id: string; title: string; color: string }) => {
     try {
       setColumnsLoading(true);
+      
+      // If no specific project is selected, show a notification but don't prevent adding
+      if (!currentProjectId) {
+        addNotification({
+          type: 'warning',
+          title: 'No Project Selected',
+          message: 'Creating column in default view. For project-specific columns, please select a project.',
+          duration: 5000
+        });
+        // Continue with column creation without projectId
+      }
+      
+      // Make sure the color is properly captured from the modal selection
+      console.log('Creating column with color:', newColumn.color);
+      
+      // Pass both the title and selected color to the API
       await kanbanAPI.addColumn(newColumn.title, newColumn.color, currentProjectId);
       await loadColumns(); // Reload columns from server
       
@@ -327,6 +355,16 @@ const TasksPage: React.FC = () => {
   };
 
   const handleRemoveColumn = async (columnId: string) => {
+    if (!currentProjectId) {
+      addNotification({
+        type: 'warning',
+        title: 'Project Required',
+        message: 'Please select a project before removing columns.',
+        duration: 5000
+      });
+      return;
+    }
+
     try {
       setColumnsLoading(true);
       await kanbanAPI.deleteColumn(columnId, currentProjectId);
@@ -489,7 +527,7 @@ const TasksPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Compact Column Management */}
+          {/* Compact Column Management - Now always visible */}
           <button
             onClick={() => setShowColumnManager(true)}
             className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 transition-colors"

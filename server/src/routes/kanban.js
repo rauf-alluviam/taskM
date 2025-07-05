@@ -35,7 +35,15 @@ router.get('/columns', authenticate, async (req, res) => {
       columns = getDefaultColumns();
     }
 
-    res.json(columns);
+    // Transform columns to include color property consistently
+    const transformedColumns = columns.map(column => ({
+      _id: column._id,
+      name: column.name,
+      order: column.order,
+      color: column.color || getDefaultColorForColumn(column.name.toLowerCase().replace(/\s+/g, '-'))
+    }));
+
+    res.json(transformedColumns);
   } catch (error) {
     console.error('Get columns error:', error);
     res.status(500).json({ message: 'Server error while fetching columns' });
@@ -75,6 +83,7 @@ router.put('/columns', authenticate, [
       const kanbanColumns = columns.map((col, index) => ({
         name: col.title,
         order: index,
+        color: col.color,
         _id: col.id === col.title.toLowerCase().replace(/\s+/g, '-') ? undefined : col.id
       }));      project.kanbanColumns = kanbanColumns;
       await project.save();
@@ -130,6 +139,7 @@ router.post('/columns', authenticate, [
       const newColumn = {
         name: title,
         order: project.kanbanColumns.length,
+        color: color, // Store the color in the database
       };      project.kanbanColumns.push(newColumn);
       await project.save();
 
@@ -204,11 +214,25 @@ router.delete('/columns/:columnId', authenticate, async (req, res) => {
 // Helper function to get default columns
 function getDefaultColumns() {
   return [
-    { _id: 'todo', name: 'todo', order: 0 },
-    { _id: 'in-progress', name: 'in-progress', order: 1 },
-    { _id: 'review', name: 'review', order: 2 },
-    { _id: 'done', name: 'done', order: 3 },
+    { _id: 'todo', name: 'todo', order: 0, color: 'bg-slate-100' },
+    { _id: 'in-progress', name: 'in-progress', order: 1, color: 'bg-blue-100' },
+    { _id: 'review', name: 'review', order: 2, color: 'bg-yellow-100' },
+    { _id: 'done', name: 'done', order: 3, color: 'bg-green-100' },
   ];
+}
+
+// Helper function to get default color for a column by ID
+function getDefaultColorForColumn(columnId) {
+  const colorMap = {
+    'todo': 'bg-slate-100',
+    'in-progress': 'bg-blue-100',
+    'review': 'bg-yellow-100',
+    'done': 'bg-green-100',
+    'testing': 'bg-purple-100',
+    'blocked': 'bg-red-100',
+    'deployed': 'bg-green-100',
+  };
+  return colorMap[columnId] || 'bg-gray-100';
 }
 
 export default router;

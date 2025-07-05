@@ -160,6 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.verificationSent) {
         localStorage.setItem('pendingVerificationEmail', email);
         // Don't set user or token - they need to verify email first
+        dispatch({ type: 'SET_LOADING', payload: false }); // Clear loading state
         return { 
           success: true, 
           verificationSent: true, 
@@ -174,6 +175,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         dispatch({ type: 'SET_USER', payload: response.user });
       }
       
+      dispatch({ type: 'SET_LOADING', payload: false }); // Clear loading state
       return { success: true, verificationSent: false };
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Registration failed' });

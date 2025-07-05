@@ -18,6 +18,11 @@ interface RegisterForm extends LoginForm {
 const Login: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState<{
+    success: boolean;
+    email: string;
+    message: string;
+  } | null>(null);
   const { login, register: registerUser, loading, error, clearError, emailVerificationRequired, emailForVerification, resendVerification, clearVerificationState } = useAuth();
   
   const { register, handleSubmit, watch, formState: { errors }, reset } = useForm<RegisterForm>();
@@ -25,14 +30,21 @@ const Login: React.FC = () => {
 
   const onSubmit = async (data: RegisterForm) => {
     clearError();
+    setRegistrationSuccess(null);
     try {
       if (isLogin) {
         await login(data.email, data.password);
       } else {
         const result = await registerUser(data.email, data.password, data.name);
-        // Don't automatically redirect to dashboard after registration
-        // User will get verification email and need to verify first
-        console.log('Registration successful:', result);
+        if (result.success && result.verificationSent) {
+          setRegistrationSuccess({
+            success: true,
+            email: result.email,
+            message: result.message || 'Registration successful! Please check your email to verify your account.'
+          });
+          // Clear the form
+          reset();
+        }
       }
     } catch (err) {
       // Error is handled by context
@@ -43,6 +55,7 @@ const Login: React.FC = () => {
     setIsLogin(!isLogin);
     reset();
     clearError();
+    setRegistrationSuccess(null); // Clear registration success when switching modes
   };
 
   const handleResend = async () => {
@@ -68,7 +81,41 @@ const Login: React.FC = () => {
         </div>
 
         <div className="card p-8">
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          {/* Registration Success Message */}
+          {registrationSuccess && (
+            <div className="mb-6 bg-success-50 border border-success-200 rounded-md p-4">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-success-100 rounded-full flex items-center justify-center mr-3">
+                  <CheckSquare className="w-5 h-5 text-success-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-success-800">Account Created Successfully!</h3>
+                  <p className="text-sm text-success-700 mt-1">
+                    {registrationSuccess.message}
+                  </p>
+                  <p className="text-xs text-success-600 mt-2">
+                    Check your email at <strong>{registrationSuccess.email}</strong> and click the verification link to activate your account.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={() => setIsLogin(true)}
+                  className="btn-primary btn-sm"
+                >
+                  Go to Login
+                </button>
+                <button
+                  onClick={() => setRegistrationSuccess(null)}
+                  className="btn-outline btn-sm"
+                >
+                  Register Another Account
+                </button>
+              </div>
+            </div>
+          )}
+
+          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)} style={{ display: registrationSuccess ? 'none' : 'block' }}>
             {error && (
               <div className="bg-error-50 border border-error-200 rounded-md p-3">
                 <p className="text-sm text-error-600">{error}</p>
@@ -206,17 +253,19 @@ const Login: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              onClick={toggleMode}
-              className="text-sm text-primary-600 hover:text-primary-500 font-medium"
-            >
-              {isLogin 
-                ? "Don't have an account? Sign up" 
-                : "Already have an account? Sign in"
-              }
-            </button>
-          </div>
+          {!registrationSuccess && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={toggleMode}
+                className="text-sm text-primary-600 hover:text-primary-500 font-medium"
+              >
+                {isLogin 
+                  ? "Don't have an account? Sign up" 
+                  : "Already have an account? Sign in"
+                }
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

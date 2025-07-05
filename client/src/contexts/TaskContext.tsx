@@ -59,7 +59,7 @@ export interface Project {
     addedBy: string;
   }>;
   documents: string[];
-  kanbanColumns: { name: string; order: number; _id: string }[];
+  kanbanColumns: { name: string; order: number; _id: string; color?: string }[];
   tags: string[];
   color: string;
   icon: string;
