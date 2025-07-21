@@ -123,6 +123,7 @@ app.use('/api/organizations', organizationRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/email', emailRoutes);
 
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

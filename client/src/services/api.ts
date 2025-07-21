@@ -458,6 +458,14 @@ export const userAPI = {
       return response.data;
     });
   },
+  getUsersByOrganization: async (orgId: string) => {
+    return withRetry(async () => {
+        console.log('organizationID', orgId);
+      const response = await api.get(`/users/by-organization/${orgId}`);
+      return response.data;
+    });
+  },
+
 };
 
 export const analyticsAPI = {

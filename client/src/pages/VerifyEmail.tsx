@@ -134,7 +134,7 @@ const VerifyEmail: React.FC = () => {
             <button 
               className="btn-primary flex items-center justify-center w-full"
               onClick={handleResendVerification}
-              disabled={status === 'loading'}
+              //disabled={status === 'loading'}
             >
               <RefreshCw size={18} className="mr-2" />
               Resend Verification Email

@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Users, FolderOpen, CheckSquare, TrendingUp, Calendar } from 'lucide-react';
+import {
+  BarChart3,
+  Users,
+  FolderOpen,
+  CheckSquare,
+  TrendingUp,
+  Calendar
+} from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid
+} from 'recharts';
 
 interface AnalyticsData {
   totalUsers: number;
@@ -8,6 +24,7 @@ interface AnalyticsData {
   completedTasks: number;
   tasksThisWeek: number;
   projectsThisMonth: number;
+  completionRate?: number;
 }
 
 const Analytics: React.FC = () => {
@@ -18,31 +35,70 @@ const Analytics: React.FC = () => {
     completedTasks: 0,
     tasksThisWeek: 0,
     projectsThisMonth: 0,
+    completionRate: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tasksOverTime, setTasksOverTime] = useState<any[]>([]);
 
   useEffect(() => {
-    // TODO: Fetch analytics data from API
-    // For now, show placeholder data
-    setTimeout(() => {
-      setData({
-        totalUsers: 25,
-        totalProjects: 12,
-        totalTasks: 156,
-        completedTasks: 89,
-        tasksThisWeek: 23,
-        projectsThisMonth: 3,
-      });
-      setLoading(false);
-    }, 1000);
+    const fetchAnalytics = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = localStorage.getItem('token');
+        // Fetch general analytics
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/analytics`, {
+          credentials: 'include',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (!res.ok) {
+          throw new Error('Failed to fetch analytics');
+        }
+        const result = await res.json();
+        setData(result);
+
+        // Fetch tasks over time for performance metrics
+        const resTasks = await fetch(`${import.meta.env.VITE_API_URL}/analytics/tasks`, {
+          credentials: 'include',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (resTasks.ok) {
+          const taskStats = await resTasks.json();
+          setTasksOverTime(
+            (taskStats.tasksOverTime || []).map((d: any) => ({
+              date: d._id,
+              count: d.count
+            }))
+          );
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch analytics');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAnalytics();
   }, []);
 
-  const completionRate = data.totalTasks > 0 ? Math.round((data.completedTasks / data.totalTasks) * 100) : 0;
+  const completionRate = data.completionRate !== undefined
+    ? data.completionRate
+    : data.totalTasks > 0
+      ? Math.round((data.completedTasks / data.totalTasks) * 100)
+      : 0;
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-red-600 font-semibold">{error}</div>
       </div>
     );
   }
@@ -153,10 +209,24 @@ const Analytics: React.FC = () => {
       {/* Performance Metrics */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h3>
-        <div className="text-center py-8">
-          <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">Detailed charts and analytics coming soon!</p>
-          <p className="text-sm text-gray-400 mt-2">Integration with chart libraries in progress</p>
+        <div className="py-8">
+          {tasksOverTime.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={tasksOverTime} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center">
+              <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">No performance data available yet.</p>
+            </div>
+          )}
+          <p className="text-sm text-gray-400 mt-2 text-center">Tasks completed per day (last 30 days)</p>
         </div>
       </div>
     </div>

@@ -385,4 +385,31 @@ router.post('/validate-assignable', authenticate, async (req, res) => {
   }
 });
 
+// Get all users by organization (super_admin or org_admin only)
+router.get('/by-organization/:orgId', authenticate, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const isSuperAdmin = req.user.role === 'super_admin';
+    const isOrgAdmin = req.user.role === 'org_admin';
+    // Handle both populated and unpopulated organization field
+    let userOrg = req.user.organization;
+    if (userOrg && typeof userOrg === 'object' && userOrg._id) {
+      userOrg = userOrg._id.toString();
+    } else if (userOrg) {
+      userOrg = userOrg.toString();
+    }
+    // Log types and values for debugging
+    console.log('[UserOrg Debug]', {
+      orgId, orgIdType: typeof orgId, userOrg, userOrgType: typeof userOrg, role: req.user.role
+    });
+    if (!isSuperAdmin && !(isOrgAdmin && userOrg === orgId)) {
+      return res.status(403).json({ message: 'Not authorized to view users for this organization' });
+    }
+    const users = await User.find({ organization: orgId }, '-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch users by organization', error: error.message });
+  }
+});
+
 export default router;

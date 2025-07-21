@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, 
   UserPlus, 
@@ -58,6 +58,9 @@ const UserManagement: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [updating, setUpdating] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+  
+  // Add ref for dropdown container
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<UpdateUserForm>();
 
@@ -66,11 +69,17 @@ const UserManagement: React.FC = () => {
     loadUsers();
   }, []);
 
+  // Fixed click outside handler
   useEffect(() => {
-    const handleClickOutside = () => setDropdownOpen(null);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(null);
+      }
+    };
+
     if (dropdownOpen) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [dropdownOpen]);
 
@@ -78,16 +87,18 @@ const UserManagement: React.FC = () => {
     try {
       setLoading(true);
       let data: UserData[] = [];
-      // Fetch all users for admin, org_admin, super_admin
-      if (
-        user?.role === 'super_admin' ||
-        user?.role === 'org_admin'
-      ) {
+      // Fetch all users for super_admin, only org users for org_admin
+      console.log('Organization id:', user?.organization?._id);
+      if (user?.role === 'super_admin') {
         const response = await userAPI.getAllUsers();
+        data = Array.isArray(response) ? response : [];
+      } else if (user?.role === 'org_admin' && user.organization?._id) {
+        const response = await userAPI.getUsersByOrganization(user.organization._id);
         data = Array.isArray(response) ? response : [];
       } else {
         data = [];
       }
+      
       setUsers(data);
     } catch (error) {
       setUsers([]);
@@ -161,6 +172,12 @@ const UserManagement: React.FC = () => {
     setValue('role', userData.role === 'super_admin' ? 'org_admin' : userData.role);
     setValue('status', userData.status);
     setShowEditModal(true);
+  };
+
+  // Fixed dropdown toggle handler
+  const toggleDropdown = (userId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setDropdownOpen(dropdownOpen === userId ? null : userId);
   };
 
   // Filtered users for display
@@ -343,33 +360,35 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     {userData._id !== user?._id && (
-                      <div className="relative">
+                      <div className="relative" ref={dropdownOpen === userData._id ? dropdownRef : null}>
                         <button 
-                          onClick={() => setDropdownOpen(dropdownOpen === userData._id ? null : userData._id)}
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md"
+                          onClick={(e) => toggleDropdown(userData._id, e)}
+                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
                         
                         {dropdownOpen === userData._id && (
-                          <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[140px]">
+                          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[140px]">
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setDropdownOpen(null);
                                 openEditModal(userData);
                               }}
-                              className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                              className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 transition-colors"
                             >
                               <Edit className="w-3 h-3" />
                               <span>Edit</span>
                             </button>
                             {user?.role === 'super_admin' && (
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setDropdownOpen(null);
                                   handleDeleteUser(userData);
                                 }}
-                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 transition-colors"
                               >
                                 <Trash2 className="w-3 h-3" />
                                 <span>Delete</span>
