@@ -70,6 +70,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   }) : false;
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<TaskFormData>();
+  
   useEffect(() => {
     if (task && isOpen) {
       // Pre-fill form with task data
@@ -104,10 +105,10 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   };
 
   const priorityOptions = [
-    { value: 'low', label: 'Low Priority', color: 'text-green-600', bg: 'bg-green-100' },
-    { value: 'medium', label: 'Medium Priority', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-    { value: 'high', label: 'High Priority', color: 'text-orange-600', bg: 'bg-orange-100' },
-    { value: 'critical', label: 'Critical Priority', color: 'text-red-600', bg: 'bg-red-100' },
+    { value: 'low', label: 'Low Priority', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' },
+    { value: 'medium', label: 'Medium Priority', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
+    { value: 'high', label: 'High Priority', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+    { value: 'critical', label: 'Critical Priority', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
   ];
 
   const defaultStatusOptions = [
@@ -181,6 +182,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
       });
     }
   };
+
   const handleClose = () => {
     reset();
     setTags([]);
@@ -204,18 +206,18 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
         {/* Validation Errors */}
         {validationErrors.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-red-400 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
                   Please fix the following errors:
                 </h3>
-                <div className="mt-2 text-sm text-red-700">
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
                   <ul className="list-disc list-inside space-y-1">
                     {validationErrors.map((error, index) => (
                       <li key={index}>{error}</li>
@@ -229,29 +231,37 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
         {/* Title */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Task Title *
           </label>
           <input
             type="text"
             {...register('title', { required: 'Title is required' })}
-            className="input w-full"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                     bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                     focus:border-blue-500 dark:focus:border-blue-400
+                     placeholder-gray-400 dark:placeholder-gray-500"
             placeholder="Enter task title..."
           />
           {errors.title && (
-            <p className="mt-1 text-sm text-error-600">{errors.title.message}</p>
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title.message}</p>
           )}
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Description
           </label>
           <textarea
             {...register('description')}
             rows={3}
-            className="textarea w-full"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                     bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                     focus:border-blue-500 dark:focus:border-blue-400
+                     placeholder-gray-400 dark:placeholder-gray-500 resize-vertical"
             placeholder="Describe the task..."
           />
         </div>
@@ -259,13 +269,19 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         {/* Priority and Status Row */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Flag className="w-4 h-4 inline mr-1" />
               Priority
             </label>
-            <select {...register('priority')} className="input w-full">
+            <select 
+              {...register('priority')} 
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                       focus:border-blue-500 dark:focus:border-blue-400"
+            >
               {priorityOptions.map(option => (
-                <option key={option.value} value={option.value}>
+                <option key={option.value} value={option.value} className="bg-white dark:bg-gray-800">
                   {option.label}
                 </option>
               ))}
@@ -273,12 +289,18 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Status
             </label>
-            <select {...register('status')} className="input w-full">
+            <select 
+              {...register('status')} 
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                       focus:border-blue-500 dark:focus:border-blue-400"
+            >
               {statusOptions.map(option => (
-                <option key={option.value} value={option.value}>
+                <option key={option.value} value={option.value} className="bg-white dark:bg-gray-800">
                   {option.label}
                 </option>
               ))}
@@ -289,26 +311,32 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         {/* Date Range */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Calendar className="w-4 h-4 inline mr-1" />
               Start Date
             </label>
             <input
               type="date"
               {...register('startDate')}
-              className="input w-full"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                       focus:border-blue-500 dark:focus:border-blue-400"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Calendar className="w-4 h-4 inline mr-1" />
               Due Date
             </label>
             <input
               type="date"
               {...register('endDate')}
-              className="input w-full"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                       focus:border-blue-500 dark:focus:border-blue-400"
             />
           </div>
         </div>
@@ -316,7 +344,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         {/* Assign Users - Only show if user has permission */}
         {canAssignTasks && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <User className="w-4 h-4 inline mr-1" />
               Assign to Users
             </label>
@@ -330,7 +358,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               project={project}
               task={task}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Assign this task to team members who will be responsible for completing it.
             </p>
           </div>
@@ -339,11 +367,11 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         {/* Show assigned users as read-only if user cannot assign */}
         {!canAssignTasks && task.assignedUsers && task.assignedUsers.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <User className="w-4 h-4 inline mr-1" />
               Assigned Users
             </label>
-            <div className="p-3 bg-gray-50 rounded-md">
+            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
               <UserAvatarList
                 users={
                   task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
@@ -353,7 +381,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 showNames={true}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               You don't have permission to modify task assignments.
             </p>
           </div>
@@ -361,14 +389,14 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
         {/* Categories/Tags */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             <Tag className="w-4 h-4 inline mr-1" />
             Categories
           </label>
           
           {/* Predefined Categories */}
           <div className="mb-3">
-            <p className="text-xs text-gray-500 mb-2">Quick add:</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick add:</p>
             <div className="flex flex-wrap gap-2">
               {predefinedCategories.map((category) => (
                 <button
@@ -378,8 +406,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   disabled={tags.includes(category)}
                   className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors ${
                     tags.includes(category)
-                      ? 'bg-blue-100 text-blue-800 border-blue-200 cursor-not-allowed opacity-50'
-                      : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200'
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-700 cursor-not-allowed opacity-50'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 hover:border-blue-200 dark:hover:border-blue-600'
                   }`}
                 >
                   {category}
@@ -395,13 +423,21 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="input flex-1"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                       focus:border-blue-500 dark:focus:border-blue-400
+                       placeholder-gray-400 dark:placeholder-gray-500"
               placeholder="Add custom category..."
             />
             <button
               type="button"
               onClick={handleAddTag}
-              className="btn-outline btn-sm px-3"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm
+                       bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                       hover:bg-gray-50 dark:hover:bg-gray-700
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+                       transition-colors"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -413,13 +449,15 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
+                           bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 
+                           border border-blue-200 dark:border-blue-700"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => handleRemoveTag(tag)}
-                    className="ml-2 text-blue-600 hover:text-blue-800"
+                    className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -430,9 +468,9 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         </div>
 
         {/* Task Info */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Task Information</h4>
-          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Task Information</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
             <div>
               <span className="font-medium">Created:</span> {' '}
               {new Date(task.createdAt).toLocaleDateString()}
@@ -443,7 +481,9 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
             </div>
             <div>
               <span className="font-medium">Task ID:</span> {' '}
-              <code className="text-xs bg-gray-200 px-1 rounded">{task._id.slice(-8)}</code>
+              <code className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-1 rounded">
+                {task._id.slice(-8)}
+              </code>
             </div>
             {task.assignedUsers?.length > 0 && (
               <div>
@@ -451,17 +491,23 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
               </div>
             )}
           </div>
-        </div>        {/* Form Actions */}
-        <div className="flex justify-between pt-4 border-t border-gray-200">
+        </div>
+
+        {/* Form Actions */}
+        <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
           <div>
             {onDelete && (
               <button
                 type="button"
                 onClick={handleDeleteTask}
-                className="btn-outline text-red-600 border-red-300 hover:bg-red-50"
+                className="px-4 py-2 border border-red-300 dark:border-red-700 rounded-md shadow-sm text-sm font-medium
+                         text-red-600 dark:text-red-400 bg-white dark:bg-gray-800
+                         hover:bg-red-50 dark:hover:bg-red-900/20
+                         focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400
+                         disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 disabled={loading}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
+                <Trash2 className="w-4 h-4 mr-2 inline" />
                 Delete Task
               </button>
             )}
@@ -471,23 +517,33 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="btn-outline"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium
+                       text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800
+                       hover:bg-gray-50 dark:hover:bg-gray-700
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                       text-white bg-blue-600 dark:bg-blue-700
+                       hover:bg-blue-700 dark:hover:bg-blue-800
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               disabled={loading}
             >
               {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>
-      </form>      {/* Subtask Manager - Outside of main form to avoid nested forms */}
-      <div className="border-t border-gray-200 pt-6 mt-6">
-        <label className="block text-sm font-medium text-gray-700 mb-4">
+      </form>
+
+      {/* Subtask Manager - Outside of main form to avoid nested forms */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
           <List className="w-4 h-4 inline mr-1" />
           Subtasks
         </label>
@@ -495,15 +551,15 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
       </div>
 
       {/* Attachment Manager */}
-      <div className="border-t border-gray-200 pt-6 mt-6">
-        <label className="block text-sm font-medium text-gray-700 mb-4">
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
           <Paperclip className="w-4 h-4 inline mr-1" />
           Attachments
         </label>
         {loadingAttachments ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-sm text-gray-600">Loading attachments...</span>
+            <div className="animate-spin w-6 h-6 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full"></div>
+            <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading attachments...</span>
           </div>
         ) : (
           <AttachmentManager

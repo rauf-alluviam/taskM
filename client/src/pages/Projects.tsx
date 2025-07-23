@@ -8,7 +8,6 @@ import { projectAPI, teamAPI } from '../services/api';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 import ProjectFilters, { ProjectFilters as ProjectFiltersType } from '../components/Filters/ProjectFilters';
-import EditProjectModal from '../components/Modals/EditProjectModal';
 import { useForm } from 'react-hook-form';
 
 interface ProjectForm {
@@ -203,15 +202,15 @@ const Projects: React.FC = () => {
     <div className="space-y-6">
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0" />
           <div>
-            <p className="text-red-800 font-medium">Error loading projects</p>
-            <p className="text-red-600 text-sm">{error}</p>
+            <p className="text-red-800 dark:text-red-200 font-medium">Error loading projects</p>
+            <p className="text-red-600 dark:text-red-300 text-sm">{error}</p>
           </div>
           <button
             onClick={loadProjects}
-            className="ml-auto btn-outline btn-sm text-red-700 border-red-300 hover:bg-red-50"
+            className="ml-auto btn-outline btn-sm text-red-700 dark:text-red-300 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/30"
           >
             Retry
           </button>
@@ -229,12 +228,12 @@ const Projects: React.FC = () => {
 
       {/* Results Count */}
       {!loading && (
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <span>
             Showing {filteredProjects.length} of {projects.length} project{projects.length !== 1 ? 's' : ''}
           </span>
           {filteredProjects.length !== projects.length && (
-            <span className="text-primary-600">
+            <span className="text-primary-600 dark:text-primary-400">
               Filtered by: {[
                 filters.search && 'search',
                 filters.department && 'department',
@@ -249,7 +248,7 @@ const Projects: React.FC = () => {
       {filteredProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
-            <div key={project._id} className="card hover:shadow-md transition-shadow">
+            <div key={project._id} className="card hover:shadow-md dark:hover:shadow-xl transition-shadow bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
               <div className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
@@ -262,13 +261,13 @@ const Projects: React.FC = () => {
                         e.stopPropagation();
                         setDropdownOpen(dropdownOpen === project._id ? null : project._id);
                       }}
-                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md"
+                      className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
                     
                     {dropdownOpen === project._id && (
-                      <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[140px]">
+                      <div className="absolute right-0 top-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg dark:shadow-xl z-50 min-w-[140px]">
                         <button
                           onClick={(e) => {
                             e.preventDefault();
@@ -277,7 +276,7 @@ const Projects: React.FC = () => {
                             // Add edit functionality later
                             alert('Edit project functionality - to be implemented');
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
                         >
                           <Edit className="w-3 h-3" />
                           <span>Edit</span>
@@ -289,7 +288,7 @@ const Projects: React.FC = () => {
                             setDropdownOpen(null);
                             handleDeleteProject(project);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2"
                         >
                           <Trash2 className="w-3 h-3" />
                           <span>Delete</span>
@@ -300,34 +299,34 @@ const Projects: React.FC = () => {
                 </div>
 
                 <Link to={`/projects/${project._id}`} className="block">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 hover:text-primary-600 dark:hover:text-primary-400">
                     {project.name}
                   </h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
                     {project.description}
                   </p>
                 </Link>
 
-                <div className="flex items-center justify-between text-sm text-gray-500">
+                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                   <div className="flex items-center space-x-4">
                     <span className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
                       {new Date(project.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-100 text-secondary-800">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-100 dark:bg-secondary-900/30 text-secondary-800 dark:text-secondary-300">
                     {project.department}
                   </span>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {project.kanbanColumns.length} columns
                     </span>
                     <Link
                       to={`/projects/${project._id}`}
-                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                     >
                       View Project →
                     </Link>
@@ -339,14 +338,14 @@ const Projects: React.FC = () => {
         </div>
       ) : (
         <div className="text-center py-12">
-          <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <FolderOpen className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
             {filters.search || filters.department || filters.dateRange.start || filters.dateRange.end
               ? 'No projects found' 
               : 'No projects yet'
             }
           </h3>
-          <p className="text-gray-500 mb-6">
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
             {filters.search || filters.department || filters.dateRange.start || filters.dateRange.end
               ? 'Try adjusting your filters or search terms' 
               : 'Create your first project to get started'
@@ -373,38 +372,38 @@ const Projects: React.FC = () => {
       >
         <form onSubmit={handleSubmit(onCreateProject)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
               Project Name *
             </label>
             <input
               {...register('name', { required: 'Project name is required' })}
-              className="input w-full"
+              className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
               placeholder="Enter project name..."
             />
             {errors.name && (
-              <p className="mt-1 text-sm text-error-600">{errors.name.message}</p>
+              <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.name.message}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
               Description
             </label>
             <textarea
               {...register('description')}
-              className="textarea w-full"
+              className="textarea w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
               placeholder="Describe the project..."
               rows={3}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
               Department *
             </label>
             <input
               {...register('department', { required: 'Department is required' })}
-              className="input w-full"
+              className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
               placeholder="e.g., Engineering, Marketing, Design"
               list="departments"
             />
@@ -419,17 +418,17 @@ const Projects: React.FC = () => {
               <option value="Support" />
             </datalist>
             {errors.department && (
-              <p className="mt-1 text-sm text-error-600">{errors.department.message}</p>
+              <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.department.message}</p>
             )}
           </div>
 
           {/* Team Selection */}
           {user?.organization && teams.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Team
               </label>
-              <select {...register('teamId')} className="input w-full">
+              <select {...register('teamId')} className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400">
                 <option value="">No specific team (Organization-wide)</option>
                 {teams.map((team) => (
                   <option key={team._id} value={team._id}>
@@ -437,7 +436,7 @@ const Projects: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Select a team to create a team-specific project
               </p>
             </div>
@@ -446,41 +445,41 @@ const Projects: React.FC = () => {
           {/* Visibility Settings */}
           {user?.organization && (
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Project Visibility *
               </label>
-              <select {...register('visibility', { required: 'Visibility is required' })} className="input w-full">
+              <select {...register('visibility', { required: 'Visibility is required' })} className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400">
                 <option value="private">Private - Only you and invited members</option>
                 <option value="team">Team - All team members can access</option>
                 <option value="organization">Organization - All organization members can view</option>
                 <option value="public">Public - Anyone can view (if enabled)</option>
               </select>
               {errors.visibility && (
-                <p className="mt-1 text-sm text-error-600">{errors.visibility.message}</p>
+                <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.visibility.message}</p>
               )}
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <div className="space-y-1">
-                  <p>• <strong>Private:</strong> Only project members can access</p>
-                  <p>• <strong>Team:</strong> All team members can participate</p>
-                  <p>• <strong>Organization:</strong> All organization members can view</p>
-                  <p>• <strong>Public:</strong> Anyone with the link can view</p>
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Private:</strong> Only project members can access</p>
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Team:</strong> All team members can participate</p>
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Organization:</strong> All organization members can view</p>
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Public:</strong> Anyone with the link can view</p>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
               onClick={handleCloseCreateModal}
-              className="btn-outline btn-md"
+              className="btn-outline btn-md border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={creating}
-              className="btn-primary btn-md"
+              className="btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? 'Creating...' : 'Create Project'}
             </button>

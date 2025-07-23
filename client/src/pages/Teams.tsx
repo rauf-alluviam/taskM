@@ -20,6 +20,7 @@ import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 import { useForm } from 'react-hook-form';
 
+
 interface Team {
   _id: string;
   name: string;
@@ -48,16 +49,19 @@ interface Team {
   updatedAt: string;
 }
 
+
 interface TeamForm {
   name: string;
   description: string;
   leadId?: string;
 }
 
+
 interface AddMemberForm {
   userId: string;
   role: 'member';
 }
+
 
 const Teams: React.FC = () => {
   const { user } = useAuth();
@@ -75,8 +79,10 @@ const Teams: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const [organizationMembers, setOrganizationMembers] = useState<any[]>([]);
 
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TeamForm>();
   const { register: registerMember, handleSubmit: handleSubmitMember, reset: resetMember, formState: { errors: memberErrors } } = useForm<AddMemberForm>();
+
 
   // Memoized functions to prevent unnecessary re-renders
   const loadTeams = useCallback(async () => {
@@ -96,6 +102,7 @@ const Teams: React.FC = () => {
     }
   }, [addNotification]);
 
+
   const loadOrganizationMembers = useCallback(async () => {
     if (!user?.organization?._id) {
       setOrganizationMembers([]);
@@ -111,6 +118,7 @@ const Teams: React.FC = () => {
     }
   }, [user?.organization?._id]);
 
+
   useEffect(() => {
     loadTeams();
     loadOrganizationMembers();
@@ -121,6 +129,7 @@ const Teams: React.FC = () => {
     }
   }, [location.pathname, loadTeams, loadOrganizationMembers]);
 
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       // Only close if click is outside the dropdown
@@ -130,11 +139,13 @@ const Teams: React.FC = () => {
       }
     };
 
+
     if (dropdownOpen) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [dropdownOpen]);
+
 
   const onCreateTeam = async (data: TeamForm) => {
     setCreating(true);
@@ -170,8 +181,10 @@ const Teams: React.FC = () => {
     }
   };
 
+
   const onAddMember = async (data: AddMemberForm) => {
     if (!selectedTeam) return;
+
 
     try {
       await teamAPI.addMember(selectedTeam._id, data.userId, data.role);
@@ -192,10 +205,12 @@ const Teams: React.FC = () => {
     }
   };
 
+
   const handleDeleteTeam = async (team: Team) => {
     if (!window.confirm(`Are you sure you want to delete "${team.name}"? This action cannot be undone.`)) {
       return;
     }
+
 
     try {
       await teamAPI.deleteTeam(team._id);
@@ -214,6 +229,7 @@ const Teams: React.FC = () => {
     }
   };
 
+
   const filteredTeams = React.useMemo(() => 
     teams.filter(team =>
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -221,20 +237,23 @@ const Teams: React.FC = () => {
     ), [teams, searchTerm]
   );
 
+
   // Check permissions
   const canManageTeams = user?.role === 'super_admin' || user?.role === 'org_admin';
   const canCreateTeams = (canManageTeams || user?.role === 'team_lead') && user?.organization?._id;
 
+
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'lead':
-        return <Shield className="w-4 h-4 text-blue-600" />;
+        return <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
       case 'member':
-        return <User className="w-4 h-4 text-gray-600" />;
+        return <User className="w-4 h-4 text-gray-600 dark:text-gray-300" />;
       default:
-        return <User className="w-4 h-4 text-gray-600" />;
+        return <User className="w-4 h-4 text-gray-600 dark:text-gray-300" />;
     }
   };
+
 
   const handleCloseCreateModal = useCallback(() => {
     setShowCreateModal(false);
@@ -245,16 +264,19 @@ const Teams: React.FC = () => {
     }
   }, [location.pathname, navigate, reset]);
 
+
   const handleDropdownToggle = useCallback((teamId: string, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     setDropdownOpen(prev => prev === teamId ? null : teamId);
   }, []);
 
+
   const handleDropdownAction = useCallback((action: () => void) => {
     setDropdownOpen(null);
     action();
   }, []);
+
 
   if (loading) {
     return (
@@ -264,23 +286,24 @@ const Teams: React.FC = () => {
     );
   }
 
+
   return (
     <div className="space-y-6">
       {/* Organization Check */}
       {!user?.organization?._id && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 dark:bg-yellow-900/20 dark:border-yellow-700/50">
           <div className="flex">
             <div className="flex-shrink-0">
-              <Users className="h-5 w-5 text-yellow-400" />
+              <Users className="h-5 w-5 text-yellow-400 dark:text-yellow-500" />
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
                 Organization Required
               </h3>
-              <div className="mt-2 text-sm text-yellow-700">
+              <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
                 <p>
                   You need to be part of an organization to create and manage teams.{' '}
-                  <Link to="/organization/create" className="font-medium underline hover:text-yellow-600">
+                  <Link to="/organization/create" className="font-medium underline hover:text-yellow-600 dark:hover:text-yellow-300">
                     Create an organization
                   </Link>{' '}
                   or contact your administrator to be added to one.
@@ -291,11 +314,12 @@ const Teams: React.FC = () => {
         </div>
       )}
 
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Teams</h1>
-          <p className="text-gray-600 mt-1">Manage your organization's teams</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Teams</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your organization's teams</p>
         </div>
         {canCreateTeams && (
           <button
@@ -308,23 +332,25 @@ const Teams: React.FC = () => {
         )}
       </div>
 
+
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
         <input
           type="text"
           placeholder="Search teams..."
-          className="input pl-10 w-full sm:w-80"
+          className="input pl-10 w-full sm:w-80 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200 dark:placeholder-gray-500"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
+
       {/* Teams Grid */}
       {filteredTeams.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTeams.map((team) => (
-            <div key={team._id} className="bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+            <div key={team._id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-shadow">
               <div className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -333,18 +359,18 @@ const Teams: React.FC = () => {
                   <div className="relative" data-dropdown>
                     <button 
                       onClick={(e) => handleDropdownToggle(team._id, e)}
-                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md"
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded-md"
                       aria-label="Team actions"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
                     
                     {dropdownOpen === team._id && (
-                      <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[160px]">
+                      <div className="absolute right-0 top-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 min-w-[160px]">
                         <Link
                           to={`/teams/${team._id}`}
                           onClick={() => setDropdownOpen(null)}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center space-x-2"
                         >
                           <Users className="w-3 h-3" />
                           <span>View Details</span>
@@ -356,7 +382,7 @@ const Teams: React.FC = () => {
                                 setSelectedTeam(team);
                                 setShowAddMemberModal(true);
                               })}
-                              className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                              className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center space-x-2"
                             >
                               <UserPlus className="w-3 h-3" />
                               <span>Add Member</span>
@@ -365,7 +391,7 @@ const Teams: React.FC = () => {
                               onClick={() => handleDropdownAction(() => 
                                 navigate(`/teams/${team._id}/edit`)
                               )}
-                              className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                              className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center space-x-2"
                             >
                               <Edit className="w-3 h-3" />
                               <span>Edit</span>
@@ -374,7 +400,7 @@ const Teams: React.FC = () => {
                               onClick={() => handleDropdownAction(() => 
                                 handleDeleteTeam(team)
                               )}
-                              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                              className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center space-x-2"
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>Delete</span>
@@ -386,26 +412,29 @@ const Teams: React.FC = () => {
                   </div>
                 </div>
 
+
                 <Link to={`/teams/${team._id}`} className="block">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-blue-600">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-2 hover:text-blue-600 dark:hover:text-blue-400">
                     {team.name}
                   </h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
                     {team.description}
                   </p>
                 </Link>
 
+
                 {/* Team Lead */}
                 <div className="mb-4">
                   <div className="flex items-center space-x-2">
-                    <Shield className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium text-gray-900">{team.lead.name}</span>
+                    <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{team.lead.name}</span>
                   </div>
-                  <p className="text-xs text-gray-500 ml-6">Team Lead</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 ml-6">Team Lead</p>
                 </div>
 
+
                 {/* Stats */}
-                <div className="flex items-center justify-between text-sm text-gray-500 border-t border-gray-200 pt-4">
+                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">
                   <div className="flex items-center space-x-4">
                     <span className="flex items-center">
                       <Users className="w-4 h-4 mr-1" />
@@ -413,10 +442,10 @@ const Teams: React.FC = () => {
                     </span>
                     <span className="flex items-center">
                       <FolderOpen className="w-4 h-4 mr-1" />
-                      {/* {team.projects } project{team.projects !== 1 ? 's' : ''} */}
+                      {(team.projects || []).length} project{(team.projects || []).length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
                     Created {new Date(team.createdAt).toLocaleDateString()}
                   </span>
                 </div>
@@ -426,11 +455,11 @@ const Teams: React.FC = () => {
         </div>
       ) : (
         <div className="text-center py-12">
-          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <Users className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
             {searchTerm ? 'No teams found' : 'No teams yet'}
           </h3>
-          <p className="text-gray-500 mb-6">
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
             {searchTerm 
               ? 'Try adjusting your search terms' 
               : 'Create your first team to get started'
@@ -448,6 +477,7 @@ const Teams: React.FC = () => {
         </div>
       )}
 
+
       {/* Create Team Modal */}
       <Modal
         isOpen={showCreateModal}
@@ -457,36 +487,38 @@ const Teams: React.FC = () => {
       >
         <form onSubmit={handleSubmit(onCreateTeam)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
               Team Name *
             </label>
             <input
               {...register('name', { required: 'Team name is required' })}
-              className="input w-full"
+              className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:placeholder-gray-400"
               placeholder="Enter team name..."
             />
             {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>
             )}
           </div>
 
+
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
               Description
             </label>
             <textarea
               {...register('description')}
-              className="textarea w-full"
+              className="textarea w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:placeholder-gray-400"
               placeholder="Describe the team's purpose..."
               rows={3}
             />
           </div>
 
+
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
               Team Lead
             </label>
-            <select {...register('leadId')} className="input w-full">
+            <select {...register('leadId')} className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
               <option value="">Select a team lead (optional)</option>
               {(organizationMembers || [])
                 .map((member) => (
@@ -495,12 +527,13 @@ const Teams: React.FC = () => {
                   </option>
                 ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               If no lead is selected, you will be assigned as the team lead
             </p>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
               onClick={handleCloseCreateModal}
@@ -519,6 +552,7 @@ const Teams: React.FC = () => {
         </form>
       </Modal>
 
+
       {/* Add Member Modal */}
       <Modal
         isOpen={showAddMemberModal}
@@ -532,12 +566,12 @@ const Teams: React.FC = () => {
       >
         <form onSubmit={handleSubmitMember(onAddMember)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
               Select Member *
             </label>
             <select 
               {...registerMember('userId', { required: 'Please select a member' })} 
-              className="input w-full"
+              className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
             >
               <option value="">Choose a member...</option>
               {(organizationMembers || [])
@@ -551,23 +585,25 @@ const Teams: React.FC = () => {
                 ))}
             </select>
             {memberErrors.userId && (
-              <p className="mt-1 text-sm text-red-600">{memberErrors.userId.message}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{memberErrors.userId.message}</p>
             )}
           </div>
 
+
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
               Role *
             </label>
-            <select {...registerMember('role', { required: 'Role is required' })} className="input w-full">
+            <select {...registerMember('role', { required: 'Role is required' })} className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
               <option value="member">Member</option>
             </select>
             {memberErrors.role && (
-              <p className="mt-1 text-sm text-red-600">{memberErrors.role.message}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{memberErrors.role.message}</p>
             )}
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
               onClick={() => {
@@ -591,5 +627,6 @@ const Teams: React.FC = () => {
     </div>
   );
 };
+
 
 export default Teams;
