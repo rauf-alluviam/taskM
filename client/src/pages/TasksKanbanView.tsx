@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Layout, List, Settings, Plus, FolderOpen, Filter, Search, ChevronDown, Tag, X, Home, Users, BarChart3, Star, MoreHorizontal, Calendar } from 'lucide-react';
 import Breadcrumb from '../components/UI/Breadcrumb';
 import KanbanBoard from '../components/Tasks/KanbanBoard';
@@ -9,6 +9,7 @@ import ColumnManager from '../components/Tasks/ColumnManager';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import { Task } from '../contexts/TaskContext';
 import UserAvatarList from '../components/UI/UserAvatarList';
+import { taskAPI } from '../services/api';
 
 interface Project { _id: string; name: string; department: string; }
 interface TaskFilters {
@@ -64,6 +65,11 @@ interface TasksKanbanViewProps {
   setSelectedTask: (task: Task | null) => void;
   orgUsers: any[];
   orgUsersLoading: boolean;
+  organizationData?: OrganizationData; // <-- add this prop
+}
+
+interface OrganizationData {
+  _id: string;
 }
 
 const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
@@ -104,8 +110,111 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   showColumnManager,
   setSelectedTask,
   orgUsers,
-  orgUsersLoading
+  orgUsersLoading,
+  organizationData // <-- add this prop
 }) => {
+  // Add selectedUserId state
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [userTasksLoading, setUserTasksLoading] = useState(false);
+  const [userTasks, setUserTasks] = useState<any[] | null>(null);
+  const [orgTasks, setOrgTasks] = useState<any[] | null>(null); // Store all org tasks
+
+  // Handler for multi-user avatar selection
+  // Only fetch org tasks when a specific subset of users is selected (not all, not none)
+  const handleMultiUserChange = async (userIds: string[]) => {
+    setSelectedUserIds(userIds);
+    // If no users are selected, use local filtering (show all tasks)
+    if (userIds.length === 0) {
+      setUserTasks(null);
+      setOrgTasks(null);
+      setFilters({ ...filters, assignedUser: 'all' });
+      return;
+    }
+    // If all users are selected, use local filtering (show all tasks)
+    if (userIds.length === orgUsers.length) {
+      setUserTasks(null);
+      setOrgTasks(null);
+      setFilters({ ...filters, assignedUser: 'all' });
+      return;
+    }
+    // If a specific subset is selected, fetch all org tasks and filter for selected users
+    setUserTasksLoading(true);
+    try {
+      // Robust orgId extraction: support string or object for orgUsers[0].organization
+      let orgId = organizationData?._id;
+      if (!orgId && orgUsers[0]?.organization) {
+        if (typeof orgUsers[0].organization === 'string') {
+          orgId = orgUsers[0].organization;
+        } else if (typeof orgUsers[0].organization === 'object' && orgUsers[0].organization._id) {
+          orgId = orgUsers[0].organization._id;
+        }
+      }
+      if (!orgId) {
+        console.error('No orgId found for fetching organization tasks');
+        setUserTasks([]);
+        setOrgTasks(null);
+        setUserTasksLoading(false);
+        return;
+      }
+      // Use getOrganizationTasks only for subset selection
+      const allOrgTasks = await taskAPI.getOrganizationTasks(orgId);
+      setOrgTasks(allOrgTasks);
+      // Filter for selected users (OR logic)
+      const filtered = allOrgTasks.filter((task: any) => {
+        if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
+        return task.assignedUsers.some((user: any) => userIds.includes(typeof user === 'string' ? user : user._id));
+      });
+      setUserTasks(filtered);
+      setFilters({ ...filters, assignedUser: userIds.join(',') });
+    } catch (error) {
+      console.error('Failed to fetch org tasks:', error);
+      setUserTasks([]);
+      setOrgTasks(null);
+    } finally {
+      setUserTasksLoading(false);
+    }
+  };
+
+  // --- FILTERED TASKS LOGIC FIX WITH DEBUG LOGS ---
+  // Place this above the return statement in the component
+  const getFilteredTasks = () => {
+    console.log('[Kanban Multi-User Filter] selectedUserIds:', selectedUserIds);
+    console.log('[Kanban Multi-User Filter] orgUsers:', orgUsers?.map(u => u._id));
+    // If no user filter or 'all', return all filteredTasks
+    if (!selectedUserIds || selectedUserIds.length === 0 || (orgUsers && selectedUserIds.length === orgUsers.length)) {
+      console.log('[Kanban Multi-User Filter] No user filter or all users selected, returning all filteredTasks:', filteredTasks.length);
+      return filteredTasks;
+    }
+    // If orgTasks is loaded (from API), use it for filtering
+    if (orgTasks && Array.isArray(orgTasks)) {
+      const result = orgTasks.filter(task => {
+        if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
+        const match = task.assignedUsers.some(
+          (user: any) => selectedUserIds.includes(typeof user === 'string' ? user : user._id)
+        );
+        if (match) {
+          console.log(`[Kanban Multi-User Filter][ORG API] Task '${task.title}' (${task._id}) matches selected users`, task.assignedUsers);
+        }
+        return match;
+      });
+      console.log('[Kanban Multi-User Filter][ORG API] Filtered tasks count:', result.length);
+      return result;
+    }
+    // fallback: local filter (should not happen, but for safety)
+    const result = filteredTasks.filter(task => {
+      if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
+      const match = task.assignedUsers.some(
+        (user: any) => selectedUserIds.includes(typeof user === 'string' ? user : user._id)
+      );
+      if (match) {
+        console.log(`[Kanban Multi-User Filter] Task '${task.title}' (${task._id}) matches selected users`, task.assignedUsers);
+      }
+      return match;
+    });
+    console.log('[Kanban Multi-User Filter] Filtered tasks count:', result.length);
+    return result;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -166,7 +275,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                 Create
               </button>
               
-              <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden">
+              {/* <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden">
                 <button className="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-white transition-all">
                   <Users className="w-3 h-3 mr-1 inline" />
                   Share
@@ -175,7 +284,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                   <BarChart3 className="w-3 h-3 mr-1 inline" />
                   Insights
                 </button>
-              </div>
+              </div> */}
 
               <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                 <MoreHorizontal className="w-4 h-4" />
@@ -184,26 +293,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="px-6 border-b border-gray-100">
-          <nav className="flex space-x-8">
-            <button className="py-3 px-1 border-b-2 border-blue-500 text-blue-600 font-medium text-sm">
-              Board
-            </button>
-            <button className="py-3 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-800 font-medium text-sm">
-              Backlog
-            </button>
-            <button className="py-3 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-800 font-medium text-sm">
-              Timeline
-            </button>
-            <button className="py-3 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-800 font-medium text-sm">
-              Reports
-            </button>
-            <button className="py-3 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-800 font-medium text-sm">
-              Issues and filters
-            </button>
-          </nav>
-        </div>
+     
 
         {/* Toolbar */}
         <div className="px-6 py-3 bg-white border-b border-gray-100">
@@ -223,29 +313,42 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
               </div>
 
               {/* Epic Dropdown */}
-              <div className="relative">
+              {/* <div className="relative">
                 <button className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all">
                   Epic
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </button>
-              </div>
+              </div> */}
 
               {/* Avatar Group */}
-              <div className="flex items-center min-w-[80px]">
-                {orgUsersLoading ? (
-                  <div className="w-24 flex justify-center items-center"><LoadingSpinner size="sm" /></div>
-                ) : (
-                  <>
-                    {orgUsers && orgUsers.length > 0 ? (
-                      <div className="flex items-center">
-                        <UserAvatarList users={orgUsers} maxDisplay={4} size="md" showNames={false} />
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">No users</span>
-                    )}
-                  </>
-                )}
-              </div>
+              {/* // In the Avatar Group section, add loading feedback */}
+<div className="flex items-center min-w-[80px]">
+  {orgUsersLoading ? (
+    <div className="w-24 flex justify-center items-center">
+      <LoadingSpinner size="sm" />
+    </div>
+  ) : (
+    orgUsers && orgUsers.length > 0 ? (
+      <div className="flex items-center">
+        <UserAvatarList
+          users={orgUsers}
+          maxDisplay={4}
+          size="md"
+          showNames={false}
+          multiSelect={true}
+          selectedUserIds={selectedUserIds}
+          onMultiSelectChange={handleMultiUserChange}
+        />
+        {userTasksLoading && (
+          <LoadingSpinner size="sm" className="ml-2" />
+        )}
+      </div>
+    ) : (
+      <span className="text-xs text-gray-400">No users</span>
+    )
+  )}
+</div>    
+
 
               {/* Only show assignees */}
            
@@ -398,7 +501,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
         <div className="h-full">
           {viewMode === 'kanban' ? (
             <KanbanBoard
-              tasks={filteredTasks}
+              tasks={getFilteredTasks()}
               onTaskUpdate={handleTaskUpdate}
               onAddTask={handleAddTask}
               onEditTask={handleEditTask}
@@ -410,7 +513,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
             <div className="p-6 h-full">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
                 <TaskListView
-                  tasks={filteredTasks}
+                  tasks={getFilteredTasks()}
                   onEditTask={handleEditTask}
                   onDeleteTask={handleDeleteTask}
                   onTaskUpdate={handleTaskUpdate}

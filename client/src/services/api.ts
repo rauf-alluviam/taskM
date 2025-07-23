@@ -67,9 +67,9 @@ api.interceptors.request.use((config) => {
   
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log('🔑 Adding auth token to request:', config.url, `Bearer ${token.substring(0, 20)}...`);
+    //console.log('🔑 Adding auth token to request:', config.url, `Bearer ${token.substring(0, 20)}...`);
   } else if (!isAuthRoute) {
-    console.log('❌ No token found for request:', config.url);
+  //  console.log('❌ No token found for request:', config.url);
   }
   return config;
 });
@@ -154,6 +154,23 @@ export const taskAPI = {
       return response.data;
     });
   },
+  getOrganizationTasks: async (orgId: string) => {
+    // Fetch all tasks for the organization: assigned to, created by, or in a project of any org user
+
+    return withRetry(async () => {
+      if (!orgId) throw new Error('No orgId provided to getOrganizationTasks');
+      console.log('🌐 [API] Fetching all organization tasks for orgId:', orgId);
+      const response = await api.get(`/tasks/org/${orgId}`);
+      console.log('🌐 [API] Organization tasks fetched:', Array.isArray(response.data) ? response.data.length : response.data);
+      return response.data;
+    });
+    //   return response.data;
+    // } catch (error: any) {
+    //   console.error('❌ [API] Failed to fetch organization tasks:', error);
+    //   throw error;
+    // }
+  },
+
   createTask: async (task: any) => {
     return withRetry(async () => {
       const response = await api.post('/tasks', task);
@@ -215,8 +232,16 @@ export const taskAPI = {
       return response.data;
     });
   },
-};
 
+getTasksByUser: async(userId: string) => {
+  return withRetry(async () => {
+    const response = await api.get(`/tasks/user-tasks/${userId}`, {
+      params:{userId}
+    });
+    return response.data;
+  });
+},
+};
 export const projectAPI = {
   getProjects: async () => {
     return withRetry(async () => {

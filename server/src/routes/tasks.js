@@ -738,6 +738,81 @@ router.get('/:id/history', authenticate, async (req, res) => {
   }
 });
 
+// Get tasks assigned to or created by the current user (regardless of project)
+router.get('/my-tasks', authenticate, async (req, res) => {
+  try {
+    const tasks = await Task.find({
+      $or: [
+        { createdBy: req.user._id },
+        { assignedUsers: req.user._id }
+      ]
+    })
+      .populate('createdBy', 'name email')
+      .populate('assignedUsers', 'name email')
+      .populate('projectId', 'name')
+      .populate('subtasks')
+      .sort({ createdAt: -1 });
+
+    res.json(tasks);
+  } catch (error) {
+    console.error('Get my-tasks error:', error);
+    res.status(500).json({ message: 'Server error while fetching my tasks' });
+  }
+});
+
+// Get tasks assigned to or created by a specific user (by userId param)
+router.get('/user-tasks/:userId', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const tasks = await Task.find({
+      $or: [
+        { createdBy: userId },
+        { assignedUsers: userId }
+      ]
+    })
+      .populate('createdBy', 'name email')
+      .populate('assignedUsers', 'name email')
+      .populate('projectId', 'name')
+      .populate('subtasks')
+      .sort({ createdAt: -1 });
+
+    res.json(tasks);
+  } catch (error) {
+    console.error('Get user-tasks error:', error);
+    res.status(500).json({ message: 'Server error while fetching user tasks' });
+  }
+});
+
+// Get all tasks for a particular organization
+router.get('/org/:orgId', authenticate, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    // Find all users in the organization
+    const users = await (await import('../models/User.js')).default.find({ organization: orgId }).select('_id');
+    const userIds = users.map(u => u._id);
+    // Find all projects in the organization
+    const projects = await Project.find({ organization: orgId }).select('_id');
+    const projectIds = projects.map(p => p._id);
+    // Find all tasks assigned to any org user OR in org projects
+    const tasks = await Task.find({
+      $or: [
+        { assignedUsers: { $in: userIds } },
+        { createdBy: { $in: userIds } },
+        { projectId: { $in: projectIds } }
+      ]
+    })
+      .populate('createdBy', 'name email')
+      .populate('assignedUsers', 'name email')
+      .populate('projectId', 'name')
+      .populate('subtasks')
+      .sort({ createdAt: -1 });
+    res.json(tasks);
+  } catch (error) {
+    console.error('Get org-tasks error:', error);
+    res.status(500).json({ message: 'Server error while fetching organization tasks' });
+  }
+});
+
 // Helper function to log task changes
 async function logTaskChange(taskId, action, data, userId, userName) {
   try {

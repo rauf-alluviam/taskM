@@ -11,6 +11,11 @@ interface UserAvatarListProps {
   size?: 'sm' | 'md' | 'lg';
   showNames?: boolean;
   className?: string;
+  onUserClick?: (user: { _id: string; name: string; email?: string }) => void;
+  selectedUserId?: string | null; // for backward compatibility
+  selectedUserIds?: string[]; // for multi-select
+  onMultiSelectChange?: (userIds: string[]) => void; // callback for multi-select
+  multiSelect?: boolean; // enable multi-select mode
 }
 
 const UserAvatarList: React.FC<UserAvatarListProps> = ({
@@ -18,7 +23,12 @@ const UserAvatarList: React.FC<UserAvatarListProps> = ({
   maxDisplay = 3,
   size = 'sm',
   showNames = false,
-  className = ''
+  className = '',
+  onUserClick,
+  selectedUserId,
+  selectedUserIds = [],
+  onMultiSelectChange,
+  multiSelect = false
 }) => {
   if (!users || users.length === 0) {
     return (
@@ -65,64 +75,113 @@ const UserAvatarList: React.FC<UserAvatarListProps> = ({
     return colors[index];
   };
 
+  // Multi-select logic
+  const isMulti = multiSelect && Array.isArray(selectedUserIds) && typeof onMultiSelectChange === 'function';
+  const selectedIds = isMulti ? selectedUserIds : selectedUserId ? [selectedUserId] : [];
+
+  const handleAvatarClick = (user: { _id: string; name: string; email?: string }) => {
+    if (isMulti) {
+      let newIds;
+      if (selectedIds.includes(user._id)) {
+        newIds = selectedIds.filter(id => id !== user._id);
+      } else {
+        newIds = [...selectedIds, user._id];
+      }
+      onMultiSelectChange(newIds);
+    } else if (onUserClick) {
+      onUserClick(user);
+    }
+  };
+
+  // Select All/Clear logic
+  const handleSelectAll = () => {
+    if (isMulti) {
+      onMultiSelectChange(users.map(u => u._id));
+    }
+  };
+  const handleClear = () => {
+    if (isMulti) {
+      onMultiSelectChange([]);
+    }
+  };
+
   if (showNames) {
     return (
-      <div className={`flex flex-wrap gap-1 ${className}`}>
-        {displayUsers.map((user, index) => (
-          <div
-            key={user._id}
-            className="flex items-center space-x-1 bg-gray-100 rounded-full px-2 py-1"
-            title={user.email || user.name}
-          >
-            <div
-              className={`${sizeClasses[size]} ${getAvatarColor(user.name)} rounded-full flex items-center justify-center text-white font-medium`}
-            >
-              {getInitials(user.name)}
-            </div>
-            <span className="text-xs text-gray-700 max-w-20 truncate">
-              {user.name}
-            </span>
-          </div>
-        ))}
-        {remainingCount > 0 && (
-          <div className="flex items-center space-x-1 bg-gray-100 rounded-full px-2 py-1">
-            <div className={`${sizeClasses[size]} bg-gray-400 rounded-full flex items-center justify-center text-white font-medium`}>
-              +{remainingCount}
-            </div>
+      <div className={`flex flex-col gap-1 ${className}`}>
+        {isMulti && (
+          <div className="flex gap-2 mb-1">
+            <button type="button" className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" onClick={handleSelectAll}>Select All</button>
+            <button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={handleClear}>Clear</button>
           </div>
         )}
+        <div className="flex flex-wrap gap-1">
+          {displayUsers.map((user, index) => (
+            <div
+              key={user._id}
+              className={`flex items-center space-x-1 bg-gray-100 rounded-full px-2 py-1 ${selectedIds.includes(user._id) ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white' : ''}`}
+              title={user.email || user.name}
+              onClick={() => handleAvatarClick(user)}
+              style={{ cursor: onUserClick || isMulti ? 'pointer' : 'default' }}
+            >
+              <div
+                className={`${sizeClasses[size]} ${getAvatarColor(user.name)} rounded-full flex items-center justify-center text-white font-medium`}
+              >
+                {getInitials(user.name)}
+              </div>
+              <span className="text-xs text-gray-700 max-w-20 truncate">
+                {user.name}
+              </span>
+            </div>
+          ))}
+          {remainingCount > 0 && (
+            <div className="flex items-center space-x-1 bg-gray-100 rounded-full px-2 py-1">
+              <div className={`${sizeClasses[size]} bg-gray-400 rounded-full flex items-center justify-center text-white font-medium`}>
+                +{remainingCount}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`flex items-center ${className}`}>
-      <div className="flex -space-x-1">
-        {displayUsers.map((user, index) => (
-          <div
-            key={user._id}
-            className={`${sizeClasses[size]} ${getAvatarColor(user.name)} rounded-full flex items-center justify-center text-white font-medium border-2 border-white cursor-help`}
-            title={`${user.name}${user.email ? ` (${user.email})` : ''}`}
-            style={{ zIndex: users.length - index }}
-          >
-            {getInitials(user.name)}
-          </div>
-        ))}
-        {remainingCount > 0 && (
-          <div
-            className={`${sizeClasses[size]} bg-gray-400 rounded-full flex items-center justify-center text-white font-medium border-2 border-white cursor-help`}
-            title={`${remainingCount} more users: ${users.slice(maxDisplay).map(u => u.name).join(', ')}`}
-            style={{ zIndex: 0 }}
-          >
-            +{remainingCount}
-          </div>
+    <div className={`flex flex-col ${className}`}>
+      {isMulti && (
+        <div className="flex gap-2 mb-1">
+          <button type="button" className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" onClick={handleSelectAll}>Select All</button>
+          <button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={handleClear}>Clear</button>
+        </div>
+      )}
+      <div className="flex items-center">
+        <div className="flex -space-x-1">
+          {displayUsers.map((user, index) => (
+            <div
+              key={user._id}
+              className={`${sizeClasses[size]} ${getAvatarColor(user.name)} rounded-full flex items-center justify-center text-white font-medium border-2 border-white ${selectedIds.includes(user._id) ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white' : ''}`}
+              title={`${user.name}${user.email ? ` (${user.email})` : ''}`}
+              style={{ zIndex: users.length - index, cursor: onUserClick || isMulti ? 'pointer' : 'default' }}
+              onClick={() => handleAvatarClick(user)}
+            >
+              {getInitials(user.name)}
+            </div>
+          ))}
+          {remainingCount > 0 && (
+            <div
+              className={`${sizeClasses[size]} bg-gray-400 rounded-full flex items-center justify-center text-white font-medium border-2 border-white cursor-help`}
+              title={`${remainingCount} more users: ${users.slice(maxDisplay).map(u => u.name).join(', ')}`}
+              style={{ zIndex: 0 }}
+            >
+              +{remainingCount}
+            </div>
+          )}
+        </div>
+        {users.length > 0 && (
+          <span className="ml-2 text-sm text-gray-600">
+            {users.length === 1 ? users[0].name : `${users.length} users`}
+          </span>
         )}
       </div>
-      {users.length > 0 && (
-        <span className="ml-2 text-sm text-gray-600">
-          {users.length === 1 ? users[0].name : `${users.length} users`}
-        </span>
-      )}
     </div>
   );
 };

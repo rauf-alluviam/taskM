@@ -38,7 +38,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   columns: propColumns,
   onManageColumns
 }) => {
-  console.log('🎯 KanbanBoard received tasks:', tasks.length, tasks.map(t => ({ title: t.title, status: t.status })));
+ // console.log('🎯 KanbanBoard received tasks:', tasks.length, tasks.map(t => ({ title: t.title, status: t.status })));
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [dragStartStatus, setDragStartStatus] = useState<string | null>(null);
@@ -69,19 +69,19 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       const normalizedColumnStatus = normalizeStatus(status);
       const matches = normalizedTaskStatus === normalizedColumnStatus;
       
-      console.log('🔍 KanbanBoard filtering task for column:', {
-        columnStatus: status,
-        normalizedColumnStatus,
-        taskTitle: task.title,
-        taskStatus: task.status,
-        normalizedTaskStatus,
-        matches
-      });
+      // console.log('🔍 KanbanBoard filtering task for column:', {
+      //   columnStatus: status,
+      //   normalizedColumnStatus,
+      //   taskTitle: task.title,
+      //   taskStatus: task.status,
+      //   normalizedTaskStatus,
+      //   matches
+      // });
       
       return matches;
     });
     
-    console.log(`📋 Column "${status}" has ${tasksForStatus.length} tasks`);
+    //console.log(`📋 Column "${status}" has ${tasksForStatus.length} tasks`);
     return tasksForStatus;
   };const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -178,7 +178,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       onTaskUpdate(taskId, { status: newStatus }, true);
       
     } catch (error) {
-      console.error('Failed to update task status:', error);
+      //console.error('Failed to update task status:', error);
       if (error.response?.status === 429) {
         setTimeout(() => {
           setIsUpdating(false);

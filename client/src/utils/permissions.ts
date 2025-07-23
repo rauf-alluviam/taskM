@@ -25,19 +25,11 @@ export class PermissionHelper {
   static canAssignTasks(context: PermissionContext): boolean {
     const { user, project, task } = context;
 
-    console.log('PermissionHelper.canAssignTasks called with:', {
-      userRole: user.role,
-      userOrg: user.organization?.name,
-      userOrgId: user.organization?._id,
-      projectPresent: !!project,
-      taskPresent: !!task,
-      taskCreatedBy: task?.createdBy,
-      userId: user._id
-    });
+   
 
     // Super admins can assign tasks anywhere
     if (user.role === 'super_admin') {
-      console.log('User is super_admin, can assign tasks');
+      //console.log('User is super_admin, can assign tasks');
       return true;
     }
 
@@ -45,12 +37,12 @@ export class PermissionHelper {
     if (user.role === 'org_admin' && user.organization) {
       // Org admins can assign in any project within their organization
       if (!project || project.organization === user.organization._id) {
-        console.log('Org admin can assign tasks in organization context');
+       
         return true;
       }
       // Also for tasks without projects but within their org context
       if (!project && task && !task.projectId) {
-        console.log('Org admin can assign personal tasks');
+      
         return true;
       }
     }
@@ -62,26 +54,26 @@ export class PermissionHelper {
         project.createdBy === user._id || 
         project.members?.some(m => m.user._id === user._id && ['admin', 'member'].includes(m.role))
       )) {
-        console.log('Team lead can assign tasks in project they are member of');
+       
         return true;
       }
       
       // Team leads can assign tasks within their organization
       if (user.organization && (!project || project.organization === user.organization._id)) {
-        console.log('Team lead can assign tasks in organization context');
+       
         return true;
       }
       
       // Team leads can assign personal tasks
       if (!project) {
-        console.log('Team lead can assign personal tasks');
+        
         return true;
       }
     }
 
     // Task creators can assign their own tasks
     if (task && task.createdBy === user._id) {
-      console.log('User can assign their own task');
+      
       return true;
     }
 
@@ -89,17 +81,17 @@ export class PermissionHelper {
     if (project && project.members?.some(m => 
       m.user._id === user._id && m.role === 'admin'
     )) {
-      console.log('User can assign as project admin');
+      
       return true;
     }
 
     // Project creators can assign tasks in their projects
     if (project && project.createdBy === user._id) {
-      console.log('User can assign as project creator');
+      
       return true;
     }
 
-    console.log('User cannot assign tasks - no matching permission');
+
     return false;
   }
 
@@ -281,24 +273,11 @@ export class PermissionHelper {
   static getAssignableUsers(context: PermissionContext, allUsers: User[]): User[] {
     const { user, project } = context;
 
-    console.log('PermissionHelper.getAssignableUsers called with:', {
-      userRole: user.role,
-      userOrg: user.organization?.name,
-      userOrgId: user.organization?._id,
-      projectPresent: !!project,
-      projectOrg: project?.organization,
-      allUsersCount: allUsers.length,
-      sampleUser: allUsers[0] ? {
-        name: allUsers[0].name,
-        role: allUsers[0].role,
-        orgId: allUsers[0].organization?._id,
-        orgName: allUsers[0].organization?.name
-      } : null
-    });
+  
 
     // First check if the user can assign tasks at all
     if (!this.canAssignTasks(context)) {
-      console.log('User cannot assign tasks, returning empty array');
+     
       return [];
     }
 
@@ -307,7 +286,7 @@ export class PermissionHelper {
 
     // Super admins can assign to anyone in their organization or globally
     if (user.role === 'super_admin') {
-      console.log('User is super_admin, returning all users');
+    
       return allUsers;
     }
 
@@ -316,18 +295,14 @@ export class PermissionHelper {
       assignableUsers = allUsers.filter(u => 
         u.organization?._id === user.organization?._id
       );
-      console.log('Org admin filter applied, remaining users:', assignableUsers.length);
-      console.log('Org admin org ID:', user.organization._id);
-      console.log('Sample filtered user org ID:', assignableUsers[0]?.organization?._id);
+     
     } 
     // Team leads can assign to users in their organization
     else if (user.role === 'team_lead' && user.organization) {
       assignableUsers = allUsers.filter(u => 
         u.organization?._id === user.organization?._id
       );
-      console.log('Team lead filter applied, remaining users:', assignableUsers.length);
-      console.log('Team lead org ID:', user.organization._id);
-      console.log('Sample filtered user org ID:', assignableUsers[0]?.organization?._id);
+     
     }
     else if (project) {
       // For project-specific tasks, limit to project members and organization members
@@ -336,14 +311,14 @@ export class PermissionHelper {
           u.organization?._id === project.organization ||
           project.members?.some(m => m.user._id === u._id)
         );
-        console.log('Project with org filter applied, remaining users:', assignableUsers.length);
+        //console.log('Project with org filter applied, remaining users:', assignableUsers.length);
       } else {
         // For projects without organization, limit to project members
         assignableUsers = allUsers.filter(u => 
           project.members?.some(m => m.user._id === u._id) ||
           u._id === project.createdBy
         );
-        console.log('Project without org filter applied, remaining users:', assignableUsers.length);
+        //console.log('Project without org filter applied, remaining users:', assignableUsers.length);
       }
     } else {
       // For personal tasks, limit to organization members if user is in an organization
@@ -351,13 +326,11 @@ export class PermissionHelper {
         assignableUsers = allUsers.filter(u => 
           u.organization?._id === user.organization?._id
         );
-        console.log('Personal task with org filter applied, remaining users:', assignableUsers.length);
-        console.log('Current user org ID:', user.organization._id);
-        console.log('Sample user org ID:', allUsers[0]?.organization?._id);
+        
       } else {
         // Individual users can only assign to themselves
         assignableUsers = [user];
-        console.log('Individual user filter applied, remaining users:', assignableUsers.length);
+       // console.log('Individual user filter applied, remaining users:', assignableUsers.length);
       }
     }
 
@@ -366,13 +339,13 @@ export class PermissionHelper {
       const isActive = !u.status || u.status === 'active'; // If no status field, assume active
       const isNotViewer = u.role !== 'viewer'; // Viewers typically shouldn't be assigned tasks
       
-      console.log(`User ${u.name}: status=${u.status || 'undefined'}, role=${u.role}, isActive=${isActive}, isNotViewer=${isNotViewer}`);
+      //console.log(`User ${u.name}: status=${u.status || 'undefined'}, role=${u.role}, isActive=${isActive}, isNotViewer=${isNotViewer}`);
       
       return isActive && isNotViewer;
     });
     
-    console.log('Final filter applied (active & non-viewer), remaining users:', finalUsers.length);
-    console.log('Final users:', finalUsers.map(u => ({ name: u.name, role: u.role, status: u.status })));
+    //console.log('Final filter applied (active & non-viewer), remaining users:', finalUsers.length);
+    //console.log('Final users:', finalUsers.map(u => ({ name: u.name, role: u.role, status: u.status })));
     return finalUsers;
   }
 

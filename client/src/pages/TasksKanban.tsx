@@ -249,11 +249,14 @@ const TasksPage: React.FC = () => {
 
   const handleCreateTask = async (data: any) => {
     setCreating(true);
-    try {
+     try {
+      // Ensure assignedUsers includes self if empty
+      let assignedUsers = data.assignedUsers && data.assignedUsers.length > 0 ? data.assignedUsers : (user ? [user._id] : []);
       const taskData = {
         ...data,
         tags: data.tags || [],
         projectId: currentProjectId,
+        assignedUsers,
       };
       
       const newTask = await taskAPI.createTask(taskData);
@@ -407,25 +410,29 @@ const TasksPage: React.FC = () => {
     }
   };
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-                         task.description.toLowerCase().includes(filters.search.toLowerCase());
-    const matchesPriority = filters.priority === 'all' || task.priority === filters.priority;
-    const matchesTags = filters.tags.length === 0 || 
-                       filters.tags.some(tag => task.tags?.includes(tag));
-    
-    let matchesProject = true;
-    if (!currentProjectId && filters.project !== 'all') {
-      const taskProjectId = typeof task.projectId === 'string' 
-        ? task.projectId 
-        : (task.projectId as any)?._id || task.projectId;
-      matchesProject = String(taskProjectId) === String(filters.project);
-    } else if (currentProjectId) {
-      matchesProject = true;
-    }
-    
-    return matchesSearch && matchesPriority && matchesTags && matchesProject;
-  });
+const filteredTasks = tasks.filter(task => {
+  const matchesSearch = task.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+                       task.description.toLowerCase().includes(filters.search.toLowerCase());
+  const matchesPriority = filters.priority === 'all' || task.priority === filters.priority;
+  const matchesTags = filters.tags.length === 0 || 
+                     filters.tags.some(tag => task.tags?.includes(tag));
+  
+  let matchesProject = true;
+  if (!currentProjectId && filters.project !== 'all') {
+    const taskProjectId = typeof task.projectId === 'string' 
+      ? task.projectId 
+      : (task.projectId as any)?._id || task.projectId;
+    matchesProject = String(taskProjectId) === String(filters.project);
+  } else if (currentProjectId) {
+    matchesProject = true;
+  }
+  
+  const result = matchesSearch && matchesPriority && matchesTags && matchesProject;
+  if (!result) {
+    console.log('Filtered out task:', task, { matchesSearch, matchesPriority, matchesTags, matchesProject });
+  }
+  return result;
+});
 
   const currentProject = projects.find(p => p._id === currentProjectId);
   const breadcrumbItems = [
