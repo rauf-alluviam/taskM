@@ -12,8 +12,8 @@ interface ImportMeta {
 }
 
 // const API_BASE_URL = (import.meta as any).env.VITE_APP_URL ;
-// const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://15.207.11.214:5003/api'; 
-const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://localhost:5003/api'; 
+const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://15.207.11.214:5003/api'; 
+// const API_BASE_URL = (import.meta as any).env.VITE_APP_URL || 'http://localhost:5003/api'; 
 const API_TIMEOUT = (import.meta as any).env.VITE_API_TIMEOUT || 10000;
 
 const api = axios.create({

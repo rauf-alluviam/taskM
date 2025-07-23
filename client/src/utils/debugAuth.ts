@@ -31,7 +31,7 @@ export const debugAuth = () => {
   
   // Check API base URL
   console.log('🌐 API Configuration:');
-  console.log('  Base URL:', (import.meta as any).env.VITE_API_URL || 'http://localhost:5000/api');
+  console.log('  Base URL:', (import.meta as any).env.VITE_APP_URL || 'http://localhost:5000/api');
   console.log('  Socket URL:', (import.meta as any).env.VITE_SOCKET_URL || 'http://localhost:5000');
   
   return {
@@ -44,7 +44,7 @@ export const debugAuth = () => {
 // Function to test API authentication
 export const testApiAuth = async () => {
   try {
-    const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/auth/verify`, {
+    const response = await fetch(`${(import.meta as any).env.VITE_APP_URL}/auth/verify`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,

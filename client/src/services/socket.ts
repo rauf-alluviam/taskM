@@ -11,7 +11,7 @@ class SocketService {
     console.log('🔌 Attempting to connect to socket server:', serverUrl);
     console.log('🔧 Environment check:', {
       VITE_SOCKET_URL: (import.meta as any).env.VITE_SOCKET_URL,
-      VITE_API_URL: (import.meta as any).env.VITE_API_URL,
+      VITE_APP_URL: (import.meta as any).env.VITE_APP_URL,
       serverUrl,
       token: token ? 'present' : 'missing'
     });

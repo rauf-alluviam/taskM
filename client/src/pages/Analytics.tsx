@@ -48,7 +48,7 @@ const Analytics: React.FC = () => {
       try {
         const token = localStorage.getItem('token');
         // Fetch general analytics
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/analytics`, {
+        const res = await fetch(`${import.meta.env.VITE_APP_URL}/analytics`, {
           credentials: 'include',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
@@ -59,7 +59,7 @@ const Analytics: React.FC = () => {
         setData(result);
 
         // Fetch tasks over time for performance metrics
-        const resTasks = await fetch(`${import.meta.env.VITE_API_URL}/analytics/tasks`, {
+        const resTasks = await fetch(`${import.meta.env.VITE_APP_URL}/analytics/tasks`, {
           credentials: 'include',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });

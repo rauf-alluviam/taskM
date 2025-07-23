@@ -429,7 +429,7 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
       formData.append('description', `Voice note: ${recordingName}`);
 
       // Upload to server/S3 using existing attachments endpoint
-      const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/attachments/upload`, {
+      const response = await fetch(`${(import.meta as any).env.VITE_APP_URL}/attachments/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -488,7 +488,7 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
     if (!newAttachmentName.trim()) return;
 
     try {
-      const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/attachments/${attachmentId}`, {
+      const response = await fetch(`${(import.meta as any).env.VITE_APP_URL}/attachments/${attachmentId}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -532,7 +532,7 @@ const VoiceEnabledDescription: React.FC<VoiceEnabledDescriptionProps> = ({
     if (!attachmentToDelete) return;
 
     try {
-      const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/attachments/${attachmentToDelete}`, {
+      const response = await fetch(`${(import.meta as any).env.VITE_APP_URL}/attachments/${attachmentToDelete}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

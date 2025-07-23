@@ -120,54 +120,63 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   const [orgTasks, setOrgTasks] = useState<any[] | null>(null); // Store all org tasks
 
   // Handler for multi-user avatar selection
-  // Only fetch org tasks when a specific subset of users is selected (not all, not none)
+  // Only fetch org tasks when all or none are selected, otherwise fetch user tasks for each selected user
   const handleMultiUserChange = async (userIds: string[]) => {
     setSelectedUserIds(userIds);
-    // If no users are selected, use local filtering (show all tasks)
-    if (userIds.length === 0) {
+    // If no users are selected, use org API (show all org tasks)
+    if (userIds.length === 0 || userIds.length === orgUsers.length) {
       setUserTasks(null);
       setOrgTasks(null);
       setFilters({ ...filters, assignedUser: 'all' });
+      setUserTasksLoading(true);
+      try {
+        let orgId = organizationData?._id;
+        if (!orgId && orgUsers[0]?.organization) {
+          if (typeof orgUsers[0].organization === 'string') {
+            orgId = orgUsers[0].organization;
+          } else if (typeof orgUsers[0].organization === 'object' && orgUsers[0].organization._id) {
+            orgId = orgUsers[0].organization._id;
+          }
+        }
+        if (!orgId) {
+          console.error('No orgId found for fetching organization tasks');
+          setOrgTasks([]);
+          setUserTasksLoading(false);
+          return;
+        }
+        // Fetch all org tasks
+        const allOrgTasks = await taskAPI.getOrganizationTasks(orgId);
+        setOrgTasks(allOrgTasks);
+      } catch (error) {
+        console.error('Failed to fetch org tasks:', error);
+        setOrgTasks([]);
+      } finally {
+        setUserTasksLoading(false);
+      }
       return;
     }
-    // If all users are selected, use local filtering (show all tasks)
-    if (userIds.length === orgUsers.length) {
-      setUserTasks(null);
-      setOrgTasks(null);
-      setFilters({ ...filters, assignedUser: 'all' });
-      return;
-    }
-    // If a specific subset is selected, fetch all org tasks and filter for selected users
+    // If a specific subset is selected, fetch user tasks for each user
     setUserTasksLoading(true);
     try {
-      // Robust orgId extraction: support string or object for orgUsers[0].organization
-      let orgId = organizationData?._id;
-      if (!orgId && orgUsers[0]?.organization) {
-        if (typeof orgUsers[0].organization === 'string') {
-          orgId = orgUsers[0].organization;
-        } else if (typeof orgUsers[0].organization === 'object' && orgUsers[0].organization._id) {
-          orgId = orgUsers[0].organization._id;
-        }
-      }
-      if (!orgId) {
-        console.error('No orgId found for fetching organization tasks');
-        setUserTasks([]);
-        setOrgTasks(null);
-        setUserTasksLoading(false);
-        return;
-      }
-      // Use getOrganizationTasks only for subset selection
-      const allOrgTasks = await taskAPI.getOrganizationTasks(orgId);
-      setOrgTasks(allOrgTasks);
-      // Filter for selected users (OR logic)
-      const filtered = allOrgTasks.filter((task: any) => {
-        if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
-        return task.assignedUsers.some((user: any) => userIds.includes(typeof user === 'string' ? user : user._id));
-      });
-      setUserTasks(filtered);
+      const userTasksResults = await Promise.all(
+        userIds.map(async (userId) => {
+          try {
+            // Fetch tasks for each user
+            return await taskAPI.getTasksByUser(userId);
+          } catch (err) {
+            console.error(`Failed to fetch tasks for user ${userId}:`, err);
+            return [];
+          }
+        })
+      );
+      // Flatten and deduplicate tasks by _id
+      const allUserTasks = userTasksResults.flat();
+      const uniqueTasks = Array.from(new Map(allUserTasks.map(task => [task._id, task])).values());
+      setUserTasks(uniqueTasks);
+      setOrgTasks(null);
       setFilters({ ...filters, assignedUser: userIds.join(',') });
     } catch (error) {
-      console.error('Failed to fetch org tasks:', error);
+      console.error('Failed to fetch user tasks:', error);
       setUserTasks([]);
       setOrgTasks(null);
     } finally {
@@ -180,24 +189,28 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   const getFilteredTasks = () => {
     console.log('[Kanban Multi-User Filter] selectedUserIds:', selectedUserIds);
     console.log('[Kanban Multi-User Filter] orgUsers:', orgUsers?.map(u => u._id));
-    // If no user filter or 'all', return all filteredTasks
+    // If no user filter or 'all', return orgTasks if loaded, else filteredTasks
     if (!selectedUserIds || selectedUserIds.length === 0 || (orgUsers && selectedUserIds.length === orgUsers.length)) {
+      if (orgTasks && Array.isArray(orgTasks)) {
+        console.log('[Kanban Multi-User Filter] No user filter or all users selected, returning orgTasks:', orgTasks.length);
+        return orgTasks;
+      }
       console.log('[Kanban Multi-User Filter] No user filter or all users selected, returning all filteredTasks:', filteredTasks.length);
       return filteredTasks;
     }
-    // If orgTasks is loaded (from API), use it for filtering
-    if (orgTasks && Array.isArray(orgTasks)) {
-      const result = orgTasks.filter(task => {
+    // If userTasks is loaded (from API), use it for filtering
+    if (userTasks && Array.isArray(userTasks)) {
+      const result = userTasks.filter(task => {
         if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
         const match = task.assignedUsers.some(
           (user: any) => selectedUserIds.includes(typeof user === 'string' ? user : user._id)
         );
         if (match) {
-          console.log(`[Kanban Multi-User Filter][ORG API] Task '${task.title}' (${task._id}) matches selected users`, task.assignedUsers);
+          console.log(`[Kanban Multi-User Filter][USER API] Task '${task.title}' (${task._id}) matches selected users`, task.assignedUsers);
         }
         return match;
       });
-      console.log('[Kanban Multi-User Filter][ORG API] Filtered tasks count:', result.length);
+      console.log('[Kanban Multi-User Filter][USER API] Filtered tasks count:', result.length);
       return result;
     }
     // fallback: local filter (should not happen, but for safety)
