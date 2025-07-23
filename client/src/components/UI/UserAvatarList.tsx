@@ -110,8 +110,8 @@ const UserAvatarList: React.FC<UserAvatarListProps> = ({
       <div className={`flex flex-col gap-1 ${className}`}>
         {isMulti && (
           <div className="flex gap-2 mb-1">
-            <button type="button" className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" onClick={handleSelectAll}>Select All</button>
-            <button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={handleClear}>Clear</button>
+            {/* <button type="button" className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" onClick={handleSelectAll}>Select All</button>
+            <button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={handleClear}>Clear</button> */}
           </div>
         )}
         <div className="flex flex-wrap gap-1">
@@ -149,8 +149,8 @@ const UserAvatarList: React.FC<UserAvatarListProps> = ({
     <div className={`flex flex-col ${className}`}>
       {isMulti && (
         <div className="flex gap-2 mb-1">
-          <button type="button" className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" onClick={handleSelectAll}>Select All</button>
-          <button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={handleClear}>Clear</button>
+         {/* // <button type="button" className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" onClick={handleSelectAll}>Select All</button>
+          //<button type="button" className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={handleClear}>Clear</button> */}
         </div>
       )}
       <div className="flex items-center">
