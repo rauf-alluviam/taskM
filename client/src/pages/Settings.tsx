@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Bell, Shield, User, Palette, Globe } from 'lucide-react';
+import { Save, Bell, Shield, User, Palette } from 'lucide-react';
 import UserProfile from '../components/UI/UserProfile';
 
 interface SettingsData {
@@ -58,10 +58,10 @@ const Settings: React.FC = () => {
 
   const handleSave = async () => {
     setSaving(true);
-    // TODO: Save settings to API
+    // TODO: Save settings to API and show notification
+    console.log('Saving settings:', settings);
     setTimeout(() => {
       setSaving(false);
-      // Show success notification
     }, 1000);
   };
 
@@ -81,17 +81,14 @@ const Settings: React.FC = () => {
     { id: 'preferences', name: 'Preferences', icon: Palette },
     { id: 'privacy', name: 'Privacy', icon: Shield },
   ] as const;
-  
-  // Check if user has admin role to show email settings link
-  const isAdmin = true; // This should be replaced with actual role check from context
 
   return (
     <div className="space-y-6">
-      {/* Header */}      {/* Header */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600">Manage your account preferences and settings</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-gray-600 dark:text-gray-300">Manage your account preferences and settings</p>
         </div>
         {activeTab !== 'profile' && (
           <button 
@@ -115,8 +112,8 @@ const Settings: React.FC = () => {
                 onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center px-3 py-2 text-left text-sm font-medium rounded-md transition-colors ${
                   activeTab === item.id
-                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-500'
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700'
                 }`}
               >
                 <item.icon className="mr-3 h-5 w-5" />
@@ -133,20 +130,20 @@ const Settings: React.FC = () => {
           )}
 
           {activeTab === 'notifications' && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Notifications</h3>
+            <div className="bg-white rounded-lg border border-gray-200 p-6 dark:bg-gray-800 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 dark:text-white">Notifications</h3>
               <div className="space-y-4">
                 {Object.entries(settings.notifications).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-200">
                         {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                       </p>
                     </div>
                     <button
                       onClick={() => updateSetting('notifications', key, !value)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        value ? 'bg-blue-600' : 'bg-gray-200'
+                        value ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
                       }`}
                     >
                       <span
@@ -162,15 +159,15 @@ const Settings: React.FC = () => {
           )}
 
           {activeTab === 'preferences' && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Preferences</h3>
+            <div className="bg-white rounded-lg border border-gray-200 p-6 dark:bg-gray-800 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 dark:text-white">Preferences</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
                     Theme
                   </label>
                   <select
-                    className="input w-full"
+                    className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     value={settings.preferences.theme}
                     onChange={(e) => updateSetting('preferences', 'theme', e.target.value)}
                   >
@@ -180,11 +177,11 @@ const Settings: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
                     Language
                   </label>
                   <select
-                    className="input w-full"
+                    className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     value={settings.preferences.language}
                     onChange={(e) => updateSetting('preferences', 'language', e.target.value)}
                   >
@@ -195,11 +192,11 @@ const Settings: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
                     Timezone
                   </label>
                   <select
-                    className="input w-full"
+                    className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     value={settings.preferences.timezone}
                     onChange={(e) => updateSetting('preferences', 'timezone', e.target.value)}
                   >
@@ -211,11 +208,11 @@ const Settings: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
                     Date Format
                   </label>
                   <select
-                    className="input w-full"
+                    className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     value={settings.preferences.dateFormat}
                     onChange={(e) => updateSetting('preferences', 'dateFormat', e.target.value)}
                   >
@@ -229,20 +226,20 @@ const Settings: React.FC = () => {
           )}
 
           {activeTab === 'privacy' && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Privacy</h3>
+            <div className="bg-white rounded-lg border border-gray-200 p-6 dark:bg-gray-800 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 dark:text-white">Privacy</h3>
               <div className="space-y-4">
                 {Object.entries(settings.privacy).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-200">
                         {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                       </p>
                     </div>
                     <button
                       onClick={() => updateSetting('privacy', key, !value)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        value ? 'bg-blue-600' : 'bg-gray-200'
+                        value ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
                       }`}
                     >
                       <span

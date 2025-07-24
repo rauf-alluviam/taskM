@@ -67,9 +67,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollaps
             {!collapsed && <span className="text-xl font-bold text-gray-900 dark:text-slate-200">TaskFlow</span>}
           </div>
           <div className="flex items-center">
-             <div className={`mt-4 flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
+             {/* <div className={`mt-4 flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
             <ThemeToggleButton />
-          </div>
+          </div> */}
             <button
               onClick={onCollapseToggle}
               className={`hidden lg:inline-flex p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700`}

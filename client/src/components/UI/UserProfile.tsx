@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, Building, Save, Edit3, Camera, Check, X } from 'lucide-react';
 import { userAPI } from '../../services/api';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface UserProfileData {
   _id: string;
@@ -19,7 +20,11 @@ interface UserProfileProps {
   onUserUpdate?: (user: UserProfileData) => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [user, setUser] = useState<UserProfileData | null>(null);
+const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {
+  const { theme } = useTheme();
+  const darkMode = theme === 'dark';
+
+  const [user, setUser] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -88,6 +93,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
     setEditing(false);
     setError(null);
   };
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -163,32 +169,49 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
     }
   };
 
+  // Theme-aware classes
+  const containerClass = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
+  const textPrimaryClass = darkMode ? 'text-white' : 'text-gray-900';
+  const textSecondaryClass = darkMode ? 'text-gray-300' : 'text-gray-700';
+  const textMutedClass = darkMode ? 'text-gray-400' : 'text-gray-500';
+  const backgroundAccentClass = darkMode ? 'bg-gray-700' : 'bg-gray-50';
+  const inputClass = darkMode 
+    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-blue-400 focus:border-blue-400' 
+    : 'border-gray-300 focus:ring-blue-500 focus:border-transparent';
+  const errorClass = darkMode 
+    ? 'bg-red-900/50 border-red-700 text-red-300' 
+    : 'bg-red-50 border-red-200 text-red-700';
+  const borderClass = darkMode ? 'border-gray-700' : 'border-gray-200';
+  const avatarBgClass = darkMode ? 'bg-gray-700' : 'bg-gray-100';
+  const spinnerClass = darkMode ? 'border-blue-400' : 'border-blue-600';
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className={`flex items-center justify-center h-64 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg`}>
+        <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${spinnerClass}`}></div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">Failed to load user profile</p>
+      <div className={`text-center py-8 ${containerClass} rounded-lg`}>
+        <p className={textMutedClass}>Failed to load user profile</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className={`${containerClass} rounded-lg border overflow-hidden transition-colors duration-200`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-8">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">            <div className="relative">
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg overflow-hidden">
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <div className={`w-20 h-20 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-full flex items-center justify-center shadow-lg overflow-hidden`}>
                 {uploadingAvatar ? (
-                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className={`w-20 h-20 ${avatarBgClass} rounded-full flex items-center justify-center`}>
+                    <div className={`w-6 h-6 border-2 ${spinnerClass} border-t-transparent rounded-full animate-spin`}></div>
                   </div>
                 ) : previewUrl ? (
                   <img 
@@ -203,7 +226,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
                     className="w-20 h-20 rounded-full object-cover"
                   />
                 ) : (
-                  <User className="w-10 h-10 text-gray-400" />
+                  <User className={`w-10 h-10 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
                 )}
               </div>
               <button 
@@ -262,14 +285,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
             )}
           </div>
         </div>
-      </div>      {/* Content */}
+      </div>
+
+      {/* Content */}
       <div className="p-6">
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
+          <div className={`mb-4 p-3 ${errorClass} border rounded-lg text-sm flex items-center justify-between`}>
             <span>{error}</span>
             <button 
               onClick={() => setError(null)}
-              className="text-red-500 hover:text-red-700"
+              className={`${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-500 hover:text-red-700'} transition-colors`}
             >
               ×
             </button>
@@ -279,11 +304,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+            <h3 className={`text-lg font-semibold ${textPrimaryClass} mb-4`}>Basic Information</h3>
             
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium ${textSecondaryClass} mb-2`}>
                 Full Name
               </label>
               {editing ? (
@@ -291,20 +316,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputClass}`}
                   placeholder="Enter your full name"
                 />
               ) : (
-                <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                  <User className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-900">{user.name}</span>
+                <div className={`flex items-center space-x-2 p-3 ${backgroundAccentClass} rounded-lg`}>
+                  <User className={`w-4 h-4 ${textMutedClass}`} />
+                  <span className={textPrimaryClass}>{user.name}</span>
                 </div>
               )}
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium ${textSecondaryClass} mb-2`}>
                 Email Address
               </label>
               {editing ? (
@@ -312,13 +337,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputClass}`}
                   placeholder="Enter your email address"
                 />
               ) : (
-                <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                  <Mail className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-900">{user.email}</span>
+                <div className={`flex items-center space-x-2 p-3 ${backgroundAccentClass} rounded-lg`}>
+                  <Mail className={`w-4 h-4 ${textMutedClass}`} />
+                  <span className={textPrimaryClass}>{user.email}</span>
                 </div>
               )}
             </div>
@@ -326,11 +351,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
 
           {/* Contact Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+            <h3 className={`text-lg font-semibold ${textPrimaryClass} mb-4`}>Contact Information</h3>
             
             {/* Mobile */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium ${textSecondaryClass} mb-2`}>
                 Mobile Number
               </label>
               {editing ? (
@@ -338,20 +363,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
                   type="tel"
                   value={formData.mobile}
                   onChange={(e) => handleInputChange('mobile', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputClass}`}
                   placeholder="Enter your mobile number"
                 />
               ) : (
-                <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                  <Phone className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-900">{user.mobile || 'Not provided'}</span>
+                <div className={`flex items-center space-x-2 p-3 ${backgroundAccentClass} rounded-lg`}>
+                  <Phone className={`w-4 h-4 ${textMutedClass}`} />
+                  <span className={textPrimaryClass}>{user.mobile || 'Not provided'}</span>
                 </div>
               )}
             </div>
 
             {/* Organization */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium ${textSecondaryClass} mb-2`}>
                 Organization
               </label>
               {editing ? (
@@ -359,13 +384,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
                   type="text"
                   value={formData.organization}
                   onChange={(e) => handleInputChange('organization', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 ${inputClass}`}
                   placeholder="Enter your organization"
                 />
               ) : (
-                <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                  <Building className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-900">
+                <div className={`flex items-center space-x-2 p-3 ${backgroundAccentClass} rounded-lg`}>
+                  <Building className={`w-4 h-4 ${textMutedClass}`} />
+                  <span className={textPrimaryClass}>
                     {typeof user.organization === 'object' && user.organization !== null 
                       ? (user.organization as any).name || 'Not provided'
                       : user.organization || 'Not provided'
@@ -378,16 +403,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
         </div>
 
         {/* Account Information */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Information</h3>
+        <div className={`mt-8 pt-6 border-t ${borderClass}`}>
+          <h3 className={`text-lg font-semibold ${textPrimaryClass} mb-4`}>Account Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-700">Role</p>
-              <p className="text-sm text-gray-900 capitalize mt-1">{user.role}</p>
+              <p className={`text-sm font-medium ${textSecondaryClass}`}>Role</p>
+              <p className={`text-sm ${textPrimaryClass} capitalize mt-1`}>{user.role}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">Member Since</p>
-              <p className="text-sm text-gray-900 mt-1">
+              <p className={`text-sm font-medium ${textSecondaryClass}`}>Member Since</p>
+              <p className={`text-sm ${textPrimaryClass} mt-1`}>
                 {new Date(user.createdAt).toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
@@ -396,8 +421,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ onUserUpdate }) => {  const [
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">User ID</p>
-              <p className="text-sm text-gray-500 font-mono mt-1">{user._id}</p>
+              <p className={`text-sm font-medium ${textSecondaryClass}`}>User ID</p>
+              <p className={`text-sm ${textMutedClass} font-mono mt-1`}>{user._id}</p>
             </div>
           </div>
         </div>
