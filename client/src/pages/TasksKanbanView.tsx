@@ -65,7 +65,7 @@ interface TasksKanbanViewProps {
   setSelectedTask: (task: Task | null) => void;
   orgUsers: any[];
   orgUsersLoading: boolean;
-  organizationData?: OrganizationData; // <-- add this prop
+  organizationData?: OrganizationData;
 }
 
 interface OrganizationData {
@@ -111,7 +111,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   setSelectedTask,
   orgUsers,
   orgUsersLoading,
-  organizationData // <-- add this prop
+  organizationData
 }) => {
   // Add selectedUserId state
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -123,51 +123,59 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   // Only fetch org tasks when a specific subset of users is selected (not all, not none)
   const handleMultiUserChange = async (userIds: string[]) => {
     setSelectedUserIds(userIds);
-    // If no users are selected, use local filtering (show all tasks)
-    if (userIds.length === 0) {
+    // If no users are selected, use org API (show all tasks)
+    if (userIds.length === 0 || userIds.length === orgUsers.length) {
       setUserTasks(null);
       setOrgTasks(null);
       setFilters({ ...filters, assignedUser: 'all' });
-      return;
-    }
-    // If all users are selected, use local filtering (show all tasks)
-    if (userIds.length === orgUsers.length) {
-      setUserTasks(null);
-      setOrgTasks(null);
-      setFilters({ ...filters, assignedUser: 'all' });
-      return;
-    }
-    // If a specific subset is selected, fetch all org tasks and filter for selected users
-    setUserTasksLoading(true);
-    try {
-      // Robust orgId extraction: support string or object for orgUsers[0].organization
-      let orgId = organizationData?._id;
-      if (!orgId && orgUsers[0]?.organization) {
-        if (typeof orgUsers[0].organization === 'string') {
-          orgId = orgUsers[0].organization;
-        } else if (typeof orgUsers[0].organization === 'object' && orgUsers[0].organization._id) {
-          orgId = orgUsers[0].organization._id;
+      // Fetch org tasks from API
+      setUserTasksLoading(true);
+      try {
+        let orgId = organizationData?._id;
+        if (!orgId && orgUsers[0]?.organization) {
+          if (typeof orgUsers[0].organization === 'string') {
+            orgId = orgUsers[0].organization;
+          } else if (typeof orgUsers[0].organization === 'object' && orgUsers[0].organization._id) {
+            orgId = orgUsers[0].organization._id;
+          }
         }
-      }
-      if (!orgId) {
-        console.error('No orgId found for fetching organization tasks');
+        if (!orgId) {
+          console.error('No orgId found for fetching organization tasks');
+          setUserTasks([]);
+          setOrgTasks(null);
+          setUserTasksLoading(false);
+          return;
+        }
+        const allOrgTasks = await taskAPI.getOrganizationTasks(orgId);
+        setOrgTasks(allOrgTasks);
+        setUserTasks(null); // Show all org tasks
+      } catch (error) {
+        console.error('Failed to fetch org tasks:', error);
         setUserTasks([]);
         setOrgTasks(null);
+      } finally {
         setUserTasksLoading(false);
-        return;
       }
-      // Use getOrganizationTasks only for subset selection
-      const allOrgTasks = await taskAPI.getOrganizationTasks(orgId);
-      setOrgTasks(allOrgTasks);
-      // Filter for selected users (OR logic)
-      const filtered = allOrgTasks.filter((task: any) => {
-        if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
-        return task.assignedUsers.some((user: any) => userIds.includes(typeof user === 'string' ? user : user._id));
-      });
-      setUserTasks(filtered);
+      return;
+    }
+    // If a specific subset is selected, fetch user tasks for each user and merge
+    setUserTasksLoading(true);
+    try {
+      const userTasksArrays = await Promise.all(
+        userIds.map(userId => taskAPI.getTasksByUser(userId))
+      );
+      // Flatten and deduplicate by _id
+      const mergedTasks = Object.values(
+        userTasksArrays.flat().reduce((acc, task) => {
+          acc[task._id] = task;
+          return acc;
+        }, {} as Record<string, any>)
+      );
+      setUserTasks(mergedTasks);
+      setOrgTasks(null);
       setFilters({ ...filters, assignedUser: userIds.join(',') });
     } catch (error) {
-      console.error('Failed to fetch org tasks:', error);
+      console.error('Failed to fetch user tasks:', error);
       setUserTasks([]);
       setOrgTasks(null);
     } finally {
@@ -178,41 +186,19 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   // --- FILTERED TASKS LOGIC FIX WITH DEBUG LOGS ---
   // Place this above the return statement in the component
   const getFilteredTasks = () => {
-    console.log('[Kanban Multi-User Filter] selectedUserIds:', selectedUserIds);
-    console.log('[Kanban Multi-User Filter] orgUsers:', orgUsers?.map(u => u._id));
-    // If no user filter or 'all', return all filteredTasks
-    if (!selectedUserIds || selectedUserIds.length === 0 || (orgUsers && selectedUserIds.length === orgUsers.length)) {
-      console.log('[Kanban Multi-User Filter] No user filter or all users selected, returning all filteredTasks:', filteredTasks.length);
-      return filteredTasks;
+    // If userTasks is set (from user API), use it
+    if (userTasks && Array.isArray(userTasks)) {
+      console.log('[Kanban Multi-User Filter][USER API] Returning userTasks:', userTasks.length);
+      return userTasks;
     }
     // If orgTasks is loaded (from API), use it for filtering
     if (orgTasks && Array.isArray(orgTasks)) {
-      const result = orgTasks.filter(task => {
-        if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
-        const match = task.assignedUsers.some(
-          (user: any) => selectedUserIds.includes(typeof user === 'string' ? user : user._id)
-        );
-        if (match) {
-          console.log(`[Kanban Multi-User Filter][ORG API] Task '${task.title}' (${task._id}) matches selected users`, task.assignedUsers);
-        }
-        return match;
-      });
-      console.log('[Kanban Multi-User Filter][ORG API] Filtered tasks count:', result.length);
-      return result;
+      console.log('[Kanban Multi-User Filter][ORG API] Returning orgTasks:', orgTasks.length);
+      return orgTasks;
     }
-    // fallback: local filter (should not happen, but for safety)
-    const result = filteredTasks.filter(task => {
-      if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
-      const match = task.assignedUsers.some(
-        (user: any) => selectedUserIds.includes(typeof user === 'string' ? user : user._id)
-      );
-      if (match) {
-        console.log(`[Kanban Multi-User Filter] Task '${task.title}' (${task._id}) matches selected users`, task.assignedUsers);
-      }
-      return match;
-    });
-    console.log('[Kanban Multi-User Filter] Filtered tasks count:', result.length);
-    return result;
+    // fallback: local filter
+    console.log('[Kanban Multi-User Filter] Returning filteredTasks:', filteredTasks.length);
+    return filteredTasks;
   };
 
   if (loading) {
@@ -273,25 +259,12 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                 Create
               </button>
               
-              {/* <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden">
-                <button className="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-white transition-all">
-                  <Users className="w-3 h-3 mr-1 inline" />
-                  Share
-                </button>
-                <button className="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-white transition-all border-l border-gray-200">
-                  <BarChart3 className="w-3 h-3 mr-1 inline" />
-                  Insights
-                </button>
-              </div> */}
-
               <button className="p-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
                 <MoreHorizontal className="w-4 h-4" />
               </button>
             </div>
           </div>
         </div>
-
-     
 
         {/* Toolbar */}
         <div className="px-6 py-3 bg-white border-b border-gray-100 dark:bg-slate-800 dark:border-slate-700">
@@ -310,60 +283,56 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                 />
               </div>
 
-              {/* Epic Dropdown */}
-              {/* <div className="relative">
-                <button className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all">
-                  Epic
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </button>
-              </div> */}
+              {/* Filter Toggle Button - THIS WAS MISSING! */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`inline-flex items-center px-3 py-2 text-sm font-medium border rounded-lg transition-all ${
+                  showFilters || activeFiltersCount > 0
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700'
+                    : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-200 dark:border-slate-700 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+                {activeFiltersCount > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full dark:bg-blue-800 dark:text-blue-200">
+                    {activeFiltersCount}
+                  </span>
+                )}
+                <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </button>
 
               {/* Avatar Group */}
-              {/* // In the Avatar Group section, add loading feedback */}
-<div className="flex items-center min-w-[80px]">
-  {orgUsersLoading ? (
-    <div className="w-24 flex justify-center items-center">
-      <LoadingSpinner size="sm" />
-    </div>
-  ) : (
-    orgUsers && orgUsers.length > 0 ? (
-      <div className="flex items-center">
-        <UserAvatarList
-          users={orgUsers}
-          maxDisplay={4}
-          size="md"
-          showNames={false}
-          multiSelect={true}
-          selectedUserIds={selectedUserIds}
-          onMultiSelectChange={handleMultiUserChange}
-        />
-        {userTasksLoading && (
-          <LoadingSpinner size="sm" className="ml-2" />
-        )}
-      </div>
-    ) : (
-      <span className="text-xs text-gray-400">No users</span>
-    )
-  )}
-</div>    
-
-
-              {/* Only show assignees */}
-           
-              {/* Recently updated */}
-              
+              <div className="flex items-center min-w-[80px]">
+                {orgUsersLoading ? (
+                  <div className="w-24 flex justify-center items-center">
+                    <LoadingSpinner size="sm" />
+                  </div>
+                ) : (
+                  orgUsers && orgUsers.length > 0 ? (
+                    <div className="flex items-center">
+                      <UserAvatarList
+                        users={orgUsers}
+                        maxDisplay={4}
+                        size="md"
+                        showNames={false}
+                        multiSelect={true}
+                        selectedUserIds={selectedUserIds}
+                        onMultiSelectChange={handleMultiUserChange}
+                      />
+                      {userTasksLoading && (
+                        <LoadingSpinner size="sm" className="ml-2" />
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">No users</span>
+                  )
+                )}
+              </div>    
             </div>
 
             {/* Right - View Options */}
             <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-600 dark:text-gray-300">GROUP BY</span>
-              <div className="relative">
-                <button className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-200 dark:border-slate-700 dark:hover:bg-slate-700 transition-all">
-                  None
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </button>
-              </div>
-
               {/* View Mode Toggle */}
               <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
                 <button

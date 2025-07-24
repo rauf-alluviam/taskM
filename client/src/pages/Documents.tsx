@@ -144,7 +144,7 @@ const Documents: React.FC = () => {
       const data = await documentAPI.getDocuments(projectId || undefined);
       
       // If no projectId specified, filter out project documents on client side as extra safety
-      const filteredData = projectId ? data : data.filter(doc => !doc.projectId);
+      const filteredData = projectId ? data : data.filter((doc: { projectId: any; }) => !doc.projectId);
       
       console.log('Documents received:', data.length, 'Filtered:', filteredData.length);
       setDocuments(filteredData);
