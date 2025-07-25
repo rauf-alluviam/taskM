@@ -9,6 +9,11 @@ const router = express.Router();
 // Get general analytics
 router.get('/', protect, async (req, res) => {
   try {
+    // Only include users, projects, and tasks belonging to the user's organization
+    const orgId = req.user.organization?._id || req.user.organization;
+    if (!orgId) {
+      return res.status(400).json({ message: 'No organization found for user.' });
+    }
     const [
       totalUsers,
       totalProjects,
@@ -17,18 +22,20 @@ router.get('/', protect, async (req, res) => {
       tasksThisWeek,
       projectsThisMonth
     ] = await Promise.all([
-      User.countDocuments(),
-      Project.countDocuments(),
-      Task.countDocuments(),
-      Task.countDocuments({ status: 'done' }),
+      User.countDocuments({ organization: orgId }),
+      Project.countDocuments({ organization: orgId }),
+      Task.countDocuments({ organization: orgId }),
+      Task.countDocuments({ organization: orgId, status: 'done' }),
       Task.countDocuments({
+        organization: orgId,
         createdAt: {
-          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
         }
       }),
       Project.countDocuments({
+        organization: orgId,
         createdAt: {
-          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
+          $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         }
       })
     ]);
@@ -50,7 +57,12 @@ router.get('/', protect, async (req, res) => {
 // Get task analytics
 router.get('/tasks', protect, async (req, res) => {
   try {
+    const orgId = req.user.organization?._id || req.user.organization;
+    if (!orgId) {
+      return res.status(400).json({ message: 'No organization found for user.' });
+    }
     const taskStats = await Task.aggregate([
+      { $match: { organization: orgId } },
       {
         $group: {
           _id: '$status',
@@ -60,6 +72,7 @@ router.get('/tasks', protect, async (req, res) => {
     ]);
 
     const priorityStats = await Task.aggregate([
+      { $match: { organization: orgId } },
       {
         $group: {
           _id: '$priority',
@@ -71,11 +84,7 @@ router.get('/tasks', protect, async (req, res) => {
     // Tasks created over time (last 30 days)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const tasksOverTime = await Task.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: thirtyDaysAgo }
-        }
-      },
+      { $match: { organization: orgId, createdAt: { $gte: thirtyDaysAgo } } },
       {
         $group: {
           _id: {
@@ -84,9 +93,7 @@ router.get('/tasks', protect, async (req, res) => {
           count: { $sum: 1 }
         }
       },
-      {
-        $sort: { _id: 1 }
-      }
+      { $sort: { _id: 1 } }
     ]);
 
     res.json({
@@ -102,7 +109,12 @@ router.get('/tasks', protect, async (req, res) => {
 // Get project analytics
 router.get('/projects', protect, async (req, res) => {
   try {
+    const orgId = req.user.organization?._id || req.user.organization;
+    if (!orgId) {
+      return res.status(400).json({ message: 'No organization found for user.' });
+    }
     const projectStats = await Project.aggregate([
+      { $match: { organization: orgId } },
       {
         $lookup: {
           from: 'tasks',

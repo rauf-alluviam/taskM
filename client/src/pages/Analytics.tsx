@@ -87,6 +87,8 @@ const Analytics: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tasksOverTime, setTasksOverTime] = useState<any[]>([]);
+  const [statusDistribution, setStatusDistribution] = useState<any[]>([]);
+  const [priorityDistribution, setPriorityDistribution] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -94,8 +96,9 @@ const Analytics: React.FC = () => {
       setError(null);
       try {
         const token = localStorage.getItem('token');
-        // Fetch general analytics
-        const res = await fetch(`${import.meta.env.VITE_APP_URL}/analytics`, {
+        const apiBase = import.meta.env.VITE_APP_URL;
+        // Fetch general analytics (organization-specific)
+        const res = await fetch(`${apiBase}/analytics`, {
           credentials: 'include',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
@@ -103,10 +106,18 @@ const Analytics: React.FC = () => {
           throw new Error('Failed to fetch analytics');
         }
         const result = await res.json();
-        setData(result);
+        setData({
+          totalUsers: result.totalUsers || 0,
+          totalProjects: result.totalProjects || 0,
+          totalTasks: result.totalTasks || 0,
+          completedTasks: result.completedTasks || 0,
+          tasksThisWeek: result.tasksThisWeek || 0,
+          projectsThisMonth: result.projectsThisMonth || 0,
+          completionRate: result.completionRate || 0,
+        });
 
-        // Fetch tasks over time for performance metrics
-        const resTasks = await fetch(`${import.meta.env.VITE_APP_URL}/analytics/tasks`, {
+        // Fetch tasks analytics (organization-specific)
+        const resTasks = await fetch(`${apiBase}/analytics/tasks`, {
           credentials: 'include',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
@@ -118,6 +129,8 @@ const Analytics: React.FC = () => {
               count: d.count
             }))
           );
+          setStatusDistribution(taskStats.statusDistribution || []);
+          setPriorityDistribution(taskStats.priorityDistribution || []);
         }
       } catch (err: any) {
         setError(err.message || 'Failed to fetch analytics');

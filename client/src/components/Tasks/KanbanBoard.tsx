@@ -18,6 +18,7 @@ import { normalizeStatus, statusToDisplayName } from '../../utils/statusMappings
 import KanbanColumn from './KanbanColumn';
 import KanbanTaskCardCompact from './KanbanTaskCardCompact';
 import { taskAPI } from '../../services/api';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -43,6 +44,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [dragStartStatus, setDragStartStatus] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false); // Prevent multiple simultaneous updates
+  const { addNotification } = useNotification();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -186,7 +188,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         }, 1000);
         return;
       }
-      alert('Failed to save task position. Please try again.');
+      addNotification({
+        type: 'error',
+        title: 'Permission Denied',
+        message: 'You do not have permission to update other tasks.',
+        duration: 5000,
+      });
     } finally {      setTimeout(() => setIsUpdating(false), 500); // Prevent rapid successive calls
     }
   };
