@@ -28,7 +28,7 @@ if (USE_MOCK_EMAIL) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
   
-  console.log('📧 Using MOCK email service. Emails will be logged to:', logsDir);
+  // console.log('📧 Using MOCK email service. Emails will be logged to:', logsDir);
   
   // Mock transporter that logs emails to files instead of sending them
   transporter = {
@@ -244,6 +244,234 @@ const testConnection = async () => {
       }
     },
     
-    // Test connection method
-    testConnection
+  async sendTaskAssignedEmail(email, { userName, taskName, projectName, dueDate, taskLink }) {
+  try {
+    const mailOptions = {
+      from: FROM_EMAIL,
+      to: email,
+      subject: `🎯 New Task Assigned: ${taskName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f8fafc; padding: 40px 20px;">
+          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;">
+            
+            <!-- Header with gradient -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+              <div style="background: rgba(255,255,255,0.2); width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 24px;">🎯</span>
+              </div>
+              <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">New Task Assigned</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 16px;">You have a new task to complete</p>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 30px;">
+              <p style="font-size: 16px; color: #374151; margin: 0 0 20px;">Hi <strong style="color: #1f2937;">{{userName}}</strong>,</p>
+              
+              <p style="font-size: 16px; color: #6b7280; margin: 0 0 25px;">You have been assigned a new task in the project <strong style="color: #1f2937;">{{projectName}}</strong>:</p>
+              
+              <!-- Task Card -->
+              <div style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); border: 1px solid #e0f2fe; border-radius: 12px; padding: 24px; margin: 20px 0; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(180deg, #2563eb, #3b82f6);"></div>
+                
+                <h2 style="color: #1e40af; margin: 0 0 16px; font-size: 20px; font-weight: 600;">{{taskName}}</h2>
+                
+                <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                  <div style="background: rgba(37, 99, 235, 0.1); padding: 8px 12px; border-radius: 8px; display: inline-flex; align-items: center;">
+                    <span style="margin-right: 6px;">📅</span>
+                    <span style="color: #1e40af; font-weight: 500; font-size: 14px;">Due: {{dueDate}}</span>
+                  </div>
+                </div>
+
+                <a href="{{taskLink}}" style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: transform 0.2s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
+                  View Task Details →
+                </a>
+              </div>
+
+              <!-- Tips Section -->
+              <div style="background: #f9fafb; border-radius: 8px; padding: 16px; margin: 20px 0; border-left: 4px solid #10b981;">
+                <p style="margin: 0; font-size: 14px; color: #059669;">
+                  💡 <strong>Tip:</strong> Click the button above to view full task details and start working on it.
+                </p>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                This is an automated notification from your project management system.
+              </p>
+            </div>
+          </div>
+        </div>
+      `.replace(/{{userName}}/g, userName)
+       .replace(/{{taskName}}/g, taskName)
+       .replace(/{{projectName}}/g, projectName)
+       .replace(/{{dueDate}}/g, dueDate)
+       .replace(/{{taskLink}}/g, taskLink)
+    };
+    
+    const result = await transporter.sendMail(mailOptions);
+    console.log('✅ Task assigned email sent:', result.messageId);
+    return result;
+  } catch (error) {
+    console.error('❌ Task assigned email failed:', error);
+    throw error;
+  }
+},
+
+async sendProjectCreatedEmail(email, { projectName, projectLink, creatorName }) {
+  try {
+    const mailOptions = {
+      from: FROM_EMAIL,
+      to: email,
+      subject: `🚀 New Project Created: ${projectName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f8fafc; padding: 40px 20px;">
+          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;">
+            
+            <!-- Header with gradient -->
+            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
+              <div style="background: rgba(255,255,255,0.2); width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 24px;">🚀</span>
+              </div>
+              <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">New Project Created</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 16px;">A new collaboration space is ready</p>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 30px;">
+              <div style="text-align: center; margin-bottom: 25px;">
+                <div style="background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%); border-radius: 12px; padding: 24px; margin: 20px 0;">
+                  <h2 style="color: #047857; margin: 0 0 12px; font-size: 22px; font-weight: 600;">{{projectName}}</h2>
+                  <p style="color: #065f46; margin: 0; font-size: 16px;">Created by <strong>{{creatorName}}</strong></p>
+                </div>
+              </div>
+
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px; text-align: center; margin: 20px 0;">
+                <div style="margin-bottom: 20px;">
+                  <span style="font-size: 48px; margin-bottom: 12px; display: block;">🎉</span>
+                  <p style="color: #166534; margin: 0; font-size: 16px; font-weight: 500;">Ready to start collaborating?</p>
+                </div>
+                
+                <a href="{{projectLink}}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 16px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                  Explore Project →
+                </a>
+              </div>
+
+              <!-- Features highlight -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 25px 0;">
+                <div style="background: #fefefe; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; text-align: center;">
+                  <span style="font-size: 20px; margin-bottom: 8px; display: block;">👥</span>
+                  <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 500;">Team Collaboration</p>
+                </div>
+                <div style="background: #fefefe; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; text-align: center;">
+                  <span style="font-size: 20px; margin-bottom: 8px; display: block;">📊</span>
+                  <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 500;">Progress Tracking</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                This is an automated notification from your project management system.
+              </p>
+            </div>
+          </div>
+        </div>
+      `.replace(/{{projectName}}/g, projectName)
+       .replace(/{{projectLink}}/g, projectLink)
+       .replace(/{{creatorName}}/g, creatorName)
+    };
+    
+    const result = await transporter.sendMail(mailOptions);
+    console.log('✅ Project created email sent:', result.messageId);
+    return result;
+  } catch (error) {
+    console.error('❌ Project created email failed:', error);
+    throw error;
+  }
+},
+
+async sendProjectMemberAddedEmail(email, { userName, projectName, projectLink }) {
+  try {
+    const mailOptions = {
+      from: FROM_EMAIL,
+      to: email,
+      subject: `👋 Welcome to Project: ${projectName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f8fafc; padding: 40px 20px;">
+          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;">
+            
+            <!-- Header with gradient -->
+            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); padding: 30px; text-align: center;">
+              <div style="background: rgba(255,255,255,0.2); width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 24px;">👋</span>
+              </div>
+              <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">Welcome to the Team!</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 16px;">You've been added to a project</p>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 30px;">
+              <p style="font-size: 16px; color: #374151; margin: 0 0 20px;">Hi <strong style="color: #1f2937;">{{userName}}</strong>,</p>
+              
+              <div style="text-align: center; margin: 25px 0;">
+                <div style="background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border-radius: 12px; padding: 24px; border: 1px solid #e9d5ff;">
+                  <span style="font-size: 40px; margin-bottom: 16px; display: block;">🎊</span>
+                  <h2 style="color: #7c3aed; margin: 0 0 8px; font-size: 20px; font-weight: 600;">You're now part of</h2>
+                  <h3 style="color: #6b21a8; margin: 0; font-size: 24px; font-weight: 700;">{{projectName}}</h3>
+                </div>
+              </div>
+
+              <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: center;">
+                <p style="color: #64748b; margin: 0 0 20px; font-size: 16px;">Ready to start collaborating with your team?</p>
+                
+                <a href="{{projectLink}}" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 16px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">
+                  Join Project →
+                </a>
+              </div>
+
+              <!-- Next steps -->
+              <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+                <h4 style="color: #d97706; margin: 0 0 12px; font-size: 16px; font-weight: 600;">✨ What's next?</h4>
+                <ul style="color: #92400e; margin: 0; padding-left: 20px; font-size: 14px;">
+                  <li style="margin-bottom: 6px;">Explore the project overview and goals</li>
+                  <li style="margin-bottom: 6px;">Check out assigned tasks and deadlines</li>
+                  <li>Connect with your team members</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                This is an automated notification from your project management system.
+              </p>
+            </div>
+          </div>
+        </div>
+      `.replace(/{{userName}}/g, userName)
+       .replace(/{{projectName}}/g, projectName)
+       .replace(/{{projectLink}}/g, projectLink)
+    };
+    
+    const result = await transporter.sendMail(mailOptions);
+    console.log('✅ Project member added email sent:', result.messageId);
+    return result;
+  } catch (error) {
+    console.error('❌ Project member added email failed:', error);
+    throw error;
+  }
+},
+
+  // Test connection method
+  testConnection: async () => {
+    try {
+      await transporter.verify();
+        console.log('✅ Email service connection successful');
+      } catch (error) {
+        console.error('❌ Email service connection failed:', error);
+      }
+    }
   };

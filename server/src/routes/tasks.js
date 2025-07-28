@@ -212,6 +212,31 @@ router.post('/', authenticate, [
     await task.populate('assignedUsers', 'name email');
     await task.populate('projectId', 'name');
 
+    // Send email to assigned users
+    if (task.assignedUsers && task.assignedUsers.length > 0) {
+      // Import emailService dynamically to avoid circular deps
+      const emailService = (await import('../services/emailService.js')).default;
+      // Get project name if available
+      let projectName = '';
+      let projectLink = '';
+      if (task.projectId) {
+        projectName = task.projectId.name || '';
+        projectLink = `${process.env.DOMAIN || 'http://localhost:3000'}/projects/${task.projectId._id}`;
+      }
+      for (const user of task.assignedUsers) {
+        // user can be populated (object) or just id
+        const userEmail = user.email || user.toString();
+        const userName = user.name || userEmail;
+        await emailService.sendTaskAssignedEmail(userEmail, {
+          userName,
+          taskName: task.title,
+          projectName,
+          dueDate: task.endDate ? new Date(task.endDate).toLocaleDateString() : '',
+          taskLink: `${process.env.DOMAIN || 'http://localhost:3000'}/tasks/${task._id}`
+        });
+      }
+    }
+
     // Emit real-time event
     const io = req.app.get('io');
     if (projectId) {

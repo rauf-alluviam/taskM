@@ -16,6 +16,8 @@ const kanbanColumnSchema = new mongoose.Schema({
   },
 }, { _id: true });
 
+
+
 const projectSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -164,19 +166,29 @@ projectSchema.virtual('activeMemberCount').get(function() {
 // Instance method to check if user is project admin
 projectSchema.methods.isAdmin = function(userId) {
   if (this.createdBy.equals(userId)) return true;
-  const member = this.members.find(m => m.user.equals(userId));
+  const member = this.members.find(m => {
+    // Compare ObjectId or populated user
+    const memberId = (typeof m.user === 'object' && m.user._id) ? m.user._id : m.user;
+    return memberId.toString() === userId.toString();
+  });
   return member && member.role === 'admin';
 };
 
 // Instance method to check if user is project member
 projectSchema.methods.isMember = function(userId) {
-  return this.members.some(member => member.user.equals(userId));
+  return this.members.some(member => {
+    const memberId = (typeof member.user === 'object' && member.user._id) ? member.user._id : member.user;
+    return memberId.toString() === userId.toString();
+  });
 };
 
 // Instance method to get user's role in project
 projectSchema.methods.getUserRole = function(userId) {
   if (this.createdBy.equals(userId)) return 'owner';
-  const member = this.members.find(m => m.user.equals(userId));
+  const member = this.members.find(m => {
+    const memberId = (typeof m.user === 'object' && m.user._id) ? m.user._id : m.user;
+    return memberId.toString() === userId.toString();
+  });
   return member ? member.role : null;
 };
 
@@ -185,7 +197,6 @@ projectSchema.methods.addMember = function(userId, role = 'member', addedBy = nu
   if (this.isMember(userId)) {
     throw new Error('User is already a member of this project');
   }
-  
   this.members.push({
     user: userId,
     role: role,
@@ -196,7 +207,10 @@ projectSchema.methods.addMember = function(userId, role = 'member', addedBy = nu
 
 // Instance method to remove member
 projectSchema.methods.removeMember = function(userId) {
-  this.members = this.members.filter(member => !member.user.equals(userId));
+  this.members = this.members.filter(member => {
+    const memberId = (typeof member.user === 'object' && member.user._id) ? member.user._id : member.user;
+    return memberId.toString() !== userId.toString();
+  });
 };
 
 // Instance method to update member role

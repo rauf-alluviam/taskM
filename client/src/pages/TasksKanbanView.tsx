@@ -188,16 +188,16 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   const getFilteredTasks = () => {
     // If userTasks is set (from user API), use it
     if (userTasks && Array.isArray(userTasks)) {
-      console.log('[Kanban Multi-User Filter][USER API] Returning userTasks:', userTasks.length);
+     
       return userTasks;
     }
     // If orgTasks is loaded (from API), use it for filtering
     if (orgTasks && Array.isArray(orgTasks)) {
-      console.log('[Kanban Multi-User Filter][ORG API] Returning orgTasks:', orgTasks.length);
+      
       return orgTasks;
     }
     // fallback: local filter
-    console.log('[Kanban Multi-User Filter] Returning filteredTasks:', filteredTasks.length);
+    
     return filteredTasks;
   };
 

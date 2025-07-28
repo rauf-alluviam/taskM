@@ -3,7 +3,10 @@ import { body, validationResult } from 'express-validator';
 import Project from '../models/Project.js';
 import Task from '../models/Task.js';
 import { authenticate, authorize } from '../middleware/auth.js';
-
+import emailService from '../services/emailService.js';
+import Organization from '../models/Organization.js';
+import User from '../models/User.js';
+import Team from '../models/Team.js';
 const router = express.Router();
 
 // Get all projects
@@ -120,113 +123,142 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Create new project
+
+
 router.post('/', authenticate, [
-  body('name').trim().isLength({ min: 1 }).withMessage('Project name is required'),
-  body('description').optional().trim(),
-  body('department').trim().isLength({ min: 1 }).withMessage('Department is required'),
-  body('teamId').optional().custom((value) => {
-    // Allow empty string, null, undefined, or valid MongoDB ObjectId
-    if (!value || value === '' || value === null || value === undefined) {
-      return true;
-    }
-    if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-      throw new Error('Valid team ID required');
-    }
-    return true;
-  }),
-  body('visibility').optional().isIn(['private', 'team', 'organization', 'public']),
-  body('kanbanColumns').optional().isArray(),
+    body('name').trim().isLength({ min: 1 }).withMessage('Project name is required'),
+    body('description').optional().trim(),
+    body('department').trim().isLength({ min: 1 }).withMessage('Department is required'),
+    body('teamId').optional().isMongoId().withMessage('Valid team ID required'),
+    body('visibility').optional().isIn(['private', 'team', 'organization', 'public']),
+    body('kanbanColumns').optional().isArray(),
+    body('members').optional().isArray().withMessage('Members must be an array of user IDs.'),
 ], async (req, res) => {
-  try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({ errors: errors.array() });
     }
 
-    const {
-      name,
-      description,
-      department,
-      teamId: rawTeamId,
-      visibility = 'team',
-      members = [],
-      kanbanColumns = [
-        { name: 'To Do', order: 0 },
-        { name: 'In Progress', order: 1 },
-        { name: 'Review', order: 2 },
-        { name: 'Done', order: 3 },
-      ],
-      tags = [],
-      color = '#3B82F6',
-      icon = 'folder'
-    } = req.body;
+    try {
+        const {
+            name,
+            description,
+            department,
+            teamId, // Now correctly validated as MongoID or undefined
+            visibility = 'team',
+            members: memberIds = [], // Renamed for clarity
+            kanbanColumns: inputColumns,
+            tags = [],
+            color = '#3B82F6',
+            icon = 'folder'
+        } = req.body;
 
-    // Convert empty string to null for teamId
-    const teamId = rawTeamId && rawTeamId !== '' ? rawTeamId : null;
+        const { user: currentUser } = req;
+        let organization = null;
+        let projectType = 'individual';
+        let team = null;
+                const teamDoc = await Team.findById(teamId).populate('members.user', 'email name');
 
-    let projectType = 'individual';
-    let organization = null;
-    let team = null;
+        // 1. IMPROVEMENT: Determine project type and validate associations
+        if (currentUser.organization) {
+            organization = currentUser.organization;
+            projectType = teamId ? 'team' : 'organization';
 
-    // Determine project type and associations based on user's context
-    if (req.user.organization) {
-      organization = req.user.organization;
-      projectType = teamId ? 'team' : 'organization';
+            if (teamId) {
+                console.log('teamDoc.organization:', teamDoc.organization.toString());
+                console.log('current organization:', organization._id.toString());
+                console.log('teamDoc.members:', teamDoc.members);
+                console.log('currentUser._id:', currentUser._id.toString());
+                if (!teamDoc || !teamDoc.organization.equals(organization._id)) {
+                    return res.status(404).json({ message: 'Team not found or does not belong to your organization' });
+                }
+                if (!teamDoc.members.some(m => m.user.equals(currentUser._id)) && !currentUser.isOrganizationAdmin()) {
+                    return res.status(403).json({ message: 'Access denied to this team' });
+                }
+                team = teamId;
+            }
+        }
+        
+        // 2. IMPROVEMENT: Automatically add the creator as a project admin
+        const projectMembers = memberIds.map(memberId => ({
+            user: memberId,
+            role: 'member',
+            addedAt: new Date(),
+            addedBy: currentUser._id
+        }));
 
-      // If teamId is provided, validate it
-      if (teamId) {
-        const Team = (await import('../models/Team.js')).default;
-        const teamDoc = await Team.findById(teamId);
-        if (!teamDoc) {
-          return res.status(404).json({ message: 'Team not found' });
+        // Ensure the creator is not duplicated if they are also in the members list
+        if (!memberIds.includes(currentUser._id.toString())) {
+            projectMembers.unshift({
+                user: currentUser._id,
+                role: 'admin', // The creator should be an admin
+                addedAt: new Date(),
+                addedBy: currentUser._id
+            });
         }
 
-        // Check if user is part of this team or is org admin
-        if (!teamDoc.isMember(req.user._id) && !teamDoc.isLead(req.user._id) && !req.user.isOrganizationAdmin()) {
-          return res.status(403).json({ message: 'Access denied to this team' });
-        }
+        const defaultColumns = [
+            { name: 'To Do', order: 0 },
+            { name: 'In Progress', order: 1 },
+            { name: 'Review', order: 2 },
+            { name: 'Done', order: 3 },
+        ];
 
-        team = teamId;
-      }
+        const project = new Project({
+            name: name.trim(),
+            description,
+            department,
+            organization,
+            team,
+            visibility,
+            projectType,
+            createdBy: currentUser._id,
+            members: projectMembers, // Use the new prepared members array
+            kanbanColumns: (inputColumns && inputColumns.length > 0) ? inputColumns : defaultColumns,
+            tags,
+            color,
+            icon
+        });
+
+        await project.save();
+        const projectLink = `${process.env.DOMAIN || 'http://localhost:3000'}/projects/${project._id}`;
+        await project.populate('members.user', 'name email');
+        // Send email to all team members (not just creator)
+        let recipients = [];
+        if (teamId) {
+            // Use teamDoc.members
+            recipients = teamDoc.members.map(m => m.user.email).filter(Boolean);
+        } else if (organization) {
+            // Fallback: all org users
+            const orgDoc = await Organization.findById(organization._id).populate('members', 'email name');
+            recipients = orgDoc.members.map(u => u.email).filter(Boolean);
+        }
+        await Promise.all(
+            recipients.map(email =>
+                emailService.sendProjectCreatedEmail(email, {
+                    projectName: project.name,
+                    projectLink,
+                    creatorName: currentUser.name
+                })
+            )
+        );
+        // 4. IMPROVEMENT: Chain populate calls for cleaner code
+        // We already populated 'members.user', so we can skip it here if we return the existing project object.
+        // For consistency, we'll re-populate everything for the final response.
+        await project.populate([
+            { path: 'createdBy', select: 'name email' },
+            { path: 'organization', select: 'name' },
+            { path: 'team', select: 'name' },
+            { path: 'members.user', select: 'name email' }
+        ]);
+        res.status(201).json(project);
+
+    } catch (error) {
+        console.error('Create project error:', error);
+        res.status(500).json({ message: 'Server error while creating project' });
     }
-
-    const project = new Project({
-      name: name.trim(),
-      description,
-      department,
-      organization,
-      team,
-      visibility,
-      projectType,
-      createdBy: req.user._id,
-      members: members.map(memberId => ({
-        user: memberId,
-        role: 'member',
-        addedAt: new Date(),
-        addedBy: req.user._id
-      })),
-      kanbanColumns: kanbanColumns.map((col, index) => ({
-        name: col.name || col.title,
-        order: col.order !== undefined ? col.order : index
-      })),
-      tags,
-      color,
-      icon
-    });
-
-    await project.save();
-    
-    await project.populate('createdBy', 'name email');
-    await project.populate('organization', 'name');
-    await project.populate('team', 'name');
-    await project.populate('members.user', 'name email');
-
-    res.status(201).json(project);
-  } catch (error) {
-    console.error('Create project error:', error);
-    res.status(500).json({ message: 'Server error while creating project' });
-  }
 });
+
 
 // Update project
 router.put('/:id', authenticate, [
@@ -695,15 +727,31 @@ router.post('/:id/members', authenticate, [
     }
 
     // Check if user is already a member
-    if (project.isMember(userId)) {
+    if (project.members.some(m => {
+      const memberId = (typeof m.user === 'object' && m.user._id) ? m.user._id : m.user;
+      return memberId.toString() === userId.toString();
+    })) {
       return res.status(400).json({ message: 'User is already a member' });
     }
+    console.log('project.members:', project.members);
 
     // Add member using the model method
     project.addMember(userId, role, req.user._id);
     await project.save();
     
     await project.populate('members.user', 'name email');
+
+    // Send email notification to the newly added member
+    const newMember = project.members.find(m => m.user._id.equals(user._id));
+    if (newMember && user.email) {
+      const projectLink = `${process.env.DOMAIN || `${process.env.DOMAIN}`}/projects/${project._id}`;
+      await emailService.sendProjectMemberAddedEmail(user.email, {
+        userName: user.name,
+        projectName: project.name,
+        projectLink
+      });
+    }
+    console.log('Member', newMember);
 
     res.json(project);
   } catch (error) {
