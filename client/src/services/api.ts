@@ -714,4 +714,19 @@ export const teamAPI = {
   },
 };
 
+export const notificationAPI = {
+  getAll: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/notifications');
+      return response.data;
+    });
+  },
+  markSeen: async (ids: string[]) => {
+    return withRetry(async () => {
+      const response = await api.post('/notifications/mark-seen', { ids });
+      return response.data;
+    });
+  },
+};
+
 export default api;

@@ -52,9 +52,9 @@ export const testApiAuth = async () => {
       }
     });
     
-    console.log('🧪 Auth Test Result:');
-    console.log('  Status:', response.status);
-    console.log('  Status Text:', response.statusText);
+    // console.log('🧪 Auth Test Result:');
+    // console.log('  Status:', response.status);
+    // console.log('  Status Text:', response.statusText);
     
     if (response.ok) {
       const data = await response.json();

@@ -45,6 +45,35 @@ class SocketService {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
       }
+      // --- JOIN ORGANIZATION ROOM ON CONNECT ---
+      try {
+        // Try to get organizationId from localStorage or window context
+        const userStr = localStorage.getItem('user');
+        let organizationId = undefined;
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            if (user && user.organization && user.organization._id) {
+              organizationId = user.organization._id;
+            }
+          } catch (e) { /* ignore */ }
+        }
+        // Fallback: try window.__USER__ if set by SSR/hydration
+        if (!organizationId && typeof window !== 'undefined' && (window as any).__USER__?.organization?._id) {
+          organizationId = (window as any).__USER__.organization._id;
+        }
+        // If not found, try to get from token (optional, not implemented here)
+        if (organizationId) {
+          this.joinOrganization(organizationId);
+        }
+      } catch (err) {}
+    });
+
+    // Listen to all events in the socket room and log them
+    this.socket.onAny((event, ...args) => {
+      if (event.startsWith('notification:') || event.startsWith('organization:') || event === 'notification:new') {
+        console.log('[Socket Room Event]', event, ...args);
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -149,9 +178,23 @@ class SocketService {
     this.socket?.emit('leave:project', projectId);
   }
 
+  // Organization room join/leave
+  joinOrganization(organizationId: string) {
+    this.socket?.emit('join:organization', organizationId);
+  }
+
+  leaveOrganization(organizationId: string) {
+    this.socket?.emit('leave:organization', organizationId);
+  }
+
   // Emit task status change for real-time updates
   emitTaskStatusChange(taskId: string, newStatus: string, projectId?: string) {
     this.socket?.emit('task:status:change', { taskId, newStatus, projectId });
+  }
+
+  // Listen for organization-wide notifications
+  onOrganizationNotification(callback: (notification: any) => void) {
+    this.socket?.on('notification:new', callback);
   }
 
   // Clean up all listeners

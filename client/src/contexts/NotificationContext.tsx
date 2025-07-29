@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { notificationAPI } from '../services/api';
 
 interface Notification {
   id: string;
@@ -33,6 +33,53 @@ interface NotificationProviderProps {
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationCounter, setNotificationCounter] = useState(0);
+
+  // Fetch notifications from backend on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const backendNotifications = await notificationAPI.getAll();
+        // Map backend notifications to local Notification type
+        const mapped = backendNotifications.map((n: any) => ({
+          id: n._id,
+          type: n.type || 'info',
+          title: n.message,
+          message: n.data && n.data.details ? n.data.details : '',
+        }));
+        setNotifications(mapped);
+      } catch (e) {
+        // Optionally handle error
+      }
+    })();
+  }, []);
+
+  // Listen for real-time organization notifications
+  useEffect(() => {
+    import('../services/socket').then(({ socketService }) => {
+      const handler = (notification: any) => {
+        // If org broadcast, show in bell and as toast
+        if (notification.isOrgBroadcast) {
+          addNotification({
+            type: notification.type || 'info',
+            title: notification.message || 'New Organization Notification',
+            message: notification.data && notification.data.details ? notification.data.details : '',
+          });
+        } else if (notification._id) {
+          // User-specific notification (from DB)
+          addNotification({
+            type: notification.type || 'info',
+            title: notification.message || 'New Notification',
+            message: notification.data && notification.data.details ? notification.data.details : '',
+          });
+        }
+      };
+      socketService.onOrganizationNotification(handler);
+      return () => {
+        socketService.removeAllListeners();
+      };
+    });
+  }, []);
+
   const addNotification = (notification: Omit<Notification, 'id'>) => {
     // Create unique ID using timestamp + counter + random string to ensure uniqueness
     const id = `${Date.now()}-${notificationCounter}-${Math.random().toString(36).substr(2, 9)}`;
@@ -65,70 +112,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       clearAll,
     }}>
       {children}
-      <NotificationContainer />
+      {/* NotificationContainer removed: only dropdown will show notifications */}
     </NotificationContext.Provider>
   );
 };
 
-const NotificationContainer: React.FC = () => {
-  const { notifications, removeNotification } = useNotification();
-
-  const getIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
-      case 'warning':
-        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
-      case 'info':
-      default:
-        return <Info className="w-5 h-5 text-blue-500" />;
-    }
-  };
-
-  const getStyles = (type: Notification['type']) => {
-    switch (type) {
-      case 'success':
-        return 'bg-green-50 border-green-200 text-green-800';
-      case 'error':
-        return 'bg-red-50 border-red-200 text-red-800';
-      case 'warning':
-        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'info':
-      default:
-        return 'bg-blue-50 border-blue-200 text-blue-800';
-    }
-  };
-
-  if (notifications.length === 0) return null;
-
-  return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
-      {notifications.map((notification) => (
-        <div
-          key={notification.id}
-          className={`flex items-start p-4 border rounded-lg shadow-lg transition-all duration-300 ${getStyles(notification.type)}`}
-        >
-          <div className="flex-shrink-0 mr-3">
-            {getIcon(notification.type)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-medium">{notification.title}</h4>
-            {notification.message && (
-              <p className="mt-1 text-sm opacity-90">{notification.message}</p>
-            )}
-          </div>
-          <button
-            onClick={() => removeNotification(notification.id)}
-            className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-};
+// Note: Org-wide (broadcast) notifications are only removed locally. User-specific notifications are marked as read in the backend via /api/notifications/mark-seen.
 
 export default NotificationProvider;

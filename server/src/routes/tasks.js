@@ -187,7 +187,7 @@ router.post('/', authenticate, [
         return res.status(403).json({ message: 'Access denied to project' });
       }
     }
-
+const io = req.app.get('io');
     const task = new Task({
       title,
       description,
@@ -237,8 +237,27 @@ router.post('/', authenticate, [
       }
     }
 
+    // Send real-time notification to assigned users and organization
+    if (task.assignedUsers && task.assignedUsers.length > 0) {
+      const notificationService = await import('../services/notificationService.js');
+      // Get organizationId from project if available
+      let organizationId = null;
+      if (task.projectId && task.projectId.organization) {
+        organizationId = task.projectId.organization;
+      }
+      for (const user of task.assignedUsers) {
+        await notificationService.createAndEmitNotification({
+          user: user._id || user,
+          organization: organizationId,
+          message: `You have been assigned a new task: ${task.title}`,
+          type: 'task_assigned',
+          data: { taskId: task._id, projectId: task.projectId?._id || task.projectId }
+        }, io);
+      }
+    }
+
     // Emit real-time event
-    const io = req.app.get('io');
+    
     if (projectId) {
       io.to(`project:${projectId}`).emit('task:created', task);
     } else {

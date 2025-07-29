@@ -24,6 +24,7 @@ import organizationRoutes from './routes/organizations.js';
 import teamRoutes from './routes/teams.js';
 // Import email routes
 import emailRoutes from './routes/email.js';
+import notificationRoutes from './routes/notifications.js';
 
 dotenv.config();
 
@@ -105,7 +106,6 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/taskflow'
 })
 .then(() => console.log('✅ Connected to MongoDB'))
 .catch((error) => console.error('❌ MongoDB connection error:', error));
-// ...existing code...
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -122,6 +122,7 @@ app.use('/api/attachments', attachmentRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 
 // Health check endpoint
@@ -174,6 +175,20 @@ io.on('connection', (socket) => {
   socket.on('leave:project', (projectId) => {
     socket.leave(`project:${projectId}`);
     console.log(`User ${socket.userId} left project ${projectId}`);
+  });
+
+  // Join user room for personal notifications
+  socket.join(`user:${socket.userId}`);
+
+  // Join organization room for org-wide notifications
+  socket.on('join:organization', (organizationId) => {
+    socket.join(`organization:${organizationId}`);
+    console.log(`User ${socket.userId} joined organization ${organizationId}`);
+  });
+
+  socket.on('leave:organization', (organizationId) => {
+    socket.leave(`organization:${organizationId}`);
+    console.log(`User ${socket.userId} left organization ${organizationId}`);
   });
 
   // Handle real-time task status changes

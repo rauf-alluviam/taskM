@@ -111,6 +111,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuthStatus();
   }, []);
 
+  // Keep user in localStorage for socket auto-join
+  useEffect(() => {
+    if (state.user) {
+      localStorage.setItem('user', JSON.stringify(state.user));
+    } else {
+      localStorage.removeItem('user');
+    }
+  }, [state.user]);
+
   const checkAuthStatus = async () => {
     const token = localStorage.getItem('token');
     if (!token) {

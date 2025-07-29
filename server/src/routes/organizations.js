@@ -164,6 +164,19 @@ router.post('/', authenticate, [
     await organization.populate('owner', 'name email avatar');
     await organization.populate('admins', 'name email avatar');
 
+    // Notify all users in the organization about the creation
+    const orgUsers = await User.find({ organization: organization._id, isActive: true });
+    const Notification = (await import('../models/Notification.js')).default;
+    const notificationPromises = orgUsers.map(user =>
+      Notification.create({
+        user: user._id,
+        message: 'Organization "' + organization.name + '" was created.',
+        type: 'info',
+        data: { organizationId: organization._id, createdBy: req.user._id }
+      })
+    );
+    await Promise.all(notificationPromises);
+
     res.status(201).json(organization);
   } catch (error) {
     console.error('Create organization error:', error);
@@ -602,6 +615,19 @@ router.post('/:id/invite', authenticate, [
       inviteResults,
       message: `Sent ${inviteResults.filter(r => r.status === 'sent').length} invitation(s)`
     });
+
+    // Notify all users in the organization about the invitation event
+    const orgUsers = await User.find({ organization: organization._id, isActive: true });
+    const Notification = (await import('../models/Notification.js')).default;
+    const notificationPromises = orgUsers.map(user =>
+      Notification.create({
+        user: user._id,
+        message: 'New member(s) invited to organization "' + organization.name + '".',
+        type: 'info',
+        data: { organizationId: organization._id, invitedBy: req.user._id }
+      })
+    );
+    await Promise.all(notificationPromises);
 
   } catch (error) {
     console.error('Invite members error:', error);
