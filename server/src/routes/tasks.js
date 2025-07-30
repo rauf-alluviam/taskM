@@ -514,7 +514,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (req.user.role === 'admin' || req.user.role === 'super_admin') {
       canDelete = true;
     }
-    // Task creator access
+    // Task creator access (user can always delete their own task)
     else if (task.createdBy.equals(req.user._id)) {
       canDelete = true;
     }

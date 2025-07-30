@@ -64,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onQuickTask }) => {
     
     if (userNotificationIds.length > 0) {
       try {
-        await notificationAPI.markSeen(userNotificationIds);
+        await notificationAPI.markAllAsSeen(userNotificationIds);
         setMarkAllSuccess(true);
         setTimeout(() => setMarkAllSuccess(false), 2000);
       } catch (error) {

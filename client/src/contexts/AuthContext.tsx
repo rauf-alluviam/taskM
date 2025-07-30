@@ -121,11 +121,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [state.user]);
 
   const checkAuthStatus = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      return;
+   
+   const token = localStorage.getItem('token');
+  if (!token) {
+       console.log('Checking authentication status...'); // DEBUG
+    dispatch({ type: 'SET_LOADING', payload: false });
+    if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+      window.location.href = '/login';
     }
+    return;
+  }
 
     try {
       const user = await authAPI.verifyToken();

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Subtask from '../models/Subtask.js';
 import Task from '../models/Task.js';
 import TaskHistory from '../models/TaskHistory.js';
+import Notification from '../models/Notification.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -288,12 +289,43 @@ router.get('/task/:taskId/stats', authenticate, async (req, res) => {
 
 export default router;
 
-// Helper function to log task changes
+// Helper function to log task changes and send notifications
 async function logTaskChange(taskId, action, data, userId, userName) {
   try {
     await TaskHistory.logChange(taskId, action, data, userId, userName);
+
+    // --- Notification logic ---
+    // Find the task to get project and organization
+    const task = await Task.findById(taskId).populate('projectId');
+    if (!task) return;
+
+    // Find the project to get organization and members
+    const project = task.projectId ? await (await import('../models/Project.js')).default.findById(task.projectId).populate('organization').populate('members.user') : null;
+    const orgId = project && project.organization ? project.organization._id : null;
+
+    // Collect users to notify: assignedUsers, project members, and optionally org admins
+    const assignedUserIds = (task.assignedUsers || []).map(u => u.toString());
+    const projectMemberIds = project ? project.members.map(m => m.user._id.toString()) : [];
+    const notifyUserIds = Array.from(new Set([...assignedUserIds, ...projectMemberIds])).filter(id => id !== userId.toString());
+
+    // Create notifications for each user
+    for (const notifyUserId of notifyUserIds) {
+      await Notification.create({
+        user: notifyUserId,
+        message: data.details || 'Task updated',
+        seen: false,
+        timestamp: new Date(),
+        type: action,
+        data: {
+          taskId,
+          orgId,
+          action,
+          details: data.details || '',
+        },
+      });
+    }
   } catch (error) {
-    console.error('Error logging task change:', error);
+    console.error('Error logging task change or sending notification:', error);
     // Don't throw error to prevent breaking the main operation
   }
 }

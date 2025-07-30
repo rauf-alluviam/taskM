@@ -721,7 +721,7 @@ export const notificationAPI = {
       return response.data;
     });
   },
-  markSeen: async (ids: string[]) => {
+  markAllAsSeen: async (ids: string[]) => {
     return withRetry(async () => {
       const response = await api.post('/notifications/mark-seen', { ids });
       return response.data;

@@ -52,6 +52,7 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
   },
+  
   settings: {
     notifications: {
       emailNotifications: { type: Boolean, default: true },
@@ -187,6 +188,10 @@ const userSchema = new mongoose.Schema({
       trim: true,
     },
   },
+  notifications: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Notification',
+  }],
 }, {
   timestamps: true,
 });
@@ -246,6 +251,12 @@ userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
   return user;
+};
+
+// Mark all notifications as seen for this user
+userSchema.methods.markAllNotificationsAsSeen = async function() {
+  const Notification = (await import('./Notification.js')).default;
+  await Notification.updateMany({ user: this._id, seen: false }, { $set: { seen: true } });
 };
 
 // Indexes for better performance

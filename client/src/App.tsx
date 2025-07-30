@@ -39,7 +39,7 @@ function App() {
 
   return (
     <ThemeProvider>
-      <NotificationProvider>
+     
         {!user ? (
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -48,6 +48,7 @@ function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         ) : (
+          <NotificationProvider>
           <Layout>
             <Routes>
               {/* Allow invitation links to work even when logged in */}
@@ -76,8 +77,9 @@ function App() {
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Layout>
+          </NotificationProvider>
         )}
-      </NotificationProvider>
+  
     </ThemeProvider>
   );
 }
