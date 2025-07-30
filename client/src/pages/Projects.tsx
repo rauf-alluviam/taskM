@@ -114,9 +114,40 @@ const Projects: React.FC = () => {
     }
   };
 
-  const onCreateProject = async (data: ProjectForm) => {
+  function extractUserId(user: any): string {
+  if (!user) return '';
+  if (typeof user === 'string') return user;
+  if (user._id) return user._id.toString();
+  if (user.user) return extractUserId(user.user); // nested user.user
+  return '';
+}
+
+
+ const onCreateProject = async (data: ProjectForm) => {
     setCreating(true);
     try {
+      let members: any[] = [];
+      if (data.teamId) {
+        const team = await teamAPI.getTeam(data.teamId);
+        if (team && Array.isArray(team.members)) {
+          members = team.members.map((m: any) => ({
+            user: extractUserId(m.user),
+            role: 'member',
+            addedAt: new Date(),
+            addedBy: user?._id ? user._id.toString() : '',
+          }));
+        }
+      }
+      // Ensure creator included as admin if not already present
+      if (user?._id && !members.some(m => m.user === user._id.toString())) {
+        members.unshift({
+          user: user._id.toString(),
+          role: 'admin',
+          addedAt: new Date(),
+          addedBy: user._id.toString(),
+        });
+      }
+
       const newProject = await projectAPI.createProject({
         ...data,
         kanbanColumns: [
@@ -125,16 +156,15 @@ const Projects: React.FC = () => {
           { name: 'review', order: 2 },
           { name: 'done', order: 3 },
         ],
+        ...(members.length > 0 ? { members } : {}),
       });
+
       dispatch({ type: 'ADD_PROJECT', payload: newProject });
       reset();
       setShowCreateModal(false);
-      
-      // Navigate back to /projects if we came from /projects/create
       if (location.pathname === '/projects/create') {
         navigate('/projects', { replace: true });
       }
-      
       addNotification({
         type: 'success',
         title: 'Project Created',
@@ -151,7 +181,7 @@ const Projects: React.FC = () => {
     } finally {
       setCreating(false);
     }
-  };
+};
 
   const handleDeleteProject = async (project: Project) => {
     if (!confirm(`Are you sure you want to delete "${project.name}"? This will also delete all tasks associated with this project. This action cannot be undone.`)) {
