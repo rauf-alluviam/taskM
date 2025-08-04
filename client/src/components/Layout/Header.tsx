@@ -78,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onQuickTask }) => {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 dark:bg-slate-800 dark:border-slate-700 sticky top-0 z-40">
+    <header className="bg-white shadow-sm border-b border-gray-200 dark:bg-slate-800 dark:border-slate-700 sticky top-0 z-[10001]">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center space-x-4">
           <button
@@ -114,7 +114,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onQuickTask }) => {
               )}
             </button>
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
+              <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[10000]">
                 <div className="p-4 border-b border-gray-100 dark:border-slate-700 font-semibold text-gray-900 dark:text-white">
                   Notifications
                 </div>

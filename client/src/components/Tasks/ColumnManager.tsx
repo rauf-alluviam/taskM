@@ -6,8 +6,9 @@ interface ColumnManagerProps {
   isOpen: boolean;
   onClose: () => void;
   columns: Array<{ id: string; title: string; color: string }>;
-  onAddColumn: (column: { id: string; title: string; color: string }) => void;
+  onAddColumn: (column: { id: string; title: string; color: string }) => Promise<void>;
   onRemoveColumn: (columnId: string) => void;
+  loading?: boolean;
 }
 
 interface DeleteConfirmation {
@@ -22,9 +23,12 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
   columns,
   onAddColumn,
   onRemoveColumn,
+  loading = false,
 }) => {
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [selectedColor, setSelectedColor] = useState('bg-gray-100');
+  const [validationError, setValidationError] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
     isOpen: false,
     columnId: '',
@@ -44,24 +48,73 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
 
   const defaultColumns = ['todo', 'in-progress', 'review', 'done'];
 
-  const handleAddColumn = () => {
-    if (!newColumnTitle.trim()) return;
+  const handleAddColumn = async () => {
+    // Clear previous validation errors
+    setValidationError('');
+    
+    // Validate empty title
+    if (!newColumnTitle.trim()) {
+      setValidationError('Column name is required');
+      return;
+    }
+
+    // Check for minimum length
+    if (newColumnTitle.trim().length < 2) {
+      setValidationError('Column name must be at least 2 characters long');
+      return;
+    }
+
+    // Check for maximum length
+    if (newColumnTitle.trim().length > 50) {
+      setValidationError('Column name must be less than 50 characters');
+      return;
+    }
 
     const columnId = newColumnTitle.toLowerCase().replace(/\s+/g, '-');
     
-    onAddColumn({
-      id: columnId,
-      title: newColumnTitle.trim(),
-      color: selectedColor,
-    });
+    // Check for duplicate column names (case insensitive)
+    const isDuplicate = columns.some(column => 
+      column.title.toLowerCase() === newColumnTitle.trim().toLowerCase() ||
+      column.id === columnId
+    );
+    
+    if (isDuplicate) {
+      setValidationError('A column with this name already exists');
+      return;
+    }
+    
+    try {
+      setIsAdding(true);
+      await onAddColumn({
+        id: columnId,
+        title: newColumnTitle.trim(),
+        color: selectedColor,
+      });
 
-    setNewColumnTitle('');
-    setSelectedColor('bg-gray-100');
+      // Reset form only on successful addition
+      setNewColumnTitle('');
+      setSelectedColor('bg-gray-100');
+      setValidationError('');
+    } catch (error) {
+      // Error is handled by the parent component, just keep the form state
+      console.error('Failed to add column:', error);
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleAddColumn();
+    }
+  };
+
+  // Clear validation error when user starts typing
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewColumnTitle(e.target.value);
+    if (validationError) {
+      setValidationError('');
     }
   };
 
@@ -151,11 +204,22 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
                 <input
                   type="text"
                   value={newColumnTitle}
-                  onChange={(e) => setNewColumnTitle(e.target.value)}
+                  onChange={handleTitleChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-colors placeholder-gray-400 dark:placeholder-slate-500"
+                  className={`w-full px-3 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-colors placeholder-gray-400 dark:placeholder-slate-500 ${
+                    validationError 
+                      ? 'border-red-300 dark:border-red-600 focus:ring-red-500 dark:focus:ring-red-400' 
+                      : 'border-gray-300 dark:border-slate-600'
+                  }`}
                   placeholder="e.g., Testing, Blocked, Deployed, QA..."
+                  maxLength={50}
                 />
+                {validationError && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center">
+                    <AlertTriangle className="w-4 h-4 mr-1 flex-shrink-0" />
+                    {validationError}
+                  </p>
+                )}
               </div>
 
               {/* Color Selection */}
@@ -193,11 +257,20 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
               {/* Add Button */}
               <button
                 onClick={handleAddColumn}
-                disabled={!newColumnTitle.trim()}
+                disabled={!newColumnTitle.trim() || isAdding || loading}
                 className="w-full px-4 py-2.5 bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white dark:text-slate-100 font-medium rounded-lg transition-colors duration-200 flex items-center justify-center shadow-sm"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Column
+                {isAdding ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Column
+                  </>
+                )}
               </button>
             </div>
           </div>

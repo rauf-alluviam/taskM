@@ -6,7 +6,6 @@ import {
   FileText,
   Users,
   UserPlus,
-  MoreVertical,
   Edit,
   Trash2,
   Crown,
@@ -37,11 +36,11 @@ import { debugAuth, testApiAuth } from '../utils/debugAuth';
 // Add interfaces for member management
 interface AddMemberForm {
   userIds: string[];
-  role: 'admin' | 'member' | 'viewer';
+  role: 'admin' | 'team_lead' | 'member' | 'viewer';
 }
 
 interface UpdateRoleForm {
-  role: 'admin' | 'member' | 'viewer';
+  role: 'admin' | 'team_lead' | 'member' | 'viewer';
 }
 
 const ProjectDetail: React.FC = () => {
@@ -63,8 +62,16 @@ const ProjectDetail: React.FC = () => {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showUpdateRoleModal, setShowUpdateRoleModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
-  const [memberActionDropdownOpen, setMemberActionDropdownOpen] = useState<string | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('📊 showUpdateRoleModal changed to:', showUpdateRoleModal);
+  }, [showUpdateRoleModal]);
+
+  useEffect(() => {
+    console.log('👤 selectedMember changed to:', selectedMember);
+  }, [selectedMember]);
 
   // State and ref for the new members popover
   const [isMembersPopoverOpen, setIsMembersPopoverOpen] = useState(false);
@@ -87,11 +94,6 @@ const ProjectDetail: React.FC = () => {
   // Effect to handle clicks outside of popovers
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Close member action dropdown
-      if (memberActionDropdownOpen) {
-        setMemberActionDropdownOpen(null);
-      }
-
       // Close main members popover
       if (
         isMembersPopoverOpen &&
@@ -108,7 +110,7 @@ const ProjectDetail: React.FC = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isMembersPopoverOpen, memberActionDropdownOpen]);
+  }, [isMembersPopoverOpen]);
 
   const loadProjectData = async () => {
     try {
@@ -160,11 +162,36 @@ const ProjectDetail: React.FC = () => {
   };
 
   const openUpdateRoleModal = (member: any) => {
-    if (!member.user) return;
+    console.log('🔄 Opening update role modal for member:', member);
+    if (!member.user) {
+      console.error('❌ Member has no user object:', member);
+      return;
+    }
     setSelectedMember(member);
     setRoleValue('role', member.role);
     setShowUpdateRoleModal(true);
     setIsMembersPopoverOpen(false); // Close popover when modal opens
+    console.log('✅ Update role modal should now be open');
+  };
+
+  const handleRoleChange = async (member: any, newRole: 'admin' | 'team_lead' | 'member') => {
+    if (!project || !member.user || member.role === newRole) return;
+
+    try {
+      await projectAPI.updateMemberRole(project._id, member.user._id, newRole);
+      addNotification({ 
+        type: 'success', 
+        title: 'Role Updated', 
+        message: `${member.user.name}'s role has been changed to ${newRole}` 
+      });
+      loadProjectData(); // Refresh data
+    } catch (error: any) {
+      addNotification({ 
+        type: 'error', 
+        title: 'Error', 
+        message: error.response?.data?.message || 'Failed to update role' 
+      });
+    }
   };
 
   const onUpdateRole = async (data: UpdateRoleForm) => {
@@ -184,6 +211,7 @@ const ProjectDetail: React.FC = () => {
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'admin': return <Crown className="w-4 h-4 text-amber-500" />;
+      case 'team_lead': return <User className="w-4 h-4 text-indigo-500" />;
       case 'member': return <User className="w-4 h-4 text-blue-500" />;
       default: return <Eye className="w-4 h-4 text-slate-500 dark:text-slate-400" />;
     }
@@ -196,6 +224,7 @@ const ProjectDetail: React.FC = () => {
   const getRoleBadgeClass = (role: string) => {
     switch (role) {
       case 'admin': return 'bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700/50';
+      case 'team_lead': return 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-700/50';
       case 'member': return 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700/50';
       default: return 'bg-gradient-to-r from-slate-50 to-gray-50 text-slate-600 border-slate-200 dark:bg-slate-700/50 dark:text-slate-300 dark:border-slate-600/50';
     }
@@ -350,7 +379,7 @@ const ProjectDetail: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-950 dark:to-black">
       {/* Enhanced Header with Gradient Background */}
-      <div className="bg-gradient-to-r from-white via-blue-50 to-indigo-100 border-b border-slate-200 backdrop-blur-sm dark:from-slate-900/80 dark:via-slate-800/80 dark:to-slate-900/80 dark:border-slate-700">
+      <div className="bg-gradient-to-r from-white via-blue-50 to-indigo-100 border-b border-slate-200 backdrop-blur-sm dark:from-slate-900/80 dark:via-slate-800/80 dark:to-slate-900/80 dark:border-slate-700 relative z-40">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div className="flex items-center space-x-4 min-w-0">
@@ -375,7 +404,7 @@ const ProjectDetail: React.FC = () => {
             </div>
             
             {/* Enhanced Action Buttons */}
-            <div className="relative flex items-center space-x-3 flex-shrink-0">
+            <div className="relative flex items-center space-x-3 flex-shrink-0 z-50">
               {/* Members Popover Button */}
               <button
                 ref={membersButtonRef}
@@ -399,11 +428,12 @@ const ProjectDetail: React.FC = () => {
               {/* Enhanced Members Popover */}
               <div
                 ref={membersPopoverRef}
-                className={`absolute top-full right-0 mt-3 w-80 sm:w-96 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 z-30 transition-all duration-300 ease-out origin-top-right dark:bg-slate-800/95 dark:border-slate-700/50 ${
+                className={`absolute top-full right-0 mt-3 w-[28rem] sm:w-[34rem] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 z-[9999] transition-all duration-300 ease-out origin-top-right dark:bg-slate-800/95 dark:border-slate-700/50 ${
                   isMembersPopoverOpen 
                     ? 'opacity-100 scale-100 translate-y-0' 
-                    : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+                    : 'opacity-0 scale-95 -translate-x-2 pointer-events-none'
                 }`}
+                style={{ maxHeight: 'calc(100vh - 200px)' }}
               >
                 <div className="p-6 border-b border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex justify-between items-center">
@@ -426,7 +456,7 @@ const ProjectDetail: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                <div className="p-3 space-y-2 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 dark:scrollbar-thumb-slate-600 dark:scrollbar-track-slate-800">
                   {project.members && project.members.length > 0 ? (
                     project.members
                       .filter(member => member.user)
@@ -456,37 +486,51 @@ const ProjectDetail: React.FC = () => {
                             </div>
                           </div>
                           {canManageMembers && (
-                            <div className="relative flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setMemberActionDropdownOpen(memberActionDropdownOpen === member.user._id ? null : member.user._id);
-                                }}
-                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-all duration-300 hover:shadow-md dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-700"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                              {memberActionDropdownOpen === member.user._id && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 z-40 overflow-hidden dark:bg-slate-900 dark:border-slate-700">
-                                  <div className="py-2">
-                                    <button 
-                                      onClick={() => openUpdateRoleModal(member)} 
-                                      className="flex items-center w-full px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-blue-400"
-                                    >
-                                      <Edit className="w-4 h-4 mr-3" /> 
-                                      Change Role
-                                    </button>
-                                    {member.user._id !== user?._id && (
-                                      <button 
-                                        onClick={() => handleRemoveMember(member.user._id, member.user.name)} 
-                                        className="flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 dark:text-red-400 dark:hover:bg-red-900/50"
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-3" /> 
-                                        Remove Member
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
+                            <div className="flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              {/* Role Toggle Buttons */}
+                              <div className="flex rounded-lg bg-slate-100 dark:bg-slate-700 p-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRoleChange(member, 'member');
+                                  }}
+                                  className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 ${
+                                    member.role === 'member'
+                                      ? 'bg-blue-500 text-white shadow-sm'
+                                      : 'text-slate-600 hover:bg-white hover:shadow-sm dark:text-slate-400 dark:hover:bg-slate-600'
+                                  }`}
+                                >
+                                  Member
+                                </button>
+                                
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRoleChange(member, 'admin');
+                                  }}
+                                  className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 ${
+                                    member.role === 'admin'
+                                      ? 'bg-amber-500 text-white shadow-sm'
+                                      : 'text-slate-600 hover:bg-white hover:shadow-sm dark:text-slate-400 dark:hover:bg-slate-600'
+                                  }`}
+                                >
+                                  Admin
+                                </button>
+                              </div>
+                              
+                              {/* Remove Member Button */}
+                              {member.user._id !== user?._id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveMember(member.user._id, member.user.name);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-all duration-200 hover:shadow-sm dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:border-red-800 flex items-center justify-center space-x-1"
+                                  title="Remove member"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Remove Member</span>
+                                </button>
                               )}
                             </div>
                           )}
@@ -523,9 +567,9 @@ const ProjectDetail: React.FC = () => {
 
 
       {/* Main Content Area */}
-      <div className="space-y-6">
+      <div className="space-y-6 relative z-10">
         {/* Project Info Card */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 sm:p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 sm:p-6 relative z-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="flex items-center gap-4">
                     <div className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg"><Building2 className="w-6 h-6 text-slate-500 dark:text-slate-400" /></div>
@@ -547,15 +591,17 @@ const ProjectDetail: React.FC = () => {
         </div>
 
         {/* Kanban Board */}
-        <KanbanBoard
-          tasks={projectTasks}
-          onTaskUpdate={handleTaskUpdate}
-          onAddTask={handleAddTask}
-          onEditTask={handleEditTask}
-          onDeleteTask={handleDeleteTask}
-          columns={project.kanbanColumns?.map(col => ({ id: col.name, title: col.name, color: col.color || getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-')) })) || []}
-          onManageColumns={() => setShowColumnManager(true)}
-        />
+        <div className="relative z-10">
+          <KanbanBoard
+            tasks={projectTasks}
+            onTaskUpdate={handleTaskUpdate}
+            onAddTask={handleAddTask}
+            onEditTask={handleEditTask}
+            onDeleteTask={handleDeleteTask}
+            columns={project.kanbanColumns?.map(col => ({ id: col.name, title: col.name, color: col.color || getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-')) })) || []}
+            onManageColumns={() => setShowColumnManager(true)}
+          />
+        </div>
       </div>
 
       {/* Modals */}
@@ -574,13 +620,14 @@ const ProjectDetail: React.FC = () => {
               <option value="">Select role...</option>
               <option value="viewer">Viewer - Can view project and tasks</option>
               <option value="member">Member - Can create and edit tasks</option>
+              <option value="team_lead">Team Lead - Can manage team members and tasks</option>
               <option value="admin">Admin - Can manage project and members</option>
             </select>
             {memberErrors.role && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{memberErrors.role.message}</p>}
           </div>
           <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg text-sm text-slate-600 dark:text-slate-400">
             <h4 className="font-medium mb-2 text-slate-800 dark:text-slate-200">Role Permissions:</h4>
-            <ul className="space-y-1 text-xs"><li><strong>Viewer:</strong> View project, tasks, and documents</li><li><strong>Member:</strong> All viewer permissions + create/edit tasks</li><li><strong>Admin:</strong> All member permissions + manage project settings and members</li></ul>
+            <ul className="space-y-1 text-xs"><li><strong>Viewer:</strong> View project, tasks, and documents</li><li><strong>Member:</strong> All viewer permissions + create/edit tasks</li><li><strong>Team Lead:</strong> All member permissions + manage team members and tasks</li><li><strong>Admin:</strong> All member permissions + manage project settings and members</li></ul>
           </div>
           <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-slate-700">
             <button type="button" onClick={() => { setShowAddMemberModal(false); setSelectedUserIds([]); resetMember(); }} className="btn-outline dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-700">Cancel</button>
@@ -598,7 +645,7 @@ const ProjectDetail: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">New Role</label>
               <select {...registerRole('role', { required: 'Please select a role' })} className="input-field w-full dark:bg-slate-700 dark:border-slate-600 dark:text-white">
-                <option value="viewer">Viewer</option><option value="member">Member</option><option value="admin">Admin</option>
+                <option value="viewer">Viewer</option><option value="member">Member</option><option value="team_lead">Team Lead</option><option value="admin">Admin</option>
               </select>
               {roleErrors.role && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{roleErrors.role.message}</p>}
             </div>

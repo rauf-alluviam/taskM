@@ -27,7 +27,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingAssignments, setOnboardingAssignments] = useState(null);
+  const [onboardingAssignments, setOnboardingAssignments] = useState<any>(null);
   const [searchParams] = useSearchParams();
   const [stats, setStats] = useState({
     totalTasks: 0,
@@ -35,6 +35,21 @@ const Dashboard: React.FC = () => {
     overdueTasks: 0,
     totalProjects: 0,
   });
+
+  // Recalculate stats whenever tasks or projects change
+  useEffect(() => {
+    const completedTasks = tasks.filter((task: any) => task.status === 'done').length;
+    const overdueTasks = tasks.filter((task: any) => 
+      task.endDate && new Date(task.endDate) < new Date() && task.status !== 'done'
+    ).length;
+
+    setStats({
+      totalTasks: tasks.length,
+      completedTasks,
+      overdueTasks,
+      totalProjects: projects.length,
+    });
+  }, [tasks, projects]);
 
   // Create debounced version of loadDashboardData to prevent excessive calls
   const debouncedLoadDashboardData = useCallback(
@@ -51,20 +66,6 @@ const Dashboard: React.FC = () => {
         // Handle tasks result
         if (results[0].status === 'fulfilled') {
           dispatch({ type: 'SET_TASKS', payload: results[0].value });
-          
-          // Calculate stats from successful task data
-          const tasksData = results[0].value;
-          const completedTasks = tasksData.filter((task: any) => task.status === 'done').length;
-          const overdueTasks = tasksData.filter((task: any) => 
-            task.endDate && new Date(task.endDate) < new Date() && task.status !== 'done'
-          ).length;
-          
-          setStats(prevStats => ({
-            ...prevStats,
-            totalTasks: tasksData.length,
-            completedTasks,
-            overdueTasks,
-          }));
         } else {
           console.error('Failed to load tasks:', results[0].reason);
         }
@@ -73,10 +74,6 @@ const Dashboard: React.FC = () => {
         if (results[1].status === 'fulfilled') {
           const projectsData = results[1].value;
           dispatch({ type: 'SET_PROJECTS', payload: projectsData });
-          setStats(prevStats => ({
-            ...prevStats,
-            totalProjects: projectsData.length,
-          }));
         } else {
           console.error('Failed to load projects:', results[1].reason);
         }
@@ -433,7 +430,7 @@ const Dashboard: React.FC = () => {
       <OnboardingTour
         isOpen={showOnboarding}
         onClose={() => setShowOnboarding(false)}
-        assignments={onboardingAssignments}
+        assignments={onboardingAssignments || undefined}
       />
     </div>
   );

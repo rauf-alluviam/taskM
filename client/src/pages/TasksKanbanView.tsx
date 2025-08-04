@@ -18,6 +18,8 @@ interface TaskFilters {
   assignedUser: string;
   tags: string[];
   project: string;
+  status: string;
+  dueDate: string;
 }
 
 interface Column {
@@ -66,6 +68,7 @@ interface TasksKanbanViewProps {
   orgUsers: any[];
   orgUsersLoading: boolean;
   organizationData?: OrganizationData;
+  columnsLoading?: boolean;
 }
 
 interface OrganizationData {
@@ -111,7 +114,8 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   setSelectedTask,
   orgUsers,
   orgUsersLoading,
-  organizationData
+  organizationData,
+  columnsLoading = false
 }) => {
   // Add selectedUserId state
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -369,7 +373,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">Filter Options</h3>
                 <button
-                  onClick={() => setFilters({ search: '', priority: 'all', assignedUser: 'all', tags: [], project: 'all' })}
+                  onClick={() => setFilters({ search: '', priority: 'all', assignedUser: 'all', tags: [], project: 'all', status: 'all', dueDate: 'all' })}
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   Clear all
@@ -410,7 +414,11 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                 {/* Status Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Status</label>
-                  <select className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                  <select 
+                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  >
                     <option value="all">All Statuses</option>
                     {columns.map(column => (
                       <option key={column.id} value={column.id}>{column.title}</option>
@@ -421,7 +429,11 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                 {/* Due Date Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Due Date</label>
-                  <select className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-slate-700 dark:text-white">
+                  <select 
+                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                    value={filters.dueDate}
+                    onChange={(e) => setFilters({ ...filters, dueDate: e.target.value })}
+                  >
                     <option value="all">Any time</option>
                     <option value="overdue">Overdue</option>
                     <option value="today">Due today</option>
@@ -485,7 +497,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                 
                 {/* Quick Actions */}
                 <div className="flex items-center space-x-3">
-                  {viewMode === 'kanban' && (
+                  {viewMode === 'kanban' && currentProjectId && (
                     <button
                       onClick={() => setShowColumnManager(true)}
                       className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors dark:bg-slate-800 dark:text-gray-400 dark:hover:text-white dark:border-slate-700 dark:hover:bg-slate-700"
@@ -514,7 +526,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                       onEditTask={handleEditTask}
                       onDeleteTask={handleDeleteTask}
                       columns={columns}
-                      onManageColumns={() => setShowColumnManager(true)}
+                      onManageColumns={currentProjectId ? () => setShowColumnManager(true) : undefined}
                     />
                   </div>
                 </div>
@@ -564,6 +576,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
         columns={columns}
         onAddColumn={handleAddColumn}
         onRemoveColumn={handleRemoveColumn}
+        loading={columnsLoading}
       />
     </div>
   );

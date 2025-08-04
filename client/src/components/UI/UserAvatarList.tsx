@@ -159,7 +159,7 @@ const UserAvatarList: React.FC<UserAvatarListProps> = ({
             <div
               key={user._id}
               className={`${sizeClasses[size]} ${getAvatarColor(user.name)} rounded-full flex items-center justify-center text-white font-medium border-2 border-white ${selectedIds.includes(user._id) ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white' : ''}`}
-              title={`${user.name}${user.email ? ` (${user.email})` : ''}`}
+              title={user.name}
               style={{ zIndex: users.length - index, cursor: onUserClick || isMulti ? 'pointer' : 'default' }}
               onClick={() => handleAvatarClick(user)}
             >
@@ -176,11 +176,6 @@ const UserAvatarList: React.FC<UserAvatarListProps> = ({
             </div>
           )}
         </div>
-        {users.length > 0 && (
-          <span className="ml-2 text-sm text-gray-600">
-            {users.length === 1 ? users[0].name : `${users.length} users`}
-          </span>
-        )}
       </div>
     </div>
   );

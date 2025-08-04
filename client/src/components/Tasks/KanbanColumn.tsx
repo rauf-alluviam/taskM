@@ -4,6 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus, MoreHorizontal } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
 import KanbanTaskCardCompact from './KanbanTaskCardCompact';
+import KanbanTaskCard from './KanbanTaskCard';
 
 interface KanbanColumnProps {
   id: string;
@@ -105,12 +106,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
             >
               <Plus className="w-4 h-4" />
             </button>
-            <button 
-              className="p-1.5 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-all duration-200 hover:scale-110"
-              title="Column options"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
+            
           </div>
         </div>
       </div>
@@ -123,7 +119,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
         <SortableContext items={tasks.map(task => task._id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
             {tasks.map((task) => (
-              <KanbanTaskCardCompact 
+              <KanbanTaskCard
                 key={task._id} 
                 task={task} 
                 onEdit={onEditTask}

@@ -183,6 +183,45 @@ const Projects: React.FC = () => {
     }
 };
 
+  const onEditProject = async (data: ProjectForm) => {
+    if (!selectedProject) return;
+    
+    setCreating(true);
+    try {
+      // Prepare the update data
+      const updateData = {
+        name: data.name.trim(),
+        description: data.description,
+        department: data.department,
+        teamId: data.teamId,
+        visibility: data.visibility,
+      };
+
+      const updatedProject = await projectAPI.updateProject(selectedProject._id, updateData);
+      
+      dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
+      reset();
+      setShowEditModal(false);
+      setSelectedProject(null);
+      
+      addNotification({
+        type: 'success',
+        title: 'Project Updated',
+        message: `"${updatedProject.name}" has been updated successfully`,
+      });
+    } catch (error: any) {
+      console.error('Failed to update project:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to update project';
+      addNotification({
+        type: 'error',
+        title: 'Error Updating Project',
+        message: errorMessage,
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleDeleteProject = async (project: Project) => {
     if (!confirm(`Are you sure you want to delete "${project.name}"? This will also delete all tasks associated with this project. This action cannot be undone.`)) {
       return;
@@ -216,6 +255,23 @@ const Projects: React.FC = () => {
     if (location.pathname === '/projects/create') {
       navigate('/projects', { replace: true });
     }
+  };
+
+  const handleOpenEditModal = (project: Project) => {
+    setSelectedProject(project);
+    // Pre-populate form with project data
+    setValue('name', project.name);
+    setValue('description', project.description);
+    setValue('department', project.department);
+    setValue('teamId', project.team?._id || '');
+    setValue('visibility', project.visibility);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedProject(null);
+    reset();
   };
 
   const departments = [...new Set(projects.map(p => p.department))];
@@ -303,8 +359,7 @@ const Projects: React.FC = () => {
                             e.preventDefault();
                             e.stopPropagation();
                             setDropdownOpen(null);
-                            // Add edit functionality later
-                            alert('Edit project functionality - to be implemented');
+                            handleOpenEditModal(project);
                           }}
                           className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
                         >
@@ -512,6 +567,130 @@ const Projects: React.FC = () => {
               className="btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? 'Creating...' : 'Create Project'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Project Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={handleCloseEditModal}
+        title="Edit Project"
+        size="md"
+      >
+        <form onSubmit={handleSubmit(onEditProject)} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+              Project Name *
+            </label>
+            <input
+              {...register('name', { required: 'Project name is required' })}
+              className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
+              placeholder="Enter project name..."
+            />
+            {errors.name && (
+              <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.name.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+              Description
+            </label>
+            <textarea
+              {...register('description')}
+              className="textarea w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
+              placeholder="Describe the project..."
+              rows={3}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+              Department *
+            </label>
+            <input
+              {...register('department', { required: 'Department is required' })}
+              className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
+              placeholder="e.g., Engineering, Marketing, Design"
+              list="departments"
+            />
+            <datalist id="departments">
+              {departments.map(dept => (
+                <option key={dept} value={dept} />
+              ))}
+              <option value="Engineering" />
+              <option value="Marketing" />
+              <option value="Design" />
+              <option value="Sales" />
+              <option value="Support" />
+            </datalist>
+            {errors.department && (
+              <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.department.message}</p>
+            )}
+          </div>
+
+          {/* Team Selection */}
+          {user?.organization && teams.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                Team
+              </label>
+              <select {...register('teamId')} className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400">
+                <option value="">No specific team (Organization-wide)</option>
+                {teams.map((team) => (
+                  <option key={team._id} value={team._id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Select a team to update team assignment
+              </p>
+            </div>
+          )}
+
+          {/* Visibility Settings */}
+          {user?.organization && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                Project Visibility *
+              </label>
+              <select {...register('visibility', { required: 'Visibility is required' })} className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400">
+                <option value="private">Private - Only you and invited members</option>
+                <option value="team">Team - All team members can access</option>
+                <option value="organization">Organization - All organization members can view</option>
+                <option value="public">Public - Anyone can view (if enabled)</option>
+              </select>
+              {errors.visibility && (
+                <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.visibility.message}</p>
+              )}
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="space-y-1">
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Private:</strong> Only project members can access</p>
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Team:</strong> All team members can participate</p>
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Organization:</strong> All organization members can view</p>
+                  <p>• <strong className="text-gray-700 dark:text-gray-300">Public:</strong> Anyone with the link can view</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={handleCloseEditModal}
+              className="btn-outline btn-md border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={creating}
+              className="btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creating ? 'Updating...' : 'Update Project'}
             </button>
           </div>
         </form>

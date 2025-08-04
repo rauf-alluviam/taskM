@@ -371,6 +371,7 @@ const Tasks: React.FC = () => {
             <p className="text-xs text-gray-500 mt-1">
               Assign this task to team members who will be responsible for completing it.
             </p>
+            
           </div>
 
           <div className="grid grid-cols-2 gap-4">

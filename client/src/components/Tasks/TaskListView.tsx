@@ -65,7 +65,6 @@ const TaskListView: React.FC<TaskListViewProps> = ({
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'title' | 'priority' | 'status' | 'dueDate'>('title');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [showDropdown, setShowDropdown] = useState<string | null>(null);
   const { theme } = useTheme();
   const darkMode = theme === 'dark';
 
@@ -219,7 +218,6 @@ const TaskListView: React.FC<TaskListViewProps> = ({
   };
 
   const handleDropdownAction = (task: Task, action: 'edit' | 'delete') => {
-    setShowDropdown(null);
     if (action === 'edit') {
       onEditTask?.(task);
     } else if (action === 'delete') {
@@ -228,15 +226,6 @@ const TaskListView: React.FC<TaskListViewProps> = ({
       }
     }
   };
-
-  React.useEffect(() => {
-    const handleClickOutside = () => {
-      setShowDropdown(null);
-    };
-    
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
 
   return (
     <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden transition-colors duration-300`}>
@@ -344,7 +333,7 @@ const TaskListView: React.FC<TaskListViewProps> = ({
             {sortedTasks.map((task) => (              
               <tr 
                 key={task._id} 
-                className={`transition-colors ${
+                className={`group transition-colors ${
                   darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
                 } ${
                   selectedTasks.includes(task._id) 
@@ -505,51 +494,37 @@ const TaskListView: React.FC<TaskListViewProps> = ({
 
                 {/* Actions */}
                 <td className="px-4 py-3">
-                  <div className="relative">
+                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setShowDropdown(showDropdown === task._id ? null : task._id);
+                        handleDropdownAction(task, 'edit');
                       }}
-                      className={`p-1 ${darkMode ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'} rounded transition-colors`}
+                      className={`p-1 ${darkMode ? 'text-gray-500 hover:text-blue-400 hover:bg-blue-900/20' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'} rounded transition-colors`}
+                      title="Quick Edit"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <Edit className="w-4 h-4" />
                     </button>
-                    {showDropdown === task._id && (
-                      <div className={`absolute right-0 top-8 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-md shadow-lg z-50 min-w-[120px] transition-colors duration-300`}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDropdownAction(task, 'edit');
-                          }}
-                          className={`w-full px-3 py-2 text-left text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'} flex items-center space-x-2 transition-colors`}
-                        >
-                          <Edit className="w-3 h-3" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowDropdown(null);
-                            // navigate(`/tasks/${task._id}/edit`);
-                          }}
-                          className={`w-full px-3 py-2 text-left text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'} flex items-center space-x-2 transition-colors`}
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>Full Editor</span>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDropdownAction(task, 'delete');
-                          }}
-                          className={`w-full px-3 py-2 text-left text-sm ${darkMode ? 'text-red-400 hover:bg-red-900/20' : 'text-red-600 hover:bg-red-50'} flex items-center space-x-2 transition-colors`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/tasks/${task._id}/edit`);
+                      }}
+                      className={`p-1 ${darkMode ? 'text-gray-500 hover:text-green-400 hover:bg-green-900/20' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'} rounded transition-colors`}
+                      title="Full Editor"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDropdownAction(task, 'delete');
+                      }}
+                      className={`p-1 ${darkMode ? 'text-gray-500 hover:text-red-400 hover:bg-red-900/20' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'} rounded transition-colors`}
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </td>
               </tr>

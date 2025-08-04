@@ -54,7 +54,7 @@ export interface Project {
       name: string;
       email: string;
     };
-    role: 'admin' | 'member' | 'viewer';
+    role: 'admin' | 'team_lead' | 'member' | 'viewer';
     addedAt: Date;
     addedBy: string;
   }>;

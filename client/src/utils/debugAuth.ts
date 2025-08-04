@@ -30,9 +30,7 @@ export const debugAuth = () => {
   }
   
   // Check API base URL
-  console.log('🌐 API Configuration:');
-  console.log('  Base URL:', (import.meta as any).env.VITE_APP_URL || 'http://localhost:5000/api');
-  console.log('  Socket URL:', (import.meta as any).env.VITE_SOCKET_URL || 'http://localhost:5000');
+  
   
   return {
     hasToken: !!token,

@@ -1,16 +1,20 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Flag, Tag, MoreVertical, User, Paperclip } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Flag, Tag, User, Paperclip, Edit, Trash2, ExternalLink } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
 import UserAvatarList from '../UI/UserAvatarList';
 
 interface KanbanTaskCardProps {
   task: Task;
   onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
 }
 
-const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit }) => {
+const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit, onDelete }) => {
+  const navigate = useNavigate();
+  
   const {
     attributes,
     listeners,
@@ -66,9 +70,21 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit }) => {
     }
   };
 
-  const handleActionClick = (e: React.MouseEvent) => {
+  const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     onEdit?.(task);
+  };
+
+  const handleEditPage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/tasks/${task._id}/edit`);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete "${task.title}"? This action cannot be undone.`)) {
+      onDelete?.(task);
+    }
   };
 
   return (
@@ -88,12 +104,30 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit }) => {
             {task.priority}
           </span>
         </div>
-        <button 
-          onClick={handleActionClick}
-          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-opacity cursor-pointer"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </button>
+        <div className="flex items-center space-x-1">
+          {/* Action buttons - only show on hover */}
+          <button 
+            onClick={handleEdit}
+            className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-all cursor-pointer"
+            title="Quick Edit"
+          >
+            <Edit className="w-3 h-3" />
+          </button>
+          <button 
+            onClick={handleEditPage}
+            className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-green-600 dark:text-gray-500 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-all cursor-pointer"
+            title="Full Editor"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </button>
+          <button 
+            onClick={handleDelete}
+            className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all cursor-pointer"
+            title="Delete"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       {/* Content area that triggers edit on click */}
@@ -154,7 +188,12 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onEdit }) => {
           {task.assignedUsers && task.assignedUsers.length > 0 && (
             <UserAvatarList
               users={
-                task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
+                task.assignedUsers
+                  .filter(user => typeof user === 'object' && user._id)
+                  .map(user => ({ 
+                    _id: (user as any)._id, 
+                    name: (user as any).name 
+                  })) as Array<{ _id: string; name: string; }>
               }
               maxDisplay={3}
               size="sm"

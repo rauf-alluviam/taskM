@@ -22,6 +22,8 @@ interface TaskFilters {
   assignedUser: string;
   tags: string[];
   project: string;
+  status: string;
+  dueDate: string;
 }
 
 interface Project {
@@ -59,6 +61,8 @@ const TasksPage: React.FC = () => {
     assignedUser: 'all',
     tags: [],
     project: projectIdFromUrl ? 'all' : 'all',
+    status: 'all',
+    dueDate: 'all',
   });
   const [orgUsers, setOrgUsers] = useState<any[]>([]);
   const [orgUsersLoading, setOrgUsersLoading] = useState(false);
@@ -147,7 +151,6 @@ const TasksPage: React.FC = () => {
       });
 
       socketService.onTaskUpdate((task) => {
-        console.log('📡 Received socket task update:', task);
         dispatch({ type: 'UPDATE_TASK', payload: task });
         addNotification({
           type: 'success',
@@ -169,11 +172,11 @@ const TasksPage: React.FC = () => {
 
       socketService.onColumnsUpdate((serverColumns) => {
         const clientColumns = serverColumns.map((col: any) => {
-          const columnId = col.name.toLowerCase().replace(/\s+/g, '-');
+          const columnId = col._id || col.name.toLowerCase().replace(/\s+/g, '-');
           const columnColor = col.color || getColorForColumn(columnId);
           
           return {
-            id: col._id || columnId,
+            id: columnId,
             title: col.name,
             color: columnColor
           };
@@ -200,9 +203,10 @@ const TasksPage: React.FC = () => {
       
       const clientColumns = serverColumns.map((col: any) => {
         const columnColor = col.color || getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-'));
+        const columnId = col._id || col.name.toLowerCase().replace(/\s+/g, '-');
         
         return {
-          id: col.name.toLowerCase().replace(/\s+/g, '-'),
+          id: columnId,
           title: col.name,
           color: columnColor
         };
@@ -210,7 +214,7 @@ const TasksPage: React.FC = () => {
       
       setColumns(clientColumns);
     } catch (error) {
-      console.error('Failed to load columns:', error);
+      console.error('❌ Failed to load columns:', error);
       setColumns([
         { id: 'todo', title: 'To Do', color: 'bg-slate-100' },
         { id: 'in-progress', title: 'In Progress', color: 'bg-blue-100' },
@@ -341,19 +345,22 @@ const TasksPage: React.FC = () => {
   };
 
   const handleAddColumn = async (newColumn: { id: string; title: string; color: string }) => {
+    // Check if we have a project context
+    if (!currentProjectId) {
+      addNotification({
+        type: 'error',
+        title: 'Project Required',
+        message: 'Please select a project to add custom columns. Custom columns are project-specific.',
+        duration: 5000
+      });
+      throw new Error('Project context required for column management');
+    }
+    
     try {
       setColumnsLoading(true);
       
-      if (!currentProjectId) {
-        addNotification({
-          type: 'warning',
-          title: 'No Project Selected',
-          message: 'Creating column in default view. For project-specific columns, please select a project.',
-          duration: 5000
-        });
-      }
+      const result = await kanbanAPI.addColumn(newColumn.title, newColumn.color, currentProjectId);
       
-      await kanbanAPI.addColumn(newColumn.title, newColumn.color, currentProjectId);
       await loadColumns();
       
       addNotification({
@@ -363,13 +370,16 @@ const TasksPage: React.FC = () => {
         duration: 3000
       });
     } catch (error: any) {
-      console.error('Failed to add column:', error);
+      console.error('❌ Failed to add column:', error);
+      const errorMessage = error.response?.data?.message || 'Unable to add the new column. Please try again.';
       addNotification({
         type: 'error',
         title: 'Failed to Add Column',
-        message: error.response?.data?.message || 'Unable to add the new column. Please try again.',
+        message: errorMessage,
         duration: 5000
       });
+      // Re-throw the error so ColumnManager can handle it (e.g., keep form state)
+      throw error;
     } finally {
       setColumnsLoading(false);
     }
@@ -417,6 +427,63 @@ const filteredTasks = tasks.filter(task => {
   const matchesTags = filters.tags.length === 0 || 
                      filters.tags.some(tag => task.tags?.includes(tag));
   
+  // Status filter
+  const matchesStatus = filters.status === 'all' || task.status === filters.status;
+  
+  // Due date filter
+  let matchesDueDate = true;
+  if (filters.dueDate !== 'all') {
+    const today = new Date();
+    const taskEndDate = task.endDate ? new Date(task.endDate) : null;
+    
+    switch (filters.dueDate) {
+      case 'overdue':
+        matchesDueDate = taskEndDate ? taskEndDate < today && task.status !== 'done' : false;
+        break;
+      case 'today':
+        if (taskEndDate) {
+          const isToday = taskEndDate.toDateString() === today.toDateString();
+          matchesDueDate = isToday;
+        } else {
+          matchesDueDate = false;
+        }
+        break;
+      case 'week':
+        if (taskEndDate) {
+          const oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+          matchesDueDate = taskEndDate >= today && taskEndDate <= oneWeekFromNow;
+        } else {
+          matchesDueDate = false;
+        }
+        break;
+      case 'month':
+        if (taskEndDate) {
+          const oneMonthFromNow = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+          matchesDueDate = taskEndDate >= today && taskEndDate <= oneMonthFromNow;
+        } else {
+          matchesDueDate = false;
+        }
+        break;
+      default:
+        matchesDueDate = true;
+    }
+  }
+  
+  // Assigned user filter
+  let matchesAssignedUser = true;
+  if (filters.assignedUser !== 'all') {
+    if (filters.assignedUser === 'me') {
+      // Check if current user is assigned to the task
+      matchesAssignedUser = task.assignedUsers?.some(assignedUser => {
+        const userId = typeof assignedUser === 'string' ? assignedUser : assignedUser._id;
+        return userId === user?._id;
+      }) || false;
+    } else if (filters.assignedUser === 'unassigned') {
+      // Check if task has no assigned users
+      matchesAssignedUser = !task.assignedUsers || task.assignedUsers.length === 0;
+    }
+  }
+  
   let matchesProject = true;
   if (!currentProjectId && filters.project !== 'all') {
     const taskProjectId = typeof task.projectId === 'string' 
@@ -427,10 +494,7 @@ const filteredTasks = tasks.filter(task => {
     matchesProject = true;
   }
   
-  const result = matchesSearch && matchesPriority && matchesTags && matchesProject;
-  if (!result) {
-    console.log('Filtered out task:', task, { matchesSearch, matchesPriority, matchesTags, matchesProject });
-  }
+  const result = matchesSearch && matchesPriority && matchesTags && matchesProject && matchesStatus && matchesDueDate && matchesAssignedUser;
   return result;
 });
 
@@ -458,8 +522,11 @@ const filteredTasks = tasks.filter(task => {
   const activeFiltersCount = [
     filters.search,
     filters.priority !== 'all',
+    filters.assignedUser !== 'all',
     filters.tags.length > 0,
-    filters.project !== 'all'
+    filters.project !== 'all',
+    filters.status !== 'all',
+    filters.dueDate !== 'all'
   ].filter(Boolean).length;
 
   if (loading) {
@@ -510,6 +577,7 @@ const filteredTasks = tasks.filter(task => {
       setSelectedTask={setSelectedTask}
       orgUsers={orgUsers}
       orgUsersLoading={orgUsersLoading}
+      columnsLoading={columnsLoading}
     />
   );
 };

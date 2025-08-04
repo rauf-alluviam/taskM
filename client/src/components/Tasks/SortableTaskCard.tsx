@@ -81,7 +81,7 @@ const SortableTaskCard: React.FC<SortableTaskCardProps> = ({ task, onEdit, onDel
             </button>
             
             {showDropdown && (
-              <div className="absolute right-0 top-6 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[120px]">
+              <div className="absolute right-0 top-6 bg-white border border-gray-200 rounded-md shadow-lg z-40 min-w-[120px]">
                 <button
                   onClick={handleEdit}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
@@ -137,7 +137,7 @@ const SortableTaskCard: React.FC<SortableTaskCardProps> = ({ task, onEdit, onDel
       </div>
 
       {showDropdown && (
-        <div className="absolute right-4 top-16 w-48 bg-white rounded-md shadow-lg z-10">
+        <div className="absolute right-4 top-16 w-48 bg-white rounded-md shadow-lg z-40">
           <div className="py-1">
             <button
               onClick={handleEdit}

@@ -16,7 +16,7 @@ import { Plus } from 'lucide-react';
 import { Task } from '../../contexts/TaskContext';
 import { normalizeStatus, statusToDisplayName } from '../../utils/statusMappings';
 import KanbanColumn from './KanbanColumn';
-import KanbanTaskCardCompact from './KanbanTaskCardCompact';
+import KanbanTaskCard from './KanbanTaskCard'
 import { taskAPI } from '../../services/api';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -198,7 +198,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
   };
   return (
-    <div className="h-full">
+    <div className="h-full relative z-10">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -234,13 +234,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
             </div>
           )}
         </div>
-        <DragOverlay>
-          {activeTask ? (
-            <div className="rotate-2 scale-105">
-              <KanbanTaskCardCompact task={activeTask} />
-            </div>
-          ) : null}
-        </DragOverlay>
+        
       </DndContext>
     </div>
   );

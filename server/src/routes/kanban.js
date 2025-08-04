@@ -112,13 +112,17 @@ router.put('/columns', authenticate, [
 // Add a new column to project
 router.post('/columns', authenticate, [
   body('projectId').optional().isMongoId(),
-  body('title').notEmpty().withMessage('Column title is required'),
+  body('title').notEmpty().withMessage('Column title is required')
+    .isLength({ min: 2, max: 50 }).withMessage('Column title must be between 2 and 50 characters'),
   body('color').notEmpty().withMessage('Column color is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({ 
+        message: errors.array()[0].msg,
+        errors: errors.array() 
+      });
     }
 
     const { projectId, title, color } = req.body;
@@ -135,9 +139,23 @@ router.post('/columns', authenticate, [
         return res.status(403).json({ message: 'Access denied' });
       }
 
+      // Check for duplicate column names (case insensitive)
+      const normalizedTitle = title.toLowerCase().trim();
+      const isDuplicate = project.kanbanColumns.some(col => 
+        col.name.toLowerCase() === normalizedTitle
+      );
+      
+      if (isDuplicate) {
+        return res.status(400).json({ 
+          message: 'A column with this name already exists' 
+        });
+      }
+
       // Add new column
+      const columnId = title.toLowerCase().replace(/\s+/g, '-');
       const newColumn = {
-        name: title,
+        _id: columnId,
+        name: title.trim(),
         order: project.kanbanColumns.length,
         color: color, // Store the color in the database
       };      project.kanbanColumns.push(newColumn);

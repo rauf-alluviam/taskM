@@ -135,7 +135,16 @@ router.post('/', authenticate, [
     body('name').trim().isLength({ min: 1 }).withMessage('Project name is required'),
     body('description').optional().trim(),
     body('department').trim().isLength({ min: 1 }).withMessage('Department is required'),
-    body('teamId').optional().isMongoId().withMessage('Valid team ID required'),
+    body('teamId').optional().custom((value) => {
+        // Allow empty string, null, undefined, or valid MongoDB ObjectId
+        if (!value || value === '' || value === null || value === undefined) {
+            return true;
+        }
+        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+            throw new Error('Valid team ID required');
+        }
+        return true;
+    }),
     body('visibility').optional().isIn(['private', 'team', 'organization', 'public']),
     body('kanbanColumns').optional().isArray(),
     body('members').optional().isArray().withMessage('Members must be an array of user IDs.'),
@@ -151,7 +160,7 @@ router.post('/', authenticate, [
             description,
             department,
             teamId,
-            visibility = 'team',
+            visibility,
             members: rawMembers = [],
             kanbanColumns: inputColumns,
             tags = [],
@@ -163,16 +172,31 @@ router.post('/', authenticate, [
         let organization = null;
         let projectType = 'individual';
         let team = null;
+        let defaultVisibility = 'private';
 
         if (currentUser.organization) {
             organization = currentUser.organization;
-            projectType = teamId ? 'team' : 'organization';
+            projectType = (teamId && teamId !== '') ? 'team' : 'organization';
+            defaultVisibility = (teamId && teamId !== '') ? 'team' : 'organization';
             
-            if (teamId) {
-                // teamDoc loading, validation, permissions here...
+            if (teamId && teamId !== '') {
+                // Validate team exists and user has access
+                const Team = (await import('../models/Team.js')).default;
+                const teamDoc = await Team.findById(teamId);
+                if (!teamDoc) {
+                    return res.status(404).json({ message: 'Team not found' });
+                }
+                
+                // Validate team belongs to same organization
+                if (!teamDoc.organization.equals(organization)) {
+                    return res.status(400).json({ message: 'Team must belong to the same organization' });
+                }
+                
                 team = teamId;
             }
         }
+
+        const finalVisibility = visibility || defaultVisibility;
 
         // Sanitize members array to ensure user is string id
         let projectMembers = (rawMembers || []).map(m => ({
@@ -205,7 +229,7 @@ router.post('/', authenticate, [
             department,
             organization,
             team,
-            visibility,
+            visibility: finalVisibility,
             projectType,
             createdBy: currentUser._id,
             members: projectMembers,
@@ -666,7 +690,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 // Add member to project
 router.post('/:id/members', authenticate, [
   body('userId').isMongoId().withMessage('Valid user ID is required'),
-  body('role').optional().isIn(['admin', 'member']).withMessage('Valid role is required'),
+  body('role').optional().isIn(['admin', 'team_lead', 'member']).withMessage('Valid role is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -773,7 +797,7 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
 
 // Update member role
 router.put('/:id/members/:userId/role', authenticate, [
-  body('role').isIn(['admin', 'member']).withMessage('Valid role is required'),
+  body('role').isIn(['admin', 'team_lead', 'member']).withMessage('Valid role is required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

@@ -202,11 +202,11 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   if (!task) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Edit Task">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Edit Task" size="xl">
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
         {/* Validation Errors */}
         {validationErrors.length > 0 && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 col-span-2">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor">
@@ -229,267 +229,276 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </div>
         )}
 
-        {/* Title */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Task Title *
-          </label>
-          <input
-            type="text"
-            {...register('title', { required: 'Title is required' })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                     bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-                     focus:border-blue-500 dark:focus:border-blue-400
-                     placeholder-gray-400 dark:placeholder-gray-500"
-            placeholder="Enter task title..."
-          />
-          {errors.title && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title.message}</p>
-          )}
-        </div>
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-3 gap-8">
+          {/* Left Column - Main Form Fields */}
+          <div className="col-span-2 space-y-6">
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Task Title *
+              </label>
+              <input
+                type="text"
+                {...register('title', { required: 'Title is required' })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                         focus:border-blue-500 dark:focus:border-blue-400
+                         placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Enter task title..."
+              />
+              {errors.title && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title.message}</p>
+              )}
+            </div>
 
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Description
-          </label>
-          <textarea
-            {...register('description')}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                     bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-                     focus:border-blue-500 dark:focus:border-blue-400
-                     placeholder-gray-400 dark:placeholder-gray-500 resize-vertical"
-            placeholder="Describe the task..."
-          />
-        </div>
-
-        {/* Priority and Status Row */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Flag className="w-4 h-4 inline mr-1" />
-              Priority
-            </label>
-            <select 
-              {...register('priority')} 
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-                       focus:border-blue-500 dark:focus:border-blue-400"
-            >
-              {priorityOptions.map(option => (
-                <option key={option.value} value={option.value} className="bg-white dark:bg-gray-800">
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Status
-            </label>
-            <select 
-              {...register('status')} 
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-                       focus:border-blue-500 dark:focus:border-blue-400"
-            >
-              {statusOptions.map(option => (
-                <option key={option.value} value={option.value} className="bg-white dark:bg-gray-800">
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Date Range */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Start Date
-            </label>
-            <input
-              type="date"
-              {...register('startDate')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-                       focus:border-blue-500 dark:focus:border-blue-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Due Date
-            </label>
-            <input
-              type="date"
-              {...register('endDate')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-                       focus:border-blue-500 dark:focus:border-blue-400"
-            />
-          </div>
-        </div>
-
-        {/* Assign Users - Only show if user has permission */}
-        {canAssignTasks && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <User className="w-4 h-4 inline mr-1" />
-              Assign to Users
-            </label>
-            <UserSelector
-              selectedUserIds={assignedUsers}
-              onSelectionChange={setAssignedUsers}
-              placeholder="Select users to assign this task..."
-              allowMultiple={true}
-              showAvatars={true}
-              className="w-full"
-              project={project}
-              task={task}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Assign this task to team members who will be responsible for completing it.
-            </p>
-          </div>
-        )}
-
-        {/* Show assigned users as read-only if user cannot assign */}
-        {!canAssignTasks && task.assignedUsers && task.assignedUsers.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <User className="w-4 h-4 inline mr-1" />
-              Assigned Users
-            </label>
-            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-              <UserAvatarList
-                users={
-                  task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
-                }
-                maxDisplay={5}
-                size="sm"
-                showNames={true}
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Description
+              </label>
+              <textarea
+                {...register('description')}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                         focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                         focus:border-blue-500 dark:focus:border-blue-400
+                         placeholder-gray-400 dark:placeholder-gray-500 resize-vertical"
+                placeholder="Describe the task..."
               />
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              You don't have permission to modify task assignments.
-            </p>
-          </div>
-        )}
 
-        {/* Categories/Tags */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            <Tag className="w-4 h-4 inline mr-1" />
-            Categories
-          </label>
-          
-          {/* Predefined Categories */}
-          <div className="mb-3">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick add:</p>
-            <div className="flex flex-wrap gap-2">
-              {predefinedCategories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => !tags.includes(category) && setTags([...tags, category])}
-                  disabled={tags.includes(category)}
-                  className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    tags.includes(category)
-                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-700 cursor-not-allowed opacity-50'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 hover:border-blue-200 dark:hover:border-blue-600'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Tag Input */}
-          <div className="flex gap-2 mb-3">
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
-                       focus:border-blue-500 dark:focus:border-blue-400
-                       placeholder-gray-400 dark:placeholder-gray-500"
-              placeholder="Add custom category..."
-            />
-            <button
-              type="button"
-              onClick={handleAddTag}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm
-                       bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                       hover:bg-gray-50 dark:hover:bg-gray-700
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
-                       transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Selected Tags */}
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
-                           bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 
-                           border border-blue-200 dark:border-blue-700"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTag(tag)}
-                    className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Task Info */}
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Task Information</h4>
-          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
-            <div>
-              <span className="font-medium">Created:</span> {' '}
-              {new Date(task.createdAt).toLocaleDateString()}
-            </div>
-            <div>
-              <span className="font-medium">Last Updated:</span> {' '}
-              {new Date(task.updatedAt).toLocaleDateString()}
-            </div>
-            <div>
-              <span className="font-medium">Task ID:</span> {' '}
-              <code className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-1 rounded">
-                {task._id.slice(-8)}
-              </code>
-            </div>
-            {task.assignedUsers?.length > 0 && (
+            {/* Priority and Status Row */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="font-medium">Assigned Users:</span> {task.assignedUsers.length}
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <Flag className="w-4 h-4 inline mr-1" />
+                  Priority
+                </label>
+                <select 
+                  {...register('priority')} 
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                           bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                           focus:border-blue-500 dark:focus:border-blue-400"
+                >
+                  {priorityOptions.map(option => (
+                    <option key={option.value} value={option.value} className="bg-white dark:bg-gray-800">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Status
+                </label>
+                <select 
+                  {...register('status')} 
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                           bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                           focus:border-blue-500 dark:focus:border-blue-400"
+                >
+                  {statusOptions.map(option => (
+                    <option key={option.value} value={option.value} className="bg-white dark:bg-gray-800">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Date Range */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  {...register('startDate')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                           bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                           focus:border-blue-500 dark:focus:border-blue-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  {...register('endDate')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                           bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                           focus:border-blue-500 dark:focus:border-blue-400"
+                />
+              </div>
+            </div>
+
+            {/* Assign Users - Only show if user has permission */}
+            {canAssignTasks && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <User className="w-4 h-4 inline mr-1" />
+                  Assign to Users
+                </label>
+                <UserSelector
+                  selectedUserIds={assignedUsers}
+                  onSelectionChange={setAssignedUsers}
+                  placeholder="Select users to assign this task..."
+                  allowMultiple={true}
+                  showAvatars={true}
+                  className="w-full"
+                  project={project}
+                  task={task}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Assign this task to team members who will be responsible for completing it.
+                </p>
               </div>
             )}
+
+            {/* Show assigned users as read-only if user cannot assign */}
+            {!canAssignTasks && task.assignedUsers && task.assignedUsers.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <User className="w-4 h-4 inline mr-1" />
+                  Assigned Users
+                </label>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                  <UserAvatarList
+                    users={
+                      task.assignedUsers.filter(user => typeof user === 'object' && user._id) as Array<{ _id: string; name: string; email?: string }>
+                    }
+                    maxDisplay={5}
+                    size="sm"
+                    showNames={true}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  You don't have permission to modify task assignments.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Categories and Task Info */}
+          <div className="col-span-1 space-y-6">
+            {/* Categories/Tags */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Tag className="w-4 h-4 inline mr-1" />
+                Categories
+              </label>
+              
+              {/* Predefined Categories */}
+              <div className="mb-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick add:</p>
+                <div className="flex flex-wrap gap-2">
+                  {predefinedCategories.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => !tags.includes(category) && setTags([...tags, category])}
+                      disabled={tags.includes(category)}
+                      className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        tags.includes(category)
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-700 cursor-not-allowed opacity-50'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 hover:border-blue-200 dark:hover:border-blue-600'
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Tag Input */}
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+                           bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 
+                           focus:border-blue-500 dark:focus:border-blue-400
+                           placeholder-gray-400 dark:placeholder-gray-500"
+                  placeholder="Add custom category..."
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm
+                           bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                           hover:bg-gray-50 dark:hover:bg-gray-700
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+                           transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Selected Tags */}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium 
+                               bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 
+                               border border-blue-200 dark:border-blue-700"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Task Info */}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Task Information</h4>
+              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <div>
+                  <span className="font-medium">Created:</span> {' '}
+                  {new Date(task.createdAt).toLocaleDateString()}
+                </div>
+                <div>
+                  <span className="font-medium">Last Updated:</span> {' '}
+                  {new Date(task.updatedAt).toLocaleDateString()}
+                </div>
+                <div>
+                  <span className="font-medium">Task ID:</span> {' '}
+                  <code className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-1 rounded">
+                    {task._id.slice(-8)}
+                  </code>
+                </div>
+                {task.assignedUsers?.length > 0 && (
+                  <div>
+                    <span className="font-medium">Assigned Users:</span> {task.assignedUsers.length}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -541,37 +550,42 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
         </div>
       </form>
 
-      {/* Subtask Manager - Outside of main form to avoid nested forms */}
+      {/* Subtasks and Attachments Side by Side */}
       <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
-          <List className="w-4 h-4 inline mr-1" />
-          Subtasks
-        </label>
-        <SubtaskManager parentTask={task} />
-      </div>
-
-      {/* Attachment Manager */}
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
-          <Paperclip className="w-4 h-4 inline mr-1" />
-          Attachments
-        </label>
-        {loadingAttachments ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin w-6 h-6 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading attachments...</span>
+        <div className="grid grid-cols-2 gap-8">
+          {/* Subtask Manager */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+              <List className="w-4 h-4 inline mr-1" />
+              Subtasks
+            </label>
+            <SubtaskManager parentTask={task} />
           </div>
-        ) : (
-          <AttachmentManager
-            attachedTo="task"
-            attachedToId={task._id}
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-            canUpload={true}
-            canDelete={true}
-            maxFileSize={50}
-          />
-        )}
+
+          {/* Attachment Manager */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+              <Paperclip className="w-4 h-4 inline mr-1" />
+              Attachments
+            </label>
+            {loadingAttachments ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin w-6 h-6 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full"></div>
+                <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading attachments...</span>
+              </div>
+            ) : (
+              <AttachmentManager
+                attachedTo="task"
+                attachedToId={task._id}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                canUpload={true}
+                canDelete={true}
+                maxFileSize={50}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </Modal>
   );
