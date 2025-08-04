@@ -253,7 +253,7 @@ router.post('/', authenticate, admin, async (req, res) => {
 // Update user
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, email, mobile, organization, role } = req.body;
+    const { name, email, mobile, organization, role, status } = req.body;
     const userId = req.params.id;
 
     // Fetch user to update
@@ -266,9 +266,28 @@ router.put('/:id', authenticate, async (req, res) => {
     const isSelf = req.user._id.toString() === userId;
     const isSuperAdmin = req.user.role === 'super_admin';
     const isOrgAdmin = req.user.role === 'org_admin';
-    const sameOrg = req.user.organization && user.organization && req.user.organization.toString() === user.organization.toString();
+    
+    // Debug logging for permission check
+    console.log('Permission check:', {
+      userId,
+      requestUserId: req.user._id.toString(),
+      isSelf,
+      isSuperAdmin,
+      isOrgAdmin,
+      requestUserOrg: req.user.organization,
+      targetUserOrg: user.organization,
+      requestUserRole: req.user.role
+    });
+    
+    // For organization admins, they can update users in their organization
+    // or users without an organization (individual users they might be managing)
+    const canOrgAdminUpdate = isOrgAdmin && (
+      (req.user.organization && user.organization && req.user.organization.toString() === user.organization.toString()) ||
+      (!user.organization) // Org admin can manage individual users
+    );
 
-    if (!isSelf && !isSuperAdmin && !(isOrgAdmin && sameOrg)) {
+    if (!isSelf && !isSuperAdmin && !canOrgAdminUpdate) {
+      console.log('Authorization failed for user update');
       return res.status(403).json({ message: 'Not authorized to update this user' });
     }
 
@@ -276,9 +295,11 @@ router.put('/:id', authenticate, async (req, res) => {
     if (name !== undefined) user.name = name;
     if (email !== undefined) user.email = email;
     if (mobile !== undefined) user.mobile = mobile;
-    if (organization !== undefined && (isSuperAdmin || (isOrgAdmin && sameOrg))) user.organization = organization;
+    if (organization !== undefined && (isSuperAdmin || canOrgAdminUpdate)) user.organization = organization;
     // Only super_admin or org_admin can change roles, and only within their org
-    if (role && (isSuperAdmin || (isOrgAdmin && sameOrg))) user.role = role;
+    if (role && (isSuperAdmin || canOrgAdminUpdate)) user.role = role;
+    // Only super_admin or org_admin can change status, and only within their org
+    if (status && (isSuperAdmin || canOrgAdminUpdate)) user.status = status;
 
     await user.save();
 

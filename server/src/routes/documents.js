@@ -101,7 +101,7 @@ const extractTextFromFile = (file) => {
 // Get all documents (with optional project filter)
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { projectId } = req.query;
+    const { projectId, organizationDocuments } = req.query;
 
     if (projectId) {
       // When projectId is specified, ensure user has access to that project
@@ -111,7 +111,7 @@ router.get('/', authenticate, async (req, res) => {
       }
 
       const hasProjectAccess = project.createdBy.equals(req.user._id) ||
-                              project.members.includes(req.user._id) ||
+                              project.members.some(member => member.user.equals(req.user._id)) ||
                               req.user.role === 'admin';
 
       if (!hasProjectAccess) {
@@ -125,6 +125,38 @@ router.get('/', authenticate, async (req, res) => {
         .populate('projectId', 'name')
         .sort({ updatedAt: -1 });
 
+      return res.json(documents);
+    } else if (organizationDocuments === 'true' && req.user.organization) {
+      // When organizationDocuments is true, return documents from all projects in the user's organization
+      console.log('📂 Fetching organization documents for user:', req.user._id);
+      console.log('📂 User organization:', req.user.organization);
+
+      // Find all projects in the user's organization that the user has access to
+      const accessibleProjects = await Project.find({
+        organization: req.user.organization,
+        $or: [
+          { createdBy: req.user._id },
+          { 'members.user': req.user._id },
+          // If user is org admin, they can see all org projects
+          ...(req.user.isOrganizationAdmin() ? [{ organization: req.user.organization }] : [])
+        ]
+      }).select('_id');
+
+      const projectIds = accessibleProjects.map(p => p._id);
+      console.log('📂 Accessible project IDs:', projectIds.length);
+
+      // Get documents from all accessible projects in the organization
+      const documentFilter = {
+        projectId: { $in: projectIds }
+      };
+
+      const documents = await Document.find(documentFilter)
+        .populate('createdBy', 'name email')
+        .populate('lastEditedBy', 'name email')
+        .populate('projectId', 'name')
+        .sort({ updatedAt: -1 });
+
+      console.log('📂 Found organization documents:', documents.length);
       return res.json(documents);
     } else {
       // If no projectId specified, only return personal documents (not in any project)
@@ -224,6 +256,7 @@ router.post('/', authenticate, [
   body('title').trim().isLength({ min: 1 }).withMessage('Title is required'),
   body('content').optional().trim(),
   body('projectId').optional().isMongoId(),
+  body('organizationId').optional().isMongoId(),
   body('isPublic').optional().isBoolean(),
 ], async (req, res) => {
   try {
@@ -240,6 +273,7 @@ router.post('/', authenticate, [
       title,
       content = '',
       projectId,
+      organizationId,
       isPublic = false,
     } = req.body;
 
@@ -264,11 +298,13 @@ router.post('/', authenticate, [
         title,
         content,
         projectId,
+        organizationId: project.organization, // Automatically set organization from project
         createdBy: req.user._id,
         lastEditedBy: req.user._id,
         isPublic: false, // Force project documents to be private to project members only
       });
 
+      console.log('📝 Creating project document with organization:', project.organization);
       await document.save();
       await document.populate('createdBy', 'name email');
       await document.populate('projectId', 'name');
@@ -287,9 +323,11 @@ router.post('/', authenticate, [
         content,
         createdBy: req.user._id,
         lastEditedBy: req.user._id,
+        organizationId: organizationId || null, // Allow explicit organizationId for personal docs
         isPublic: isPublic || false,
       });
 
+      console.log('📝 Creating personal document with organization:', organizationId || 'none');
       await document.save();
       await document.populate('createdBy', 'name email');
 
@@ -318,7 +356,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const { projectId } = req.body;
+    const { projectId, organizationId } = req.body;
 
     // Extract title from filename (remove extension)
     const title = req.file.originalname.replace(/\.[^/.]+$/, '');
@@ -363,6 +401,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
         title,
         content: '', // No Quill content for imported files
         projectId,
+        organizationId: project.organization, // Automatically set organization from project
         createdBy: req.user._id,
         lastEditedBy: req.user._id,
         isPublic: false,
@@ -374,6 +413,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
         s3Url: s3Result.url,
       });
 
+      console.log('📝 Creating imported project document with organization:', project.organization);
       await document.save();
       console.log('✅ Document saved:', document._id);
       
@@ -399,6 +439,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
         content: '', // No Quill content for imported files
         createdBy: req.user._id,
         lastEditedBy: req.user._id,
+        organizationId: organizationId || null, // Allow explicit organizationId for personal docs
         isPublic: false,
         isImported: true,
         originalFileName: req.file.originalname,
@@ -408,6 +449,7 @@ router.post('/import', authenticate, upload.single('file'), async (req, res) => 
         s3Url: s3Result.url,
       });
 
+      console.log('📝 Creating imported personal document with organization:', organizationId || 'none');
       await document.save();
       console.log('✅ Document saved:', document._id);
       

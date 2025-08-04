@@ -294,9 +294,11 @@ export const projectAPI = {
 };
 
 export const documentAPI = {
-  getDocuments: async (projectId?: string) => {
+  getDocuments: async (projectId?: string, organizationDocuments?: boolean) => {
     return withRetry(async () => {
-      const params = projectId ? { projectId } : {};
+      const params: any = {};
+      if (projectId) params.projectId = projectId;
+      if (organizationDocuments) params.organizationDocuments = 'true';
       const response = await api.get('/documents', { params });
       return response.data;
     });
@@ -367,6 +369,12 @@ export const kanbanAPI = {
     return withRetry(async () => {
       const params = projectId ? { projectId } : {};
       const response = await api.delete(`/kanban/columns/${columnId}`, { params });
+      return response.data;
+    });
+  },
+  updateColumn: async (columnId: string, updates: { title?: string; color?: string }, projectId?: string) => {
+    return withRetry(async () => {
+      const response = await api.put(`/kanban/columns/${columnId}`, { ...updates, projectId });
       return response.data;
     });
   },

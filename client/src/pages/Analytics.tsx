@@ -96,15 +96,32 @@ const Analytics: React.FC = () => {
       setError(null);
       try {
         const token = localStorage.getItem('token');
-        const apiBase = import.meta.env.VITE_APP_URL;
-        // Fetch general analytics (organization-specific)
+        const apiBase = (import.meta as any).env.VITE_APP_URL;
+        
+        // Fetch general analytics
         const res = await fetch(`${apiBase}/analytics`, {
           credentials: 'include',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
+        
         if (!res.ok) {
-          throw new Error('Failed to fetch analytics');
+          if (res.status === 404) {
+            // User might not have an organization - show personal analytics
+            setData({
+              totalUsers: 1, // Just the current user
+              totalProjects: 0,
+              totalTasks: 0,
+              completedTasks: 0,
+              tasksThisWeek: 0,
+              projectsThisMonth: 0,
+              completionRate: 0,
+            });
+            setError('No organization found. Showing personal analytics only.');
+            return;
+          }
+          throw new Error(`Failed to fetch analytics: ${res.status}`);
         }
+        
         const result = await res.json();
         setData({
           totalUsers: result.totalUsers || 0,
@@ -116,11 +133,12 @@ const Analytics: React.FC = () => {
           completionRate: result.completionRate || 0,
         });
 
-        // Fetch tasks analytics (organization-specific)
+        // Fetch detailed tasks analytics
         const resTasks = await fetch(`${apiBase}/analytics/tasks`, {
           credentials: 'include',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
+        
         if (resTasks.ok) {
           const taskStats = await resTasks.json();
           setTasksOverTime(
@@ -131,8 +149,12 @@ const Analytics: React.FC = () => {
           );
           setStatusDistribution(taskStats.statusDistribution || []);
           setPriorityDistribution(taskStats.priorityDistribution || []);
+        } else if (resTasks.status !== 404) {
+          console.warn('Failed to fetch detailed task analytics:', resTasks.status);
         }
+        
       } catch (err: any) {
+        console.error('Analytics fetch error:', err);
         setError(err.message || 'Failed to fetch analytics');
       } finally {
         setLoading(false);
@@ -157,11 +179,14 @@ const Analytics: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error && !error.includes('No organization found')) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
         <div className="flex items-center justify-center h-64">
-          <div className="text-red-600 dark:text-red-400 font-semibold">{error}</div>
+          <div className="text-center">
+            <div className="text-red-600 dark:text-red-400 font-semibold mb-2">Failed to load analytics</div>
+            <div className="text-gray-500 dark:text-gray-400 text-sm">{error}</div>
+          </div>
         </div>
       </div>
     );
@@ -169,32 +194,32 @@ const Analytics: React.FC = () => {
 
   const stats = [
     {
-      title: 'Total Users',
-      value: data.totalUsers,
+      title: error && error.includes('No organization found') ? 'Personal Account' : 'Total Users',
+      value: error && error.includes('No organization found') ? 'You' : data.totalUsers,
       icon: Users,
       color: 'bg-blue-500 dark:bg-blue-600',
-      change: '+12%',
+      change: error && error.includes('No organization found') ? '' : '+12%',
     },
     {
       title: 'Active Projects',
       value: data.totalProjects,
       icon: FolderOpen,
       color: 'bg-green-500 dark:bg-green-600',
-      change: '+8%',
+      change: data.totalProjects > 0 ? '+8%' : '',
     },
     {
       title: 'Total Tasks',
       value: data.totalTasks,
       icon: CheckSquare,
       color: 'bg-purple-500 dark:bg-purple-600',
-      change: '+15%',
+      change: data.totalTasks > 0 ? '+15%' : '',
     },
     {
       title: 'Completion Rate',
       value: `${completionRate}%`,
       icon: TrendingUp,
       color: 'bg-orange-500 dark:bg-orange-600',
-      change: '+5%',
+      change: data.totalTasks > 0 ? '+5%' : '',
     },
   ];
 
@@ -221,7 +246,17 @@ const Analytics: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Analytics</h1>
-              <p className="text-gray-600 dark:text-gray-400">Overview of your team's performance and progress</p>
+              <p className="text-gray-600 dark:text-gray-400">
+                {error && error.includes('No organization found') 
+                  ? 'Personal analytics - join an organization to see team metrics'
+                  : 'Overview of your team\'s performance and progress'
+                }
+              </p>
+              {error && error.includes('No organization found') && (
+                <div className="mt-2 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-md text-sm">
+                  Note: Limited analytics available without organization membership
+                </div>
+              )}
             </div>
             <button
               onClick={toggleTheme}
@@ -250,8 +285,14 @@ const Analytics: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <span className="text-sm text-green-600 dark:text-green-400 font-medium">{stat.change}</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">from last month</span>
+                  {stat.change ? (
+                    <>
+                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">{stat.change}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">from last month</span>
+                    </>
+                  ) : (
+                    <span className="text-sm text-gray-500 dark:text-gray-400">No trend data available</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -273,8 +314,20 @@ const Analytics: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-purple-500 dark:bg-purple-400 rounded-full"></div>
-                  <span className="text-sm text-gray-600 dark:text-gray-300">Active team members: {data.totalUsers}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    {error && error.includes('No organization found') 
+                      ? 'Personal account - no team data'
+                      : `Active team members: ${data.totalUsers}`
+                    }
+                  </span>
                 </div>
+                {data.totalTasks === 0 && (
+                  <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      No tasks found. Start creating projects and tasks to see analytics here.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -403,12 +456,18 @@ const Analytics: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 transition-colors">
               <div className="flex items-center space-x-3 mb-4">
                 <Users className="w-5 h-5 text-purple-500 dark:text-purple-400" />
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Team Status</h4>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {error && error.includes('No organization found') ? 'Account Status' : 'Team Status'}
+                </h4>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">Active members</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{data.totalUsers}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    {error && error.includes('No organization found') ? 'Account type' : 'Active members'}
+                  </span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {error && error.includes('No organization found') ? 'Personal' : data.totalUsers}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600 dark:text-gray-300">Active projects</span>

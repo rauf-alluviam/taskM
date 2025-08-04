@@ -53,6 +53,7 @@ interface TasksKanbanViewProps {
   handleDeleteTask: any;
   handleAddColumn: any;
   handleRemoveColumn: any;
+  handleEditColumn?: (columnId: string, updates: { title?: string; color?: string }) => Promise<void>;
   showTaskModal: boolean;
   setShowTaskModal: (open: boolean) => void;
   handleCreateTask: any;
@@ -100,6 +101,7 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   handleDeleteTask,
   handleAddColumn,
   handleRemoveColumn,
+  handleEditColumn,
   showTaskModal,
   setShowTaskModal,
   handleCreateTask,
@@ -117,6 +119,13 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   organizationData,
   columnsLoading = false
 }) => {
+  // Debug logging to check what TasksKanbanView receives
+  console.log('🔗 TasksKanbanView: Received handleEditColumn prop:', {
+    handleEditColumn: !!handleEditColumn,
+    handleEditColumnType: typeof handleEditColumn,
+    functionLength: handleEditColumn?.toString?.().length || 0
+  });
+
   // Add selectedUserId state
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [userTasksLoading, setUserTasksLoading] = useState(false);
@@ -518,13 +527,15 @@ const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
             <div className="flex-1 overflow-hidden">
               {viewMode === 'kanban' ? (
                 <div className="h-full px-8 py-6">
-                  <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 overflow-hidden">
+                  <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700">
                     <KanbanBoard
                       tasks={getFilteredTasks()}
                       onTaskUpdate={handleTaskUpdate}
                       onAddTask={handleAddTask}
                       onEditTask={handleEditTask}
                       onDeleteTask={handleDeleteTask}
+                      onDeleteColumn={handleRemoveColumn}
+                      onEditColumn={handleEditColumn}
                       columns={columns}
                       onManageColumns={currentProjectId ? () => setShowColumnManager(true) : undefined}
                     />

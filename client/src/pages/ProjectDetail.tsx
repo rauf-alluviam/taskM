@@ -556,10 +556,7 @@ const ProjectDetail: React.FC = () => {
                 <span className="hidden sm:inline">Documents</span>
               </Link>
               
-              <button className="group px-4 py-2.5 bg-white/80 backdrop-blur-sm text-slate-700 rounded-xl font-medium border-2 border-slate-200 transition-all duration-300 hover:bg-gradient-to-r hover:from-purple-500 hover:to-pink-600 hover:text-white hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/25 transform hover:scale-105 hover:-translate-y-0.5 dark:bg-slate-700/80 dark:text-slate-200 dark:border-slate-600">
-                <Settings className="w-4 h-4 mr-2 inline" />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
+            
             </div>
           </div>
         </div>
@@ -598,6 +595,7 @@ const ProjectDetail: React.FC = () => {
             onAddTask={handleAddTask}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
+            onDeleteColumn={handleRemoveColumn}
             columns={project.kanbanColumns?.map(col => ({ id: col.name, title: col.name, color: col.color || getColorForColumn(col.name.toLowerCase().replace(/\s+/g, '-')) })) || []}
             onManageColumns={() => setShowColumnManager(true)}
           />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Plus, Check, AlertTriangle, Trash2 } from 'lucide-react';
 import Modal from '../UI/Modal';
 
@@ -29,6 +29,7 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
   const [selectedColor, setSelectedColor] = useState('bg-gray-100');
   const [validationError, setValidationError] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
     isOpen: false,
     columnId: '',
@@ -48,9 +49,38 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
 
   const defaultColumns = ['todo', 'in-progress', 'review', 'done'];
 
+  // Focus management - focus the input when modal opens and after successful column addition
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      // Small delay to ensure modal is fully rendered
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // Focus input after successful column addition
+  useEffect(() => {
+    if (isOpen && !isAdding && inputRef.current && newColumnTitle === '') {
+      // Re-focus after successful addition (when form is reset)
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isAdding, newColumnTitle]);
+
   const handleAddColumn = async () => {
     // Clear previous validation errors
     setValidationError('');
+    
+    // Check maximum column limit
+    const MAX_COLUMNS = 12; // Reasonable limit for UI/UX
+    if (columns.length >= MAX_COLUMNS) {
+      setValidationError(`Maximum ${MAX_COLUMNS} columns allowed for optimal performance and user experience`);
+      return;
+    }
     
     // Validate empty title
     if (!newColumnTitle.trim()) {
@@ -95,6 +125,16 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
       setNewColumnTitle('');
       setSelectedColor('bg-gray-100');
       setValidationError('');
+      
+      // Enhanced refocus for better UX (TC_040)
+      // Focus immediately after state reset
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          // Optional: select all text if any exists
+          inputRef.current.select();
+        }
+      }, 100);
     } catch (error) {
       // Error is handled by the parent component, just keep the form state
       console.error('Failed to add column:', error);
@@ -155,7 +195,12 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
           
           {/* Current Columns */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100 mb-3">Current Columns</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Current Columns</h3>
+              <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded-full">
+                {columns.length}/12 columns
+              </span>
+            </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {columns.map((column) => (
                 <div
@@ -196,6 +241,19 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
             </h3>
             
             <div className="space-y-4">
+              {/* Column Limit Warning */}
+              {columns.length >= 10 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center">
+                    <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
+                    {columns.length >= 12 
+                      ? "Maximum column limit reached. Remove existing columns to add new ones."
+                      : `Approaching column limit (${columns.length}/12). Too many columns may affect user experience.`
+                    }
+                  </p>
+                </div>
+              )}
+              
               {/* Column Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
@@ -206,6 +264,7 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
                   value={newColumnTitle}
                   onChange={handleTitleChange}
                   onKeyPress={handleKeyPress}
+                  ref={inputRef} // Attach ref to the input
                   className={`w-full px-3 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-colors placeholder-gray-400 dark:placeholder-slate-500 ${
                     validationError 
                       ? 'border-red-300 dark:border-red-600 focus:ring-red-500 dark:focus:ring-red-400' 
@@ -257,7 +316,7 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
               {/* Add Button */}
               <button
                 onClick={handleAddColumn}
-                disabled={!newColumnTitle.trim() || isAdding || loading}
+                disabled={!newColumnTitle.trim() || isAdding || loading || columns.length >= 12}
                 className="w-full px-4 py-2.5 bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white dark:text-slate-100 font-medium rounded-lg transition-colors duration-200 flex items-center justify-center shadow-sm"
               >
                 {isAdding ? (
@@ -268,7 +327,7 @@ const ColumnManager: React.FC<ColumnManagerProps> = ({
                 ) : (
                   <>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Column
+                    {columns.length >= 12 ? 'Column Limit Reached' : 'Add Column'}
                   </>
                 )}
               </button>

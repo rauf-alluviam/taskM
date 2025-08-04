@@ -14,6 +14,10 @@ const documentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project',
   },
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -62,5 +66,6 @@ const documentSchema = new mongoose.Schema({
 // Index for better query performance
 documentSchema.index({ projectId: 1 });
 documentSchema.index({ createdBy: 1 });
+documentSchema.index({ organizationId: 1 });
 
 export default mongoose.model('Document', documentSchema);

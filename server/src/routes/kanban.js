@@ -37,7 +37,7 @@ router.get('/columns', authenticate, async (req, res) => {
 
     // Transform columns to include color property consistently
     const transformedColumns = columns.map(column => ({
-      _id: column._id,
+      _id: column._id ? column._id.toString() : column._id,
       name: column.name,
       order: column.order,
       color: column.color || getDefaultColorForColumn(column.name.toLowerCase().replace(/\s+/g, '-'))
@@ -83,8 +83,8 @@ router.put('/columns', authenticate, [
       const kanbanColumns = columns.map((col, index) => ({
         name: col.title,
         order: index,
-        color: col.color,
-        _id: col.id === col.title.toLowerCase().replace(/\s+/g, '-') ? undefined : col.id
+        color: col.color
+        // Don't manually set _id - let Mongoose handle ObjectId generation
       }));      project.kanbanColumns = kanbanColumns;
       await project.save();
 
@@ -139,6 +139,14 @@ router.post('/columns', authenticate, [
         return res.status(403).json({ message: 'Access denied' });
       }
 
+      // Check maximum column limit
+      const MAX_COLUMNS = 12;
+      if (project.kanbanColumns.length >= MAX_COLUMNS) {
+        return res.status(400).json({ 
+          message: `Maximum ${MAX_COLUMNS} columns allowed for optimal performance and user experience` 
+        });
+      }
+
       // Check for duplicate column names (case insensitive)
       const normalizedTitle = title.toLowerCase().trim();
       const isDuplicate = project.kanbanColumns.some(col => 
@@ -152,14 +160,17 @@ router.post('/columns', authenticate, [
       }
 
       // Add new column
-      const columnId = title.toLowerCase().replace(/\s+/g, '-');
       const newColumn = {
-        _id: columnId,
         name: title.trim(),
         order: project.kanbanColumns.length,
         color: color, // Store the color in the database
-      };      project.kanbanColumns.push(newColumn);
+      };
+      
+      project.kanbanColumns.push(newColumn);
       await project.save();
+
+      // Get the newly added column (Mongoose will have assigned an _id)
+      const addedColumn = project.kanbanColumns[project.kanbanColumns.length - 1];
 
       // Emit real-time event
       const io = req.app.get('io');
@@ -167,7 +178,7 @@ router.post('/columns', authenticate, [
 
       // Return the new column with client format
       const clientColumn = {
-        id: title.toLowerCase().replace(/\s+/g, '-'),
+        id: addedColumn._id.toString(), // Use the generated ObjectId as string
         title: title,
         color: color
       };
@@ -188,16 +199,26 @@ router.post('/columns', authenticate, [
   }
 });
 
-// Delete a column from project
-router.delete('/columns/:columnId', authenticate, async (req, res) => {
+// Edit/Update individual column
+router.put('/columns/:columnId', authenticate, [
+  body('projectId').optional().isMongoId(),
+  body('title').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Column title must be between 2 and 50 characters'),
+  body('color').optional().notEmpty().withMessage('Column color is required'),
+], async (req, res) => {
   try {
-    const { columnId } = req.params;
-    const { projectId } = req.query;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        message: errors.array()[0].msg,
+        errors: errors.array() 
+      });
+    }
 
-    // Prevent deletion of default columns
-    const defaultColumns = ['todo', 'in-progress', 'review', 'done'];
-    if (defaultColumns.includes(columnId)) {
-      return res.status(400).json({ message: 'Cannot delete default columns' });
+    const { columnId } = req.params;
+    const { projectId, title, color } = req.body;
+
+    if (!title && !color) {
+      return res.status(400).json({ message: 'At least one field (title or color) must be provided for update' });
     }
 
     if (projectId) {
@@ -210,10 +231,126 @@ router.delete('/columns/:columnId', authenticate, async (req, res) => {
       const canUpdate = project.createdBy.equals(req.user._id) || req.user.role === 'admin';
       if (!canUpdate) {
         return res.status(403).json({ message: 'Access denied' });
-      }      // Remove column
-      project.kanbanColumns = project.kanbanColumns.filter(
-        col => col.name.toLowerCase().replace(/\s+/g, '-') !== columnId
-      );
+      }
+
+      // Find the column to update
+      const columnIndex = project.kanbanColumns.findIndex(col => {
+        if (col._id && col._id.toString() === columnId) return true;
+        const nameBasedId = col.name.toLowerCase().replace(/\s+/g, '-');
+        return nameBasedId === columnId;
+      });
+
+      if (columnIndex === -1) {
+        return res.status(404).json({ message: 'Column not found' });
+      }
+
+      const column = project.kanbanColumns[columnIndex];
+      
+      // Prevent editing default columns names
+      const defaultColumns = ['todo', 'in-progress', 'review', 'done'];
+      const isDefaultColumn = defaultColumns.includes(column.name.toLowerCase().replace(/\s+/g, '-'));
+      
+      if (isDefaultColumn && title && title.toLowerCase().replace(/\s+/g, '-') !== column.name.toLowerCase().replace(/\s+/g, '-')) {
+        return res.status(400).json({ message: 'Cannot rename default columns (To Do, In Progress, Review, Done). Only colors can be changed.' });
+      }
+
+      // Check for duplicate names if title is being changed
+      if (title && title.trim().toLowerCase() !== column.name.toLowerCase()) {
+        const normalizedTitle = title.toLowerCase().trim();
+        const isDuplicate = project.kanbanColumns.some((col, index) => 
+          index !== columnIndex && col.name.toLowerCase() === normalizedTitle
+        );
+        
+        if (isDuplicate) {
+          return res.status(400).json({ message: 'A column with this name already exists' });
+        }
+      }
+
+      // Update the column
+      if (title) project.kanbanColumns[columnIndex].name = title.trim();
+      if (color) project.kanbanColumns[columnIndex].color = color;
+
+      await project.save();
+
+      // Emit real-time event
+      const io = req.app.get('io');
+      io.to(`project:${projectId}`).emit('columns:updated', project.kanbanColumns);
+
+      // Return updated column
+      const updatedColumn = project.kanbanColumns[columnIndex];
+      const clientColumn = {
+        id: updatedColumn._id.toString(),
+        title: updatedColumn.name,
+        color: updatedColumn.color
+      };
+
+      res.json({ 
+        message: 'Column updated successfully',
+        column: clientColumn 
+      });
+    } else {
+      // For personal columns - just return success for now
+      res.json({ 
+        message: 'Personal column updated successfully',
+        column: {
+          id: columnId,
+          title: title || 'Updated Column',
+          color: color || 'bg-gray-100'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Update column error:', error);
+    res.status(500).json({ message: 'Server error while updating column' });
+  }
+});
+
+// Delete a column from project
+router.delete('/columns/:columnId', authenticate, async (req, res) => {
+  try {
+    const { columnId } = req.params;
+    const { projectId } = req.query;
+
+    // Prevent deletion of default columns (check by name since default columns might not have ObjectIds)
+    const defaultColumnNames = ['todo', 'in-progress', 'review', 'done'];
+    
+    if (projectId) {
+      const project = await Project.findById(projectId);
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      // Check permissions
+      const canUpdate = project.createdBy.equals(req.user._id) || req.user.role === 'admin';
+      if (!canUpdate) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Find the column to check if it's a default column
+      const columnToDelete = project.kanbanColumns.find(col => {
+        if (col._id && col._id.toString() === columnId) return true;
+        const nameBasedId = col.name.toLowerCase().replace(/\s+/g, '-');
+        return nameBasedId === columnId;
+      });
+
+      if (columnToDelete && defaultColumnNames.includes(columnToDelete.name.toLowerCase().replace(/\s+/g, '-'))) {
+        return res.status(400).json({ message: 'Cannot delete default columns' });
+      }      // Remove column by ObjectId or fallback to name-based matching for legacy columns
+      const initialLength = project.kanbanColumns.length;
+      project.kanbanColumns = project.kanbanColumns.filter(col => {
+        // Try to match by ObjectId first (for new columns)
+        if (col._id && col._id.toString() === columnId) {
+          return false;
+        }
+        // Fallback to name-based matching for legacy columns
+        const nameBasedId = col.name.toLowerCase().replace(/\s+/g, '-');
+        return nameBasedId !== columnId;
+      });
+      
+      // Check if any column was actually removed
+      if (project.kanbanColumns.length === initialLength) {
+        return res.status(404).json({ message: 'Column not found' });
+      }
       
       await project.save();
 

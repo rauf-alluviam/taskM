@@ -171,6 +171,12 @@ const TasksPage: React.FC = () => {
       });
 
       socketService.onColumnsUpdate((serverColumns) => {
+        console.log('🔔 Received columns:updated Socket.IO event:', {
+          serverColumns,
+          currentProjectId,
+          columnsCount: serverColumns?.length || 0
+        });
+        
         const clientColumns = serverColumns.map((col: any) => {
           const columnId = col._id || col.name.toLowerCase().replace(/\s+/g, '-');
           const columnColor = col.color || getColorForColumn(columnId);
@@ -181,7 +187,10 @@ const TasksPage: React.FC = () => {
             color: columnColor
           };
         });
+        
+        console.log('🔄 Updating columns state with:', clientColumns);
         setColumns(clientColumns);
+        
         addNotification({
           type: 'info',
           title: 'Columns Updated',
@@ -420,6 +429,43 @@ const TasksPage: React.FC = () => {
     }
   };
 
+  const handleEditColumn = async (columnId: string, updates: { title?: string; color?: string }) => {
+    if (!currentProjectId) {
+      addNotification({
+        type: 'warning',
+        title: 'Project Required',
+        message: 'Please select a project before editing columns.',
+        duration: 5000
+      });
+      throw new Error('Project context required for column editing');
+    }
+
+    try {
+      setColumnsLoading(true);
+      await kanbanAPI.updateColumn(columnId, updates, currentProjectId);
+      await loadColumns();
+      
+      addNotification({
+        type: 'success',
+        title: 'Column Updated',
+        message: 'Column has been updated successfully.',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Failed to update column:', error);
+      const errorMessage = error.response?.data?.message || 'Unable to update the column. Please try again.';
+      addNotification({
+        type: 'error',
+        title: 'Failed to Update Column',
+        message: errorMessage,
+        duration: 5000
+      });
+      throw error;
+    } finally {
+      setColumnsLoading(false);
+    }
+  };
+
 const filteredTasks = tasks.filter(task => {
   const matchesSearch = task.title.toLowerCase().includes(filters.search.toLowerCase()) ||
                        task.description.toLowerCase().includes(filters.search.toLowerCase());
@@ -537,6 +583,13 @@ const filteredTasks = tasks.filter(task => {
     );
   }
 
+  // Debug logging to check if handleEditColumn is defined
+  console.log('🎯 TasksKanban: Passing handleEditColumn to TasksKanbanView:', {
+    handleEditColumn: !!handleEditColumn,
+    handleEditColumnType: typeof handleEditColumn,
+    functionLength: handleEditColumn?.toString?.().length || 0
+  });
+
   return (
     <TasksKanbanView
       loading={loading}
@@ -563,6 +616,7 @@ const filteredTasks = tasks.filter(task => {
       handleDeleteTask={handleDeleteTask}
       handleAddColumn={handleAddColumn}
       handleRemoveColumn={handleRemoveColumn}
+      handleEditColumn={handleEditColumn}
       showTaskModal={showTaskModal}
       setShowTaskModal={setShowTaskModal}
       handleCreateTask={handleCreateTask}

@@ -101,6 +101,7 @@
 
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
+  height: 8px; /* For horizontal scrollbars */
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
@@ -114,4 +115,33 @@
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Dark mode scrollbar */
+.dark .scrollbar-thin::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Dropdown animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown {
+  animation: slideDown 0.15s ease-out;
 }

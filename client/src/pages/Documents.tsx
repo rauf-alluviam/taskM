@@ -16,10 +16,12 @@ import {
   Image,
   FileSpreadsheet,
   Presentation,
-  Archive
+  Archive,
+  Filter
 } from 'lucide-react';
 import { documentAPI, projectAPI } from '../services/api';
 import { useNotification } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Modal from '../components/UI/Modal';
 import { useForm } from 'react-hook-form';
@@ -58,15 +60,18 @@ const Documents: React.FC = () => {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('project');
   const { addNotification } = useNotification();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [allDocuments, setAllDocuments] = useState<Document[]>([]); // Store all documents
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>(''); // Project filter state
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -127,8 +132,31 @@ const Documents: React.FC = () => {
   useEffect(() => {
     loadDocuments();
     loadProjects();
-  }, [projectId]);
+  }, []); // Only load once on mount
 
+  // Filter documents when projectId changes or documents are loaded
+  useEffect(() => {
+    if (projectId) {
+      // Show documents for the specific project (already filtered by API)
+      setDocuments(allDocuments);
+    } else if (user?.organization) {
+      // Show all organization documents (already filtered by API)
+      setDocuments(allDocuments);
+    } else {
+      // Show personal documents (already filtered by API)
+      setDocuments(allDocuments);
+    }
+  }, [projectId, allDocuments, user?.organization]);
+
+  // Watch for filter changes and trigger API calls
+  useEffect(() => {
+    console.log('🔍 Filter changed:', selectedProjectFilter, 'projectId:', projectId);
+    if (!projectId && selectedProjectFilter !== '') {
+      // Only trigger API calls when not viewing a specific project and filter is changed
+      console.log('🔄 Triggering filtered document load for:', selectedProjectFilter);
+      loadFilteredDocuments(selectedProjectFilter);
+    }
+  }, [selectedProjectFilter, projectId]);
 
   const loadProjects = async () => {
     try {
@@ -139,21 +167,106 @@ const Documents: React.FC = () => {
     }
   };
 
-
   const loadDocuments = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('Loading documents with projectId:', projectId);
-      const data = await documentAPI.getDocuments(projectId || undefined);
-      
-      const filteredData = projectId ? data : data.filter((doc: { projectId: any; }) => !doc.projectId);
-      
-      console.log('Documents received:', data.length, 'Filtered:', filteredData.length);
-      setDocuments(filteredData);
+      if (projectId) {
+        // Load documents for a specific project
+        console.log('Loading documents for project:', projectId);
+        const data = await documentAPI.getDocuments(projectId);
+        console.log('Project documents received:', data.length);
+        setAllDocuments(data);
+      } else if (user?.organization) {
+        // Load both organization documents AND personal documents
+        console.log('Loading organization and personal documents');
+        
+        // Get organization documents (project documents)
+        const orgDocsPromise = documentAPI.getDocuments(undefined, true);
+        
+        // Get personal documents (documents not in any project)
+        const personalDocsPromise = documentAPI.getDocuments();
+        
+        const [orgDocs, personalDocs] = await Promise.all([orgDocsPromise, personalDocsPromise]);
+        
+        // Combine both arrays, removing duplicates by ID
+        const allDocs = [...orgDocs];
+        personalDocs.forEach(doc => {
+          if (!allDocs.find(existing => existing._id === doc._id)) {
+            allDocs.push(doc);
+          }
+        });
+        
+        console.log('Organization documents received:', orgDocs.length);
+        console.log('Personal documents received:', personalDocs.length);
+        console.log('Total documents:', allDocs.length);
+        setAllDocuments(allDocs);
+      } else {
+        // Load personal documents (no organization)
+        console.log('Loading personal documents');
+        const data = await documentAPI.getDocuments();
+        console.log('Personal documents received:', data.length);
+        setAllDocuments(data);
+      }
     } catch (error: any) {
       console.error('Failed to load documents:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to load documents';
+      setError(errorMessage);
+      addNotification({
+        type: 'error',
+        title: 'Error Loading Documents',
+        message: errorMessage,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // New function to load documents based on filter selection
+  const loadFilteredDocuments = async (filterValue: string) => {
+    try {
+      console.log('📂 Loading filtered documents for filter:', filterValue);
+      setLoading(true);
+      setError(null);
+      
+      if (!filterValue || filterValue === '') {
+        // Load all documents (organization + personal)
+        console.log('Loading all documents');
+        if (user?.organization) {
+          const orgDocsPromise = documentAPI.getDocuments(undefined, true);
+          const personalDocsPromise = documentAPI.getDocuments();
+          const [orgDocs, personalDocs] = await Promise.all([orgDocsPromise, personalDocsPromise]);
+          const allDocs = [...orgDocs];
+          personalDocs.forEach(doc => {
+            if (!allDocs.find(existing => existing._id === doc._id)) {
+              allDocs.push(doc);
+            }
+          });
+          setAllDocuments(allDocs);
+        } else {
+          const data = await documentAPI.getDocuments();
+          setAllDocuments(data);
+        }
+      } else if (filterValue === 'all') {
+        // Load all organization documents
+        console.log('Loading all organization documents');
+        const data = await documentAPI.getDocuments(undefined, true);
+        setAllDocuments(data);
+      } else if (filterValue === 'personal') {
+        // Load only personal documents
+        console.log('Loading personal documents only');
+        const data = await documentAPI.getDocuments();
+        setAllDocuments(data);
+      } else {
+        // Load documents for specific project
+        console.log('Loading documents for project:', filterValue);
+        const data = await documentAPI.getDocuments(filterValue);
+        console.log('Project documents received:', data.length);
+        setAllDocuments(data);
+      }
+    } catch (error: any) {
+      console.error('Failed to load filtered documents:', error);
       const errorMessage = error.response?.data?.message || 'Failed to load documents';
       setError(errorMessage);
       addNotification({
@@ -178,11 +291,16 @@ const Documents: React.FC = () => {
       const finalProjectId = projectId || data.projectId;
       if (finalProjectId) {
         documentData.projectId = finalProjectId;
+        // Note: organizationId will be automatically set by backend from project
+      } else if (user?.organization) {
+        // For personal documents within an organization, pass organizationId
+        documentData.organizationId = user.organization._id;
       }
       
       console.log('Creating document with data:', documentData);
       const newDoc = await documentAPI.createDocument(documentData);
-      setDocuments([newDoc, ...documents]);
+      setAllDocuments([newDoc, ...allDocuments]); // Update allDocuments
+      setDocuments([newDoc, ...documents]); // Update filtered documents
       reset();
       setShowCreateModal(false);
       addNotification({
@@ -213,12 +331,16 @@ const Documents: React.FC = () => {
       const finalProjectId = projectId;
       if (finalProjectId) {
         formData.append('projectId', finalProjectId);
+        // Note: organizationId will be automatically set by backend from project
+      } else if (user?.organization) {
+        // For personal documents within an organization, pass organizationId
+        formData.append('organizationId', user.organization._id);
       }
-
 
       console.log('Importing document with file:', file.name);
       const newDoc = await documentAPI.importDocument(formData);
-      setDocuments([newDoc, ...documents]);
+      setAllDocuments([newDoc, ...allDocuments]); // Update allDocuments
+      setDocuments([newDoc, ...documents]); // Update filtered documents
       addNotification({
         type: 'success',
         title: 'Document Imported',
@@ -275,7 +397,8 @@ const Documents: React.FC = () => {
     setDeleting(true);
     try {
       await documentAPI.deleteDocument(documentId);
-      setDocuments(documents.filter(doc => doc._id !== documentId));
+      setAllDocuments(allDocuments.filter(doc => doc._id !== documentId)); // Update allDocuments
+      setDocuments(documents.filter(doc => doc._id !== documentId)); // Update filtered documents
       setDeleteConfirmId(null);
       addNotification({ type: 'success', title: 'Document Deleted', message: 'Document has been deleted successfully' });
     } catch (error: any) {
@@ -288,10 +411,13 @@ const Documents: React.FC = () => {
   };
 
 
-  const filteredDocuments = documents.filter(doc =>
-    doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    doc.projectName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDocuments = documents.filter(doc => {
+    // Only apply search filtering since project filtering is now handled by API calls
+    const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.projectName?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesSearch;
+  });
 
 
   if (loading) {
@@ -309,19 +435,21 @@ const Documents: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {projectId ? 'Project Documents' : 'Personal Documents'}
+            {projectId ? 'Project Documents' : user?.organization ? 'Organization Documents' : 'Personal Documents'}
           </h1>
           <p className="text-gray-600 mt-1 dark:text-gray-300">
             {projectId 
               ? 'Manage documents for this project'
-              : 'Manage your personal documents (not associated with any project)'
+              : user?.organization 
+                ? `Documents from all projects in ${user.organization.name}`
+                : 'Manage your personal documents (not associated with any project)'
             }
           </p>
-          {!projectId && (
+          {!projectId && !user?.organization && (
             <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-900/50 dark:border-blue-700">
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                💡 <strong>Tip:</strong> To view project documents, navigate to a specific project first. 
-                Project documents are only accessible to project members.
+                💡 <strong>Tip:</strong> Join an organization to collaborate on documents with your team. 
+                Project documents are shared with all project members.
               </p>
             </div>
           )}
@@ -347,7 +475,7 @@ const Documents: React.FC = () => {
             className="btn-primary btn-md"
           >
             <Plus className="w-4 h-4 mr-2" />
-            {projectId ? 'New Project Document' : 'New Personal Document'}
+            {projectId ? 'New Project Document' : user?.organization ? 'New  Document' : 'New Personal Document'}
           </button>
         </div>
       </div>
@@ -371,19 +499,49 @@ const Documents: React.FC = () => {
       )}
 
 
-      {/* Search and View Toggle */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-        <div className="relative flex-1 sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search documents..."
-            className="input pl-10 w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {/* Search, Filter, and View Toggle */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 flex-1">
+          {/* Search Bar */}
+          <div className="relative flex-1 sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search documents..."
+              className="input pl-10 w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          {/* Project Filter */}
+          {!projectId && (user?.organization || projects.length > 0) && (
+            <div className="relative sm:w-48">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+              <select
+                value={selectedProjectFilter}
+                onChange={(e) => {
+                  console.log('🔄 Filter dropdown changed to:', e.target.value);
+                  setSelectedProjectFilter(e.target.value);
+                }}
+                className="input pl-10 w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white appearance-none"
+              >
+                <option value="">All Documents</option>
+                {user?.organization && (
+                  <option value="all">All Organization</option>
+                )}
+                <option value="personal">Personal Only</option>
+                {projects.map((project) => (
+                  <option key={project._id} value={project._id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         
+        {/* View Toggle */}
         <div className="flex items-center bg-gray-100 rounded-lg p-1 dark:bg-gray-800">
           <button
             onClick={() => setViewMode('card')}
@@ -586,7 +744,9 @@ const Documents: React.FC = () => {
               ? 'Try adjusting your search terms' 
               : projectId 
                 ? 'Create your first document for this project'
-                : 'Create your first document to get started'
+                : user?.organization
+                  ? 'No documents found in your organization projects'
+                  : 'Create your first document to get started'
             }
           </p>
           {!searchTerm && (
@@ -620,7 +780,7 @@ const Documents: React.FC = () => {
               placeholder="Enter document title..."
             />
             {errors.title && (
-              <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.title.message}</p>
+              <p className="mt-1 text-sm text-error-600 dark:text-error-400">{errors.title?.message}</p>
             )}
           </div>
 
@@ -649,6 +809,14 @@ const Documents: React.FC = () => {
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-900/50 dark:border-blue-700">
               <p className="text-sm text-blue-700 dark:text-blue-300">
                 📁 This document will be created in the current project and will only be accessible to project members.
+              </p>
+            </div>
+          )}
+
+          {!projectId && user?.organization && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-md dark:bg-green-900/50 dark:border-green-700">
+              <p className="text-sm text-green-700 dark:text-green-300">
+                🏢 Choose a project to create an organization document, or leave blank for a personal document.
               </p>
             </div>
           )}
@@ -712,7 +880,7 @@ const Documents: React.FC = () => {
                 Cancel
               </button>
               <button
-                onClick={() => onDeleteDocument(deleteConfirmId)}
+                onClick={() => deleteConfirmId && onDeleteDocument(deleteConfirmId)}
                 disabled={deleting}
                 className="btn-danger btn-md"
               >

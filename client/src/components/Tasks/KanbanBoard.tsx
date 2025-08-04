@@ -26,6 +26,8 @@ interface KanbanBoardProps {
   onAddTask: (status: string) => void;
   onEditTask?: (task: Task) => void;
   onDeleteTask?: (task: Task) => void;
+  onDeleteColumn?: (columnId: string) => void;
+  onEditColumn?: (columnId: string, updates: { title?: string; color?: string }) => Promise<void>;
   columns?: Array<{ id: string; title: string; color: string }>;
   onManageColumns?: () => void;
 }
@@ -36,6 +38,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onAddTask, 
   onEditTask, 
   onDeleteTask,
+  onDeleteColumn,
+  onEditColumn,
   columns: propColumns,
   onManageColumns
 }) => {
@@ -64,7 +68,16 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     { id: 'done', title: 'Done', color: 'bg-green-100' },
   ];
 
-  const columns = propColumns || defaultColumns;  const getTasksByStatus = (status: string) => {
+  const columns = propColumns || defaultColumns;
+
+  // Debug: Log all columns being rendered
+  console.log('📋 KanbanBoard: All columns being rendered:', columns.map(col => ({
+    id: col.id,
+    title: col.title,
+    isDefault: ['todo', 'in-progress', 'review', 'done'].includes(col.id)
+  })));
+
+  const getTasksByStatus = (status: string) => {
     const tasksForStatus = tasks.filter(task => {
       // Normalize both values to kebab-case for comparison
       const normalizedTaskStatus = normalizeStatus(task.status);
@@ -206,33 +219,61 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-3 pb-3 overflow-x-auto min-h-0">
-          {columns.map((column) => (
-            <KanbanColumn
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              tasks={getTasksByStatus(column.id)}
-              color={column.color}
-              onAddTask={() => onAddTask(column.id)}
-              onEditTask={onEditTask}
-              onDeleteTask={onDeleteTask}
-            />
-          ))}
-          
-          {/* Add Column Button */}
-          {onManageColumns && (
-            <div className="flex-shrink-0 w-72">
-              <button
-                onClick={onManageColumns}
-                className="w-full h-full min-h-[200px] border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-colors duration-200 flex flex-col items-center justify-center text-gray-500 hover:text-gray-700"
-              >
-                <Plus className="w-8 h-8 mb-2" />
-                <span className="font-medium">Add Column</span>
-                <span className="text-sm text-gray-400">Create new stage</span>
-              </button>
+        {/* Scroll container with indicators */}
+        <div className="relative h-full">
+          {/* Left scroll indicator */}
+          {columns.length > 3 && (
+            <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-white via-white to-transparent dark:from-slate-800 dark:via-slate-800 pointer-events-none z-10 flex items-center justify-start pl-2">
+              <div className="w-1 h-8 bg-gray-400 dark:bg-slate-500 rounded-full opacity-70"></div>
             </div>
           )}
+          
+          {/* Right scroll indicator */}
+          {columns.length > 3 && (
+            <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white via-white to-transparent dark:from-slate-800 dark:via-slate-800 pointer-events-none z-10 flex items-center justify-end pr-2">
+              <div className="w-1 h-8 bg-gray-400 dark:bg-slate-500 rounded-full opacity-70"></div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pb-4 pr-6 overflow-x-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600 scrollbar-track-gray-100 dark:scrollbar-track-slate-800 hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-slate-500">
+            {columns.map((column) => (
+              <div key={column.id} className="flex-shrink-0">
+                <KanbanColumn
+                  id={column.id}
+                  title={column.title}
+                  tasks={getTasksByStatus(column.id)}
+                  color={column.color}
+                  onAddTask={() => onAddTask(column.id)}
+                  onEditTask={onEditTask}
+                  onDeleteTask={onDeleteTask}
+                  onRemoveColumn={onDeleteColumn}
+                  onEditColumn={(() => {
+                    console.log(`🔗 KanbanBoard: Passing onEditColumn to column "${column.title}" (${column.id}):`, {
+                      onEditColumn: !!onEditColumn,
+                      onEditColumnType: typeof onEditColumn,
+                      functionLength: onEditColumn?.toString?.().length || 0,
+                      columnIsCustom: !['todo', 'in-progress', 'review', 'done'].includes(column.id)
+                    });
+                    return onEditColumn;
+                  })()}
+                />
+              </div>
+            ))}
+            
+            {/* Add Column Button */}
+            {onManageColumns && (
+              <div className="flex-shrink-0 w-72">
+                <button
+                  onClick={onManageColumns}
+                  className="w-full h-full min-h-[200px] border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-colors duration-200 flex flex-col items-center justify-center text-gray-500 hover:text-gray-700 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:text-slate-400 dark:hover:text-slate-300"
+                >
+                  <Plus className="w-8 h-8 mb-2" />
+                  <span className="font-medium">Add Column</span>
+                  <span className="text-sm text-gray-400 dark:text-slate-500">Create new stage</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         
       </DndContext>
