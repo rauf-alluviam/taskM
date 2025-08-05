@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import { body, validationResult } from 'express-validator';
 import User from '../models/User.js';
 import { authenticate, admin } from '../middleware/auth.js';
 import { uploadToS3, getSignedUrl } from '../services/s3Service.js';
@@ -64,8 +65,32 @@ router.get('/me', authenticate, async (req, res) => {
 });
 
 // Update current user profile
-router.put('/me', authenticate, async (req, res) => {
+router.put('/me', authenticate, [
+  body('name').optional().trim().isLength({ min: 1 }).withMessage('Name cannot be empty'),
+  body('email').optional().isEmail().withMessage('Valid email is required'),
+  body('mobile').optional().trim(),
+  body('organization').optional().custom((value) => {
+    // Allow null, undefined, or valid ObjectId
+    if (value === null || value === undefined || value === '') {
+      return true;
+    }
+    // Check if it's a valid ObjectId format
+    if (typeof value === 'string' && value.match(/^[0-9a-fA-F]{24}$/)) {
+      return true;
+    }
+    throw new Error('Organization must be a valid ObjectId or null');
+  }),
+], async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        message: 'Validation failed',
+        errors: errors.array() 
+      });
+    }
+
     const { name, email, mobile, organization } = req.body;
     const userId = req.user._id;
 
@@ -74,11 +99,21 @@ router.put('/me', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update fields
+    // Update fields with proper validation
     if (name !== undefined) user.name = name;
     if (email !== undefined) user.email = email;
     if (mobile !== undefined) user.mobile = mobile;
-    if (organization !== undefined) user.organization = organization;    await user.save();
+    
+    // Handle organization field properly
+    if (organization !== undefined) {
+      if (organization === null || organization === '') {
+        user.organization = null; // Unset organization
+      } else {
+        user.organization = organization; // Should be a valid ObjectId string
+      }
+    }
+    
+    await user.save();
 
     // Remove password from response
     const userResponse = user.toObject();
@@ -103,7 +138,7 @@ router.put('/me', authenticate, async (req, res) => {
 // Get all users for member selection (simple API)
 router.get('/members-selection', authenticate, async (req, res) => {
   try {
-    console.log('Getting all users for member selection');
+   
     
     // Simple query to get all active users
     const users = await User.find(
@@ -117,7 +152,7 @@ router.get('/members-selection', authenticate, async (req, res) => {
     .sort({ name: 1 })
     .limit(100); // Reasonable limit for dropdown
 
-    console.log(`Found ${users.length} users`);
+   
 
     // Generate signed URLs for avatars
     const usersWithAvatars = await Promise.all(
@@ -200,6 +235,97 @@ router.get('/', authenticate, admin, async (req, res) => {
   }
 });
 
+// Get enhanced user details with projects and role management
+router.get('/enhanced', authenticate, async (req, res) => {
+  try {
+    let users = [];
+    const Project = (await import('../models/Project.js')).default;
+    
+    if (req.user.role === 'super_admin') {
+      users = await User.find({}, '-password')
+        .populate('organization', 'name _id')
+        .populate('teams.team', 'name _id')
+        .sort({ createdAt: -1 });
+    } else if (req.user.role === 'org_admin' && req.user.organization) {
+      users = await User.find({ organization: req.user.organization }, '-password')
+        .populate('organization', 'name _id')
+        .populate('teams.team', 'name _id')
+        .sort({ createdAt: -1 });
+    } else {
+      return res.status(403).json({ message: 'Not authorized to view user management' });
+    }
+
+    // Enhanced user data with project information
+    const enhancedUsers = await Promise.all(
+      users.map(async (user) => {
+        const userObj = user.toObject();
+        
+        // Find projects where user is involved
+        const projects = await Project.find({
+          $or: [
+            { createdBy: user._id },
+            { 'members.user': user._id }
+          ],
+          isActive: true
+        }, 'name _id createdBy members.user members.role status department')
+          .populate('createdBy', 'name _id')
+          .lean();
+
+        // Add project information with detailed roles
+        userObj.projects = projects.map(project => {
+          let role = 'member';
+          let joinedAt = null;
+          
+          if (project.createdBy._id.toString() === user._id.toString()) {
+            role = 'owner';
+          } else {
+            const member = project.members.find(m => m.user.toString() === user._id.toString());
+            if (member) {
+              role = member.role;
+              joinedAt = member.addedAt;
+            }
+          }
+          
+          return {
+            _id: project._id,
+            name: project.name,
+            role: role,
+            status: project.status,
+            department: project.department,
+            isOwner: project.createdBy._id.toString() === user._id.toString(),
+            joinedAt: joinedAt
+          };
+        });
+
+        // Add project statistics
+        userObj.projectStats = {
+          total: userObj.projects.length,
+          owned: userObj.projects.filter(p => p.isOwner).length,
+          adminOf: userObj.projects.filter(p => p.role === 'admin').length,
+          memberOf: userObj.projects.filter(p => p.role === 'member').length
+        };
+
+        // Generate signed URL for avatar if it exists
+        if (user.avatar) {
+          try {
+            userObj.avatarUrl = await getSignedUrl(user.avatar);
+          } catch (error) {
+            console.error('Error generating avatar URL:', error);
+            userObj.avatarUrl = null;
+          }
+        }
+
+        return userObj;
+      })
+    );
+
+    res.json(enhancedUsers);
+  } catch (error) {
+    console.error('Enhanced users fetch error:', error);
+    res.status(500).json({ message: 'Failed to fetch enhanced user data', error: error.message });
+  }
+});
+
 // Get user by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
@@ -251,8 +377,33 @@ router.post('/', authenticate, admin, async (req, res) => {
 });
 
 // Update user
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, [
+  body('name').trim().isLength({ min: 1 }).withMessage('Name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('role').optional().isIn(['super_admin', 'org_admin', 'team_lead', 'member', 'viewer']).withMessage('Valid role is required'),
+  body('status').optional().isIn(['active', 'inactive', 'pending', 'suspended']).withMessage('Valid status is required'),
+  body('organization').optional().custom((value) => {
+    // Allow null, undefined, or valid ObjectId
+    if (value === null || value === undefined || value === '') {
+      return true;
+    }
+    // Check if it's a valid ObjectId format
+    if (typeof value === 'string' && value.match(/^[0-9a-fA-F]{24}$/)) {
+      return true;
+    }
+    throw new Error('Organization must be a valid ObjectId or null');
+  }),
+], async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        message: 'Validation failed',
+        errors: errors.array() 
+      });
+    }
+
     const { name, email, mobile, organization, role, status } = req.body;
     const userId = req.params.id;
 
@@ -267,27 +418,31 @@ router.put('/:id', authenticate, async (req, res) => {
     const isSuperAdmin = req.user.role === 'super_admin';
     const isOrgAdmin = req.user.role === 'org_admin';
     
-    // Debug logging for permission check
-    console.log('Permission check:', {
-      userId,
-      requestUserId: req.user._id.toString(),
-      isSelf,
-      isSuperAdmin,
-      isOrgAdmin,
-      requestUserOrg: req.user.organization,
-      targetUserOrg: user.organization,
-      requestUserRole: req.user.role
-    });
+    // Handle both populated and unpopulated organization field for comparison
+    let currentUserOrg = req.user.organization;
+    let targetUserOrg = user.organization;
+    
+    // Convert to string if it's an object with _id
+    if (currentUserOrg && typeof currentUserOrg === 'object' && currentUserOrg._id) {
+      currentUserOrg = currentUserOrg._id.toString();
+    } else if (currentUserOrg) {
+      currentUserOrg = currentUserOrg.toString();
+    }
+    
+    if (targetUserOrg && typeof targetUserOrg === 'object' && targetUserOrg._id) {
+      targetUserOrg = targetUserOrg._id.toString();
+    } else if (targetUserOrg) {
+      targetUserOrg = targetUserOrg.toString();
+    }
     
     // For organization admins, they can update users in their organization
     // or users without an organization (individual users they might be managing)
     const canOrgAdminUpdate = isOrgAdmin && (
-      (req.user.organization && user.organization && req.user.organization.toString() === user.organization.toString()) ||
-      (!user.organization) // Org admin can manage individual users
+      (currentUserOrg && targetUserOrg && currentUserOrg === targetUserOrg) ||
+      (!targetUserOrg) // Org admin can manage individual users
     );
 
     if (!isSelf && !isSuperAdmin && !canOrgAdminUpdate) {
-      console.log('Authorization failed for user update');
       return res.status(403).json({ message: 'Not authorized to update this user' });
     }
 
@@ -295,7 +450,16 @@ router.put('/:id', authenticate, async (req, res) => {
     if (name !== undefined) user.name = name;
     if (email !== undefined) user.email = email;
     if (mobile !== undefined) user.mobile = mobile;
-    if (organization !== undefined && (isSuperAdmin || canOrgAdminUpdate)) user.organization = organization;
+    
+    // Handle organization field properly
+    if (organization !== undefined && (isSuperAdmin || canOrgAdminUpdate)) {
+      if (organization === null || organization === '') {
+        user.organization = null; // Unset organization
+      } else {
+        user.organization = organization; // Should be a valid ObjectId string
+      }
+    }
+    
     // Only super_admin or org_admin can change roles, and only within their org
     if (role && (isSuperAdmin || canOrgAdminUpdate)) user.role = role;
     // Only super_admin or org_admin can change status, and only within their org
@@ -420,14 +584,66 @@ router.get('/by-organization/:orgId', authenticate, async (req, res) => {
       userOrg = userOrg.toString();
     }
     // Log types and values for debugging
-    console.log('[UserOrg Debug]', {
-      orgId, orgIdType: typeof orgId, userOrg, userOrgType: typeof userOrg, role: req.user.role
-    });
+
     // if (!isSuperAdmin && !(isOrgAdmin && userOrg === orgId)) {
     //   return res.status(403).json({ message: 'Not authorized to view users for this organization' });
     // }
-    const users = await User.find({ organization: orgId }, '-password').sort({ createdAt: -1 });
-    res.json(users);
+    const users = await User.find({ organization: orgId }, '-password')
+      .populate('organization', 'name _id')
+      .populate('teams.team', 'name _id')
+      .sort({ createdAt: -1 });
+
+    // Get project information for each user
+    const Project = (await import('../models/Project.js')).default;
+    const usersWithProjects = await Promise.all(
+      users.map(async (user) => {
+        const userObj = user.toObject();
+        
+        // Find projects where user is a member or creator
+        const projects = await Project.find({
+          $or: [
+            { createdBy: user._id },
+            { 'members.user': user._id }
+          ],
+          isActive: true
+        }, 'name _id createdBy members.user members.role')
+          .populate('createdBy', 'name _id')
+          .lean();
+
+        // Add project information with roles
+        userObj.projects = projects.map(project => {
+          let role = 'member';
+          if (project.createdBy._id.toString() === user._id.toString()) {
+            role = 'owner';
+          } else {
+            const member = project.members.find(m => m.user.toString() === user._id.toString());
+            if (member) {
+              role = member.role;
+            }
+          }
+          return {
+            _id: project._id,
+            name: project.name,
+            role: role,
+            isOwner: project.createdBy._id.toString() === user._id.toString()
+          };
+        });
+
+        // Generate signed URL for avatar if it exists
+        if (user.avatar) {
+          try {
+            userObj.avatarUrl = await getSignedUrl(user.avatar);
+          } catch (error) {
+            console.error('Error generating avatar URL:', error);
+            userObj.avatarUrl = null;
+          }
+        }
+
+        return userObj;
+      })
+    );
+
+    res.json(usersWithProjects);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch users by organization', error: error.message });
   }

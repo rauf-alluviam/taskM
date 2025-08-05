@@ -163,18 +163,18 @@ io.use((socket, next) => {
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.userId || 'anonymous'}`);
+  //console.log(`User connected: ${socket.userId || 'anonymous'}`);
 
   // Join project room
   socket.on('join:project', (projectId) => {
     socket.join(`project:${projectId}`);
-    console.log(`User ${socket.userId} joined project ${projectId}`);
+    //console.log(`User ${socket.userId} joined project ${projectId}`);
   });
 
   // Leave project room
   socket.on('leave:project', (projectId) => {
     socket.leave(`project:${projectId}`);
-    console.log(`User ${socket.userId} left project ${projectId}`);
+    //console.log(`User ${socket.userId} left project ${projectId}`);
   });
 
   // Join user room for personal notifications
@@ -183,12 +183,12 @@ io.on('connection', (socket) => {
   // Join organization room for org-wide notifications
   socket.on('join:organization', (organizationId) => {
     socket.join(`organization:${organizationId}`);
-    console.log(`User ${socket.userId} joined organization ${organizationId}`);
+    //console.log(`User ${socket.userId} joined organization ${organizationId}`);
   });
 
   socket.on('leave:organization', (organizationId) => {
     socket.leave(`organization:${organizationId}`);
-    console.log(`User ${socket.userId} left organization ${organizationId}`);
+    //console.log(`User ${socket.userId} left organization ${organizationId}`);
   });
 
   // Handle real-time task status changes
@@ -202,7 +202,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.userId || 'anonymous'}`);
+    //console.log(`User disconnected: ${socket.userId || 'anonymous'}`);
   });
 });
 

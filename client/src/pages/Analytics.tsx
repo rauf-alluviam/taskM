@@ -258,17 +258,7 @@ const Analytics: React.FC = () => {
                 </div>
               )}
             </div>
-            <button
-              onClick={toggleTheme}
-              className="mt-4 sm:mt-0 p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors self-start sm:self-auto"
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDark ? (
-                <Sun className="w-5 h-5 text-yellow-500" />
-              ) : (
-                <Moon className="w-5 h-5 text-gray-600" />
-              )}
-            </button>
+      
           </div>
 
           {/* Stats Grid */}

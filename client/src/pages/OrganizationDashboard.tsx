@@ -83,6 +83,9 @@ const OrganizationDashboard: React.FC = () => {
     totalTasks: 0,
     completedTasks: 0,
     activeMembers: 0,
+    tasksThisWeek: 0,
+    projectsThisMonth: 0,
+    completionRate: 0,
   });
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -122,12 +125,10 @@ const OrganizationDashboard: React.FC = () => {
   const loadOrganizationData = async () => {
     try {
       setLoading(true);
-      const [orgData, teamsData, membersData, projectsData, tasksData] = await Promise.allSettled([
+      const [orgData, teamsData, membersData] = await Promise.allSettled([
         organizationAPI.getOrganization(user!.organization!._id),
         teamAPI.getTeams(),
         organizationAPI.getMembers(user!.organization!._id),
-        projectAPI.getProjects(),
-        taskAPI.getTasks(),
       ]);
 
       if (orgData.status === 'fulfilled') {
@@ -142,18 +143,50 @@ const OrganizationDashboard: React.FC = () => {
         setMembers(membersData.value.members);
       }
 
-      if (projectsData.status === 'fulfilled' && tasksData.status === 'fulfilled') {
-        const projects = projectsData.value;
-        const tasks = tasksData.value;
-        const completedTasks = tasks.filter((task: any) => task.status === 'done').length;
-        
+      // Fetch analytics data using the same endpoint as Analytics page
+      const token = localStorage.getItem('token');
+      const apiBase = (import.meta as any).env.VITE_APP_URL;
+      
+      const res = await fetch(`${apiBase}/analytics`, {
+        credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      
+      if (res.ok) {
+        const analyticsData = await res.json();
         setStats({
-          totalProjects: projects.length,
-          totalTasks: tasks.length,
-          completedTasks,
-          activeMembers: membersData.status === 'fulfilled' ? 
-            membersData.value.members.filter((m: any) => m.status === 'active').length : 0,
+          totalProjects: analyticsData.totalProjects || 0,
+          totalTasks: analyticsData.totalTasks || 0,
+          completedTasks: analyticsData.completedTasks || 0,
+          activeMembers: analyticsData.totalUsers || (membersData.status === 'fulfilled' ? 
+            membersData.value.members.filter((m: any) => m.status === 'active').length : 0),
+          tasksThisWeek: analyticsData.tasksThisWeek || 0,
+          projectsThisMonth: analyticsData.projectsThisMonth || 0,
+          completionRate: analyticsData.completionRate || 0,
         });
+      } else {
+        // Fallback to old method if analytics endpoint fails
+        const [projectsData, tasksData] = await Promise.allSettled([
+          projectAPI.getProjects(),
+          taskAPI.getTasks(),
+        ]);
+
+        if (projectsData.status === 'fulfilled' && tasksData.status === 'fulfilled') {
+          const projects = projectsData.value;
+          const tasks = tasksData.value;
+          const completedTasks = tasks.filter((task: any) => task.status === 'done').length;
+          
+          setStats({
+            totalProjects: projects.length,
+            totalTasks: tasks.length,
+            completedTasks,
+            activeMembers: membersData.status === 'fulfilled' ? 
+              membersData.value.members.filter((m: any) => m.status === 'active').length : 0,
+            tasksThisWeek: 0,
+            projectsThisMonth: 0,
+            completionRate: tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0,
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to load organization data:', error);
@@ -219,28 +252,28 @@ const OrganizationDashboard: React.FC = () => {
       value: stats.totalProjects,
       icon: FolderOpen,
       color: 'blue',
-      change: '+5%',
+      change: stats.projectsThisMonth > 0 ? `+${stats.projectsThisMonth} this month` : 'No new projects',
     },
     {
-      name: 'Active Tasks',
-      value: stats.totalTasks - stats.completedTasks,
+      name: 'Total Tasks',
+      value: stats.totalTasks,
       icon: CheckSquare,
       color: 'purple',
-      change: '+12%',
+      change: stats.tasksThisWeek > 0 ? `+${stats.tasksThisWeek} this week` : 'No new tasks',
     },
     {
-      name: 'Completed Tasks',
-      value: stats.completedTasks,
+      name: 'Completion Rate',
+      value: `${stats.completionRate}%`,
       icon: TrendingUp,
       color: 'green',
-      change: '+8%',
+      change: stats.completedTasks > 0 ? `${stats.completedTasks} completed` : 'No completed tasks',
     },
     {
       name: 'Team Members',
       value: stats.activeMembers,
       icon: Users,
       color: 'orange',
-      change: '+3%',
+      change: members.length > stats.activeMembers ? `${members.length - stats.activeMembers} pending` : 'All active',
     },
   ];
 
@@ -285,10 +318,7 @@ const OrganizationDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <div className="space-y-6 p-6">
-        {/* Dark Mode Toggle */}
-        
-
-        {/* Header */}
+        {/* Header with Theme Toggle */}
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700 rounded-xl p-8 text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -304,24 +334,27 @@ const OrganizationDashboard: React.FC = () => {
                 <span>{organization.projectCount} projects</span>
               </div>
             </div>
-            {canManageOrganization && (
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="bg-white dark:bg-gray-100 text-blue-600 dark:text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 dark:hover:bg-gray-200 transition-colors duration-200"
-                >
-                  <UserPlus className="w-4 h-4 mr-2 inline" />
-                  Invite Member
-                </button>
-                <Link
-                  to="/organization/settings"
-                  className="bg-blue-400 dark:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-300 dark:hover:bg-blue-400 transition-colors duration-200"
-                >
-                  <Settings className="w-4 h-4 mr-2 inline" />
-                  Settings
-                </Link>
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+             
+              {canManageOrganization && (
+                <>
+                  <button
+                    onClick={() => setShowInviteModal(true)}
+                    className="bg-white dark:bg-gray-100 text-blue-600 dark:text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 dark:hover:bg-gray-200 transition-colors duration-200"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2 inline" />
+                    Invite Member
+                  </button>
+                  <Link
+                    to="/organization/settings"
+                    className="bg-blue-400 dark:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-300 dark:hover:bg-blue-400 transition-colors duration-200"
+                  >
+                    <Settings className="w-4 h-4 mr-2 inline" />
+                    Settings
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -333,11 +366,17 @@ const OrganizationDashboard: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.name}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stat.value}</p>
-                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">{stat.change} from last month</p>
                 </div>
                 <div className={`p-3 rounded-full ${getStatCardClasses(stat.color)}`}>
                   <stat.icon className="w-6 h-6" />
                 </div>
+              </div>
+              <div className="mt-4">
+                {stat.change ? (
+                  <span className="text-sm text-gray-500 dark:text-gray-400">{stat.change}</span>
+                ) : (
+                  <span className="text-sm text-gray-500 dark:text-gray-400">No data available</span>
+                )}
               </div>
             </div>
           ))}
@@ -473,6 +512,7 @@ const OrganizationDashboard: React.FC = () => {
           </div>
         </div>
 
+      
         {/* Quick Actions */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>

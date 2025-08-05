@@ -19,17 +19,11 @@ router.get('/test', (req, res) => {
 // Test route to check attachment retrieval
 router.get('/test-attachment/:id', authenticate, async (req, res) => {
   try {
-    console.log('🧪 Testing attachment retrieval for ID:', req.params.id);
     const attachment = await Attachment.findById(req.params.id);
     if (!attachment) {
-      console.log('❌ Attachment not found');
       return res.status(404).json({ message: 'Attachment not found' });
     }
-    console.log('✅ Attachment found:', {
-      id: attachment._id,
-      name: attachment.originalName,
-      active: attachment.isActive
-    });
+   
     res.json({ 
       message: 'Attachment found',
       attachment: {
@@ -40,7 +34,6 @@ router.get('/test-attachment/:id', authenticate, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Test attachment error:', error);
     res.status(500).json({ message: 'Error testing attachment retrieval' });
   }
 });
@@ -133,20 +126,11 @@ const checkAccess = async (attachedTo, attachedToId, userId, userRole) => {
 // Upload attachment
 router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
   try {
-    console.log('📎 Attachment upload request received');
-    console.log('User:', req.user ? req.user._id : 'No user');
-    console.log('File:', req.file ? req.file.originalname : 'No file');
-    console.log('Body:', req.body);
-    console.log('AWS Config Check:', {
-      hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
-      hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
-      region: process.env.AWS_REGION,
-      bucket: process.env.AWS_S3_BUCKET
-    });
-
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
-    }    const { attachedTo, attachedToId, description } = req.body;
+    }
+
+    const { attachedTo, attachedToId, description } = req.body;
 
     if (!attachedTo || !attachedToId) {
       return res.status(400).json({ message: 'attachedTo and attachedToId are required' });
@@ -155,30 +139,24 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     // Validate attachedTo value
     if (!['task', 'document'].includes(attachedTo)) {
       return res.status(400).json({ message: 'attachedTo must be either "task" or "document"' });
-    }// Check if user has access to attach files to this resource
-    console.log('🔐 Checking access permissions...');
+    }
+
+    // Check if user has access to attach files to this resource
     const hasAccess = await checkAccess(attachedTo, attachedToId, req.user._id, req.user.role);
     if (!hasAccess) {
-      console.log('❌ Access denied for user:', req.user._id);
       return res.status(403).json({ message: 'Access denied' });
     }
-    console.log('✅ Access granted');
 
     // Generate unique S3 key
-    console.log('🔑 Generating S3 key...');
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
     const fileExtension = path.extname(req.file.originalname);
     const s3Key = `${attachedTo}s/${attachedToId}/${timestamp}-${randomString}${fileExtension}`;
-    console.log('Generated S3 key:', s3Key);
 
     // Upload to S3
-    console.log('📤 Starting S3 upload...');
     const s3Result = await uploadToS3(req.file, s3Key);
-    console.log('✅ S3 upload completed:', s3Result);
 
     // Create attachment record
-    console.log('💾 Creating attachment record...');
     const attachment = new Attachment({
       originalName: req.file.originalname,
       filename: req.file.originalname,
@@ -194,10 +172,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     });
 
     await attachment.save();
-    console.log('✅ Attachment record saved:', attachment._id);
-    
     await attachment.populate('uploadedBy', 'name email');
-    console.log('✅ Attachment populated');
 
     // Log to task history for any attachment added to a task
     if (attachedTo === 'task') {
@@ -237,7 +212,6 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
           req.user._id,
           req.user.name
         );
-        console.log('✅ Task history logged for attachment addition:', action);
       } catch (historyError) {
         console.error('❌ Failed to log task history:', historyError);
         // Don't fail the request if history logging fails
@@ -259,20 +233,12 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 // Get attachment download URL
 router.get('/download/:attachmentId', authenticate, async (req, res) => {
   try {
-    console.log('⬇️ Download URL request received for attachment:', req.params.attachmentId);
-    console.log('User:', req.user._id);
-      const attachment = await Attachment.findById(req.params.attachmentId);
+    const attachment = await Attachment.findById(req.params.attachmentId);
     if (!attachment || !attachment.isActive) {
-      console.log('❌ Attachment not found or inactive:', req.params.attachmentId);
       return res.status(404).json({ message: 'Attachment not found' });
-    }    console.log('✅ Attachment found:', {
-      id: attachment._id,
-      name: attachment.originalName,
-      s3Key: attachment.s3Key
-    });
+    }
 
     // Check access
-    console.log('🔐 Checking access permissions...');
     const hasAccess = await checkAccess(
       attachment.attachedTo, 
       attachment.attachedToId, 
@@ -280,15 +246,12 @@ router.get('/download/:attachmentId', authenticate, async (req, res) => {
       req.user.role
     );
     if (!hasAccess) {
-      console.log('❌ Access denied for user:', req.user._id);
       return res.status(403).json({ message: 'Access denied' });
     }
-    console.log('✅ Access granted');
 
     // Generate signed URL for download
-    console.log('🔗 Generating signed URL for S3 key:', attachment.s3Key);
     const signedUrl = await getSignedUrl(attachment.s3Key, 3600); // 1 hour expiry
-    console.log('✅ Signed URL generated successfully');
+
 
     res.json({
       downloadUrl: signedUrl,
@@ -305,28 +268,19 @@ router.get('/download/:attachmentId', authenticate, async (req, res) => {
 // Get attachments for a resource
 router.get('/:attachedTo/:attachedToId', authenticate, async (req, res) => {
   try {
-    console.log('📋 Get attachments request received');
-    console.log('Params:', req.params);
-    console.log('User:', req.user._id);
-    
     const { attachedTo, attachedToId } = req.params;
 
     // Validate attachedTo value
     if (!['task', 'document'].includes(attachedTo)) {
-      console.log('❌ Invalid attachedTo value:', attachedTo);
       return res.status(400).json({ message: 'attachedTo must be either "task" or "document"' });
     }
 
     // Check access
-    console.log('🔐 Checking access permissions...');
     const hasAccess = await checkAccess(attachedTo, attachedToId, req.user._id, req.user.role);
     if (!hasAccess) {
-      console.log('❌ Access denied for user:', req.user._id);
       return res.status(403).json({ message: 'Access denied' });
     }
-    console.log('✅ Access granted');
 
-    console.log('🔍 Searching for attachments...');
     const attachments = await Attachment.find({
       attachedTo,
       attachedToId,
@@ -335,11 +289,8 @@ router.get('/:attachedTo/:attachedToId', authenticate, async (req, res) => {
     .populate('uploadedBy', 'name email')
     .sort({ createdAt: -1 });
 
-    console.log('✅ Found attachments:', attachments.length);
-
     res.json(attachments);
   } catch (error) {
-    console.error('❌ Get attachments error:', error);
     res.status(500).json({ message: 'Server error while fetching attachments' });
   }
 });
@@ -411,9 +362,7 @@ router.delete('/:attachmentId', authenticate, async (req, res) => {
           req.user._id,
           req.user.name
         );
-        console.log('✅ Task history logged for attachment removal');
       } catch (historyError) {
-        console.error('❌ Failed to log task history:', historyError);
         // Don't fail the request if history logging fails
       }
     }
@@ -494,9 +443,8 @@ router.patch('/:attachmentId', authenticate, async (req, res) => {
           req.user._id,
           req.user.name
         );
-        console.log('✅ Task history logged for attachment update');
       } catch (historyError) {
-        console.error('❌ Failed to log task history:', historyError);
+        console.error('❌ Failed to log task history for attachment update:', historyError);
         // Don't fail the request if history logging fails
       }
     }

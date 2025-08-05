@@ -6,7 +6,12 @@ const router = express.Router();
 
 // Get all notifications for the authenticated user
 router.get('/', authenticate, async (req, res) => {
-  const notifications = await Notification.find({ user: req.user._id }).sort({ timestamp: -1 });
+  // Only fetch unseen notifications by default
+  // Add query parameter to get all notifications if needed: ?all=true
+  const showAll = req.query.all === 'true';
+  const filter = showAll ? { user: req.user._id } : { user: req.user._id, seen: false };
+  
+  const notifications = await Notification.find(filter).sort({ timestamp: -1 });
   res.json(notifications);
 });
 

@@ -43,11 +43,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   columns: propColumns,
   onManageColumns
 }) => {
- // console.log('🎯 KanbanBoard received tasks:', tasks.length, tasks.map(t => ({ title: t.title, status: t.status })));
-
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [dragStartStatus, setDragStartStatus] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false); // Prevent multiple simultaneous updates
+  const [isUpdating, setIsUpdating] = useState(false);
   const { addNotification } = useNotification();
 
   const sensors = useSensors(
@@ -62,10 +60,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   );
 
   const defaultColumns = [
-    { id: 'todo', title: 'To Do', color: 'bg-slate-100' },
-    { id: 'in-progress', title: 'In Progress', color: 'bg-blue-100' },
-    { id: 'review', title: 'Review', color: 'bg-yellow-100' },
-    { id: 'done', title: 'Done', color: 'bg-green-100' },
+    { id: 'todo', title: 'To Do', color: 'border-slate-200' },
+    { id: 'in-progress', title: 'In Progress', color: 'border-blue-200' },
+    { id: 'review', title: 'Review', color: 'border-yellow-200' },
+    { id: 'done', title: 'Done', color: 'border-green-200' },
   ];
 
   const columns = propColumns || defaultColumns;
@@ -84,28 +82,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       const normalizedColumnStatus = normalizeStatus(status);
       const matches = normalizedTaskStatus === normalizedColumnStatus;
       
-      // console.log('🔍 KanbanBoard filtering task for column:', {
-      //   columnStatus: status,
-      //   normalizedColumnStatus,
-      //   taskTitle: task.title,
-      //   taskStatus: task.status,
-      //   normalizedTaskStatus,
-      //   matches
-      // });
-      
       return matches;
     });
     
-    //console.log(`📋 Column "${status}" has ${tasksForStatus.length} tasks`);
     return tasksForStatus;
-  };const handleDragStart = (event: DragStartEvent) => {
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const task = tasks.find(t => t._id === active.id);
     if (task) {
       setActiveTask(task);
-      setDragStartStatus(task.status); // Store the original status at drag start
+      setDragStartStatus(task.status);
     }
   };
+
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     
@@ -139,7 +130,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       // Update immediately for responsive UI
       onTaskUpdate(activeTask._id, { status: newStatus });
     }
-  };  const handleDragEnd = (event: DragEndEvent) => {
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     
     // Reset drag state

@@ -498,6 +498,12 @@ export const userAPI = {
       return response.data;
     });
   },
+  getEnhancedUsers: async () => {
+    return withRetry(async () => {
+      const response = await api.get('/users/enhanced');
+      return response.data;
+    });
+  },
 
 };
 

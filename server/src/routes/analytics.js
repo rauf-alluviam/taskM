@@ -10,6 +10,15 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organization?._id || req.user.organization;
+    console.log('@@@@@@@@@@@@@@@@@@@@@ Main Analytics - Organization ID:', orgId);
+    console.log('@@@@@@@@@@@@@@@@@@@@@ User organization object:', req.user.organization);
+    console.log('@@@@@@@@@@@@@@@@@@@@@ User role:', req.user.role);
+    console.log('@@@@@@@@@@@@@@@@@@@@@ Full user object keys:', Object.keys(req.user));
+    console.log('@@@@@@@@@@@@@@@@@@@@@ User ID:', req.user._id);
+    
+    // Check if orgId is truthy
+    console.log('@@@@@@@@@@@@@@@@@@@@@ orgId is truthy:', !!orgId);
+    console.log('@@@@@@@@@@@@@@@@@@@@@ orgId type:', typeof orgId);
     
     let totalUsers, totalProjects, totalTasks, completedTasks, tasksThisWeek, projectsThisMonth;
 
@@ -17,33 +26,25 @@ router.get('/', authenticate, async (req, res) => {
       // Organization-specific analytics
       const orgProjects = await Project.find({ organization: orgId }).select('_id');
       const projectIds = orgProjects.map(p => p._id);
+      console.log('@@@@@@@@@@@@@@@@@@@@@ Found projects:', orgProjects.length);
+      console.log('@@@@@@@@@@@@@@@@@@@@@ Project IDs:', projectIds);
 
       const orgUsers = await User.find({ organization: orgId }).select('_id');
       const userIds = orgUsers.map(u => u._id);
+      console.log('@@@@@@@@@@@@@@@@@@@@@ Found users:', orgUsers.length);
 
       [totalUsers, totalProjects, totalTasks, completedTasks, tasksThisWeek, projectsThisMonth] = await Promise.all([
         User.countDocuments({ organization: orgId }),
         Project.countDocuments({ organization: orgId }),
         Task.countDocuments({
-          $or: [
-            { projectId: { $in: projectIds } },
-            { createdBy: { $in: userIds } },
-            { assignedUsers: { $in: userIds } }
-          ]
+          projectId: { $in: projectIds }
         }),
         Task.countDocuments({
-          $or: [
-            { projectId: { $in: projectIds }, status: 'done' },
-            { createdBy: { $in: userIds }, status: 'done' },
-            { assignedUsers: { $in: userIds }, status: 'done' }
-          ]
+          projectId: { $in: projectIds }, 
+          status: 'done'
         }),
         Task.countDocuments({
-          $or: [
-            { projectId: { $in: projectIds } },
-            { createdBy: { $in: userIds } },
-            { assignedUsers: { $in: userIds } }
-          ],
+          projectId: { $in: projectIds },
           createdAt: {
             $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
           }
@@ -55,8 +56,10 @@ router.get('/', authenticate, async (req, res) => {
           }
         })
       ]);
+    
     } else {
       // Personal analytics (for users not in an organization)
+      console.log('@@@@@@@@@@@@@@@@@@@@@ No organization found, using personal analytics');
       [totalUsers, totalProjects, totalTasks, completedTasks, tasksThisWeek, projectsThisMonth] = await Promise.all([
         Promise.resolve(1), // Just the current user
         Project.countDocuments({ createdBy: req.user._id }),
@@ -108,7 +111,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/tasks', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organization?._id || req.user.organization;
-    
+    console.log('@@@@@@@@@@@@@@@@@@@@@Organization ID:', orgId);
     let taskStats, priorityStats, tasksOverTime;
 
     if (orgId) {
@@ -121,11 +124,7 @@ router.get('/tasks', authenticate, async (req, res) => {
 
       // Create match condition for organization tasks
       const orgTasksMatch = {
-        $or: [
-          { projectId: { $in: projectIds } },
-          { createdBy: { $in: userIds } },
-          { assignedUsers: { $in: userIds } }
-        ]
+        projectId: { $in: projectIds }
       };
 
       taskStats = await Task.aggregate([

@@ -325,7 +325,7 @@ router.put('/:id', authenticate, [
     const userName = req.user.name;
     const userId = req.user._id;
     
-    console.log('🔄 Server: Updating task', req.params.id, 'with data:', updates);
+   
     
     // Log changes for each field
     for (const [field, newValue] of Object.entries(updates)) {
@@ -478,11 +478,6 @@ router.put('/:id', authenticate, [
       .populate('assignedUsers', 'name email')
       .populate('projectId', 'name');
 
-    console.log('✅ Server: Task updated successfully:', { 
-      id: updatedTask._id, 
-      title: updatedTask.title, 
-      status: updatedTask.status 
-    });
 
     // Emit real-time event
     const io = req.app.get('io');

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Save, Bell, Shield, User, Palette } from 'lucide-react';
+import { Save, Bell, Shield, User, Palette, Sun, Moon } from 'lucide-react';
 import UserProfile from '../components/UI/UserProfile';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SettingsData {
   profile: {
@@ -15,7 +16,6 @@ interface SettingsData {
     projectUpdates: boolean;
   };
   preferences: {
-    theme: 'light' | 'dark' | 'auto';
     language: string;
     timezone: string;
     dateFormat: string;
@@ -28,6 +28,7 @@ interface SettingsData {
 }
 
 const Settings: React.FC = () => {
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'preferences' | 'privacy'>('profile');
   const [settings, setSettings] = useState<SettingsData>({
     profile: {
@@ -42,7 +43,6 @@ const Settings: React.FC = () => {
       projectUpdates: true,
     },
     preferences: {
-      theme: 'light',
       language: 'en',
       timezone: 'UTC',
       dateFormat: 'MM/DD/YYYY',
@@ -163,18 +163,36 @@ const Settings: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4 dark:text-white">Preferences</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                    Theme
+                  <label className="block text-sm font-medium text-gray-700 mb-3 dark:text-gray-300">
+                    Theme Preference
                   </label>
-                  <select
-                    className="input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    value={settings.preferences.theme}
-                    onChange={(e) => updateSetting('preferences', 'theme', e.target.value)}
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">Auto</option>
-                  </select>
+                  <div className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
+                        {theme === 'light' ? (
+                          <Sun className="w-4 h-4 text-yellow-500" />
+                        ) : (
+                          <Moon className="w-4 h-4 text-blue-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {theme === 'light' ? 'Light Mode' : 'Dark Mode'}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Currently active theme
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={toggleTheme}
+                      className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-500 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                      <span>Switch to {theme === 'light' ? 'Dark' : 'Light'}</span>
+                    </button>
+                  </div>
+                  
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
