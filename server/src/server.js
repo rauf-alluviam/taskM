@@ -25,8 +25,29 @@ import teamRoutes from './routes/teams.js';
 // Import email routes
 import emailRoutes from './routes/email.js';
 import notificationRoutes from './routes/notifications.js';
+import account from './routes/accounts/accounts.js';
 
 dotenv.config();
+const app = express();
+
+// Configure CORS with specific options
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.FRONTEND_URL 
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Set proper MIME types for JavaScript modules
+app.use((req, res, next) => {
+  const jsExtensions = ['.js', '.mjs', '.ts', '.tsx', '.jsx'];
+  if (jsExtensions.some(ext => req.url.endsWith(ext))) {
+    res.type('application/javascript; charset=utf-8');
+  }
+  next();
+});
 
 // Validate critical environment variables
 const requiredEnvVars = ['JWT_SECRET', 'MONGODB_URI'];
@@ -49,7 +70,7 @@ if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'fallback-secret') {
 console.log('✅ Environment variables validated');
 console.log(`🔐 JWT Secret: ${JWT_SECRET ? 'Set' : 'Missing'} (${JWT_SECRET?.substring(0, 4)}...)`);
 
-const app = express();
+
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
@@ -123,6 +144,7 @@ app.use('/api/organizations', organizationRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/accounts', account);
 
 
 // Health check endpoint

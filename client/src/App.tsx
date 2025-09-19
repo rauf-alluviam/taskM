@@ -16,6 +16,7 @@ import Users from './pages/Users';
 import UserManagement from './pages/UserManagement';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Accounts from './pages/Accounts';
 import OrganizationDashboard from './pages/OrganizationDashboard';
 import OrganizationSettings from './pages/OrganizationSettings';
 import CreateOrganization from './pages/CreateOrganization';
@@ -72,6 +73,7 @@ function App() {
               <Route path="/users" element={<Users />} />
               <Route path="/user-management" element={<UserManagement />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/accounts" element={<Accounts />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/login" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

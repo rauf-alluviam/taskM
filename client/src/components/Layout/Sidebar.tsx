@@ -1,8 +1,19 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, FolderOpen, CheckSquare, FileText, Settings, X, Users,
-  BarChart3, Building2, UserCog, Crown, Shield
+  LayoutDashboard, 
+  FolderOpen, 
+  CheckSquare, 
+  FileText, 
+  Settings, 
+  X, 
+  Users,
+  BarChart3, 
+  Building2, 
+  UserCog, 
+  Crown, 
+  Shield, 
+  Wallet
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -15,21 +26,27 @@ interface SidebarProps {
   onCollapseToggle: () => void;
 }
 
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollapseToggle }) => {
   const { user } = useAuth();
   const { theme } = useTheme();
 
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'org_admin';
-  const hasOrganization = user?.organization;
+  const isAdmin: boolean = user?.role === 'super_admin' || user?.role === 'org_admin';
+  const hasOrganization: boolean = !!user?.organization;
 
-  const navigation = [
+  const navigation: NavigationItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Projects', href: '/projects', icon: FolderOpen },
-    { name: 'Teams', href: '/teams', icon: Users },
+    { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Documents', href: '/documents', icon: FileText },
+    { name: 'Accounts', href: '/accounts', icon: Wallet },
     ...(isAdmin ? [
-      { name: 'User Management', href: '/users', icon: UserCog },
+      { name: 'User Management', href: '/users', icon: Users },
       { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     ] : []),
     ...(user?.role === 'super_admin' ? [
@@ -67,18 +84,22 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollaps
             {!collapsed && <span className="text-xl font-bold text-gray-900 dark:text-slate-200">TaskFlow</span>}
           </div>
           <div className="flex items-center">
-             {/* <div className={`mt-4 flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
-            <ThemeToggleButton />
-          </div> */}
+            {/* <div className={`mt-4 flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
+              <ThemeToggleButton />
+            </div> */}
             <button
               onClick={onCollapseToggle}
               className={`hidden lg:inline-flex p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700`}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {collapsed ? (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
               ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" /></svg>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
+                </svg>
               )}
             </button>
             <button
@@ -91,12 +112,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollaps
         </div>
 
         <nav className={`flex-1 px-2 py-4 space-y-2 overflow-y-auto`}>
-          {navigation.map((item) => (
+          {navigation.map((item: NavigationItem) => (
             <NavLink
               key={item.name}
               to={item.href}
               onClick={onClose}
-              className={({ isActive }) => `
+              className={({ isActive }: { isActive: boolean }) => `
                 flex items-center ${collapsed ? 'justify-center' : ''} px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
                 ${isActive 
                   ? 'bg-primary-50 dark:bg-slate-700 text-primary-700 dark:text-slate-200' 
@@ -105,7 +126,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollaps
               `}
               title={collapsed ? item.name : undefined}
             >
-              {/* THIS IS THE KEY CHANGE FOR THE ICON */}
               <item.icon className={`h-5 w-5 flex-shrink-0 ${!collapsed ? 'mr-3' : ''}`} />
               {!collapsed && <span className="truncate">{item.name}</span>}
             </NavLink>
@@ -136,7 +156,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollaps
             )}
           </div>
           {/* Theme Toggle Button at the bottom of sidebar */}
-         
         </div>
       </div>
     </>
