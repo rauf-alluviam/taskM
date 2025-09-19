@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5003/api';
 const API_TIMEOUT = (import.meta as any).env.VITE_API_TIMEOUT || 10000;
 
 const api = axios.create({

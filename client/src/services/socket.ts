@@ -6,7 +6,7 @@ class SocketService {
   private maxReconnectAttempts = 5;
   private connectionTimeout: NodeJS.Timeout | null = null;
     connect(token?: string) {
-    const serverUrl = (import.meta as any).env.VITE_SOCKET_URL || 'http://localhost:5001';
+    const serverUrl = (import.meta as any).env.VITE_SOCKET_URL || 'http://localhost:5003';
     
     console.log('🔌 Attempting to connect to socket server:', serverUrl);
     console.log('🔧 Environment check:', {

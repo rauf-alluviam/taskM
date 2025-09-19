@@ -38,7 +38,7 @@ const io = new Server(server, {
   },
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5003;
 
 // Security middleware
 app.use(helmet());
