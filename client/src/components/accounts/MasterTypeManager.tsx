@@ -1,8 +1,30 @@
 // components/MasterTypeManager.tsx
 import React, { useState, useEffect, useCallback } from 'react';
+import { alpha } from '@mui/material/styles';
 import {
   Box,
+  Paper,
+  Grid,
+  Typography,
+  Avatar,
   Button,
+  Divider,
+  Fade,
+  Stack,
+  CardHeader,
+  Tooltip,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -12,29 +34,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  IconButton,
-  Typography,
-  Paper,
-  Grid,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Card,
-  CardContent,
-  CardHeader,
-  Divider,
-  Stack,
-  Avatar,
-  Tooltip,
-  Fade,
-  Slide,
   useTheme,
-  alpha
-} from '@mui/material';
+  Slide
+} from "@mui/material";
 import {
   Add,
   Delete,
@@ -52,9 +54,9 @@ import {
   Error as ErrorIcon,
   CalendarToday
 } from '@mui/icons-material';
+
 import { SelectChangeEvent } from '@mui/material/Select';
 import { CustomField, DefaultFields, MasterType, MasterEntry, MasterData } from './master.types';
-
 
 const API_BASE_URL = import.meta.env.VITE_APP_URL;
 
@@ -88,6 +90,13 @@ const MasterTypeManager: React.FC = () => {
     },
     customFields: []
   });
+
+  const PRIMARY_COLOR = "#2186eb";
+const SECONDARY_COLOR = "#3ed6cb";
+const SIDEBAR_BG = "#f6f9fd";
+const HEADER_GRADIENT = "linear-gradient(90deg, #2186eb 0%, #3ed6cb 100%)";
+const CARD_BG = "#fff";
+const ICON_BG = "#eaf3fb";
 
   const reminderOptions: ReminderOption[] = [
     { value: 'weekly', label: 'Weekly' },
@@ -465,7 +474,7 @@ const MasterTypeManager: React.FC = () => {
       p: { xs: 1, sm: 2, md: 3 }, 
       maxWidth: 1600, 
       mx: 'auto',
-      bgcolor: alpha(theme.palette.primary.main, 0.02),
+      bgcolor: SIDEBAR_BG,
       minHeight: '100vh'
     }}>
       {/* Enhanced Header */}
@@ -479,12 +488,12 @@ const MasterTypeManager: React.FC = () => {
         <Box sx={{ 
           width: 56, 
           height: 56, 
-          borderRadius: '16px', 
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+          borderRadius: '12px', 
+          background: HEADER_GRADIENT,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.3)}`
+          boxShadow: `0 8px 24px ${alpha(PRIMARY_COLOR, 0.25)}`
         }}>
           <Business sx={{ color: 'white', fontSize: 28 }} />
         </Box>
@@ -493,10 +502,9 @@ const MasterTypeManager: React.FC = () => {
             variant="h4" 
             sx={{ 
               fontWeight: 800, 
-              color: theme.palette.text.primary,
               letterSpacing: '-0.025em',
               fontSize: { xs: '1.75rem', sm: '2.125rem', md: '2.5rem' },
-              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              background: HEADER_GRADIENT,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text'
@@ -511,102 +519,152 @@ const MasterTypeManager: React.FC = () => {
       </Box>
 
       {/* Enhanced Master Type Selection */}
-      <Fade in timeout={600}>
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 3, 
-            mb: 4,
-            borderRadius: 4,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-            background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.04)} 100%)`,
-            backdropFilter: 'blur(10px)'
-          }}
-        >
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel 
-                  sx={{ 
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    color: theme.palette.primary.main
-                  }}
-                >
-                  Select Master Type
-                </InputLabel>
-                <Select
-                  value={selectedMasterType}
-                  label="Select Master Type"
-                  onChange={handleMasterTypeChange}
+  <Fade in timeout={600}>
+  <Paper
+    elevation={1}
+    sx={{
+      p: 3,
+      mb: 4,
+      borderRadius: 3,
+      border: `1px solid ${alpha('#1765D8', 0.15)}`,
+      backgroundColor: '#fff',
+      boxShadow: '0 4px 12px rgba(23, 101, 216, 0.1)',
+    }}
+  >
+    <Grid container spacing={3} alignItems="center">
+      <Grid item xs={12} md={6}>
+        <FormControl fullWidth>
+          <InputLabel
+            sx={{
+              fontSize: '1rem',
+              fontWeight: 700,
+              color: '#1765D8',
+              letterSpacing: 0.5,
+            }}
+          >
+            Select Master Type
+          </InputLabel>
+          <Select
+            value={selectedMasterType}
+            label="Select Master Type"
+            onChange={handleMasterTypeChange}
+            sx={{
+              borderRadius: 2,
+              '& .MuiOutlinedInput-root': {
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#1765D8',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#1765D8',
+                  borderWidth: 2,
+                },
+              },
+              fontSize: '1rem',
+            }}
+          >
+            {getMasterTypeOptions().map((type) => (
+              <MenuItem
+                key={type}
+                value={type}
+                sx={{
+                  fontSize: '1rem',
+                  py: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  color: '#222',
+                }}
+              >
+                <Avatar
                   sx={{
-                    borderRadius: 3,
-                    '& .MuiOutlinedInput-root': {
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: theme.palette.primary.main,
-                      }
-                    }
+                    width: 28,
+                    height: 28,
+                    bgcolor: '#1765D8',
+                    fontSize: 16,
                   }}
                 >
-                  {getMasterTypeOptions().map((type) => (
-                    <MenuItem key={type} value={type} sx={{ fontSize: '1rem', py: 1.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar sx={{ width: 24, height: 24, bgcolor: theme.palette.primary.main }}>
-                          <Business sx={{ fontSize: 14 }} />
-                        </Avatar>
-                        {type}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                  <MenuItem value="CREATE_NEW" sx={{ fontSize: '1rem', color: theme.palette.success.main, py: 1.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ width: 24, height: 24, bgcolor: theme.palette.success.main }}>
-                        <Add sx={{ fontSize: 14 }} />
-                      </Avatar>
-                      Create New Master Type
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            {selectedMasterType && selectedMasterType !== 'CREATE_NEW' && (
-              <Grid item xs={12} md={6}>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  {(() => {
-                    const stats = getMasterTypeStats(selectedMasterType);
-                    return (
-                      <>
-                        <Chip
-                          icon={<TrendingUp />}
-                          label={`${stats.total} Total`}
-                          color="primary"
-                          variant="outlined"
-                          sx={{ fontWeight: 600 }}
-                        />
-                        <Chip
-                          icon={<Schedule />}
-                          label={`${stats.upcoming} Due Soon`}
-                          color="warning"
-                          variant="outlined"
-                          sx={{ fontWeight: 600 }}
-                        />
-                        <Chip
-                          icon={<ErrorIcon />}
-                          label={`${stats.overdue} Overdue`}
-                          color="error"
-                          variant="outlined"
-                          sx={{ fontWeight: 600 }}
-                        />
-                      </>
-                    );
-                  })()}
-                </Box>
-              </Grid>
-            )}
-          </Grid>
-        </Paper>
-      </Fade>
+                  <Business fontSize="small" />
+                </Avatar>
+                {type}
+              </MenuItem>
+            ))}
+            <MenuItem
+              value="CREATE_NEW"
+              sx={{
+                fontSize: '1rem',
+                color: '#3ed6cb',
+                py: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 28,
+                  height: 28,
+                  bgcolor: '#3ed6cb',
+                  fontSize: 16,
+                }}
+              >
+                <Add fontSize="small" />
+              </Avatar>
+              Create New Master Type
+            </MenuItem>
+          </Select>
+        </FormControl>
+      </Grid>
+
+      {selectedMasterType && selectedMasterType !== 'CREATE_NEW' && (
+        <Grid item xs={12} md={6}>
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              flexWrap: 'wrap',
+              justifyContent: { xs: 'flex-start', md: 'flex-end' },
+            }}
+          >
+            {(() => {
+              const stats = getMasterTypeStats(selectedMasterType);
+              return (
+                <>
+                  <Chip
+                    icon={<TrendingUp />}
+                    label={`${stats.total} Total`}
+                    color="primary"
+                    variant="outlined"
+                    sx={{ fontWeight: 700, borderRadius: 2, fontSize: '0.9rem' }}
+                  />
+                  <Chip
+                    icon={<Schedule />}
+                    label={`${stats.upcoming} Due Soon`}
+                    color="warning"
+                    variant="outlined"
+                    sx={{
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      fontSize: '0.9rem',
+                    }}
+                  />
+                  <Chip
+                    icon={<ErrorIcon />}
+                    label={`${stats.overdue} Overdue`}
+                    color="error"
+                    variant="outlined"
+                    sx={{ fontWeight: 700, borderRadius: 2, fontSize: '0.9rem' }}
+                  />
+                </>
+              );
+            })()}
+          </Box>
+        </Grid>
+      )}
+    </Grid>
+  </Paper>
+</Fade>
+
+
 
       <Grid container spacing={3}>
         {/* Enhanced Inline Form */}
@@ -616,12 +674,12 @@ const MasterTypeManager: React.FC = () => {
               <Card 
                 elevation={0}
                 sx={{ 
-                  borderRadius: 4,
-                  border: `2px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                  background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+                  borderRadius: 2,
+                  border: `1px solid ${alpha(PRIMARY_COLOR, 0.15)}`,
+                  background: CARD_BG,
                   position: 'sticky',
                   top: 20,
-                  backdropFilter: 'blur(10px)'
+                  boxShadow: `0 4px 16px ${alpha(PRIMARY_COLOR, 0.08)}`
                 }}
               >
                 <CardHeader
@@ -964,264 +1022,252 @@ const MasterTypeManager: React.FC = () => {
 
         {/* Enhanced Entries Table */}
         {selectedMasterType && selectedMasterType !== 'CREATE_NEW' && (
-          <Grid item xs={12} lg={showInlineForm ? 7 : 12}>
-            <Card 
-              elevation={0} 
-              sx={{ 
-                borderRadius: 4,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                overflow: 'hidden',
-                background: theme.palette.background.paper
+  <Grid item xs={12} lg={showInlineForm ? 7 : 12}>
+    <Card
+      elevation={1}
+      sx={{
+        borderRadius: 4,
+        border: `1px solid ${alpha('#dee2e6', 0.6)}`,
+        overflow: 'hidden',
+        background: '#fff',
+        boxShadow: 'none',
+      }}
+    >
+      <Box
+        sx={{
+          p: 3,
+          background: 'linear-gradient(135deg, #f0f4ff 0%, #e0f0ff 100%)',
+          borderBottom: `1px solid ${alpha('#dee2e6', 0.8)}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 700,
+            color: '#222',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <Assignment color="primary" />
+          {selectedMasterType} Records
+          <Chip
+            label={filteredEntries.length}
+            color="primary"
+            size="small"
+            sx={{ fontWeight: 600, ml: 1 }}
+          />
+        </Typography>
+      </Box>
+
+      {filteredEntries.length === 0 ? (
+        <Box sx={{ p: 8, textAlign: 'center', color: '#555' }}>
+          <Avatar
+            sx={{
+              width: 80,
+              height: 80,
+              bgcolor: alpha('#1765D8', 0.1),
+              mx: 'auto',
+              mb: 3,
+            }}
+          >
+            <Business sx={{ fontSize: 40, color: '#1765D8' }} />
+          </Avatar>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#222' }}>
+            No entries found
+          </Typography>
+          <Typography
+            color="textSecondary"
+            sx={{ mb: 4, fontSize: '1.1rem', maxWidth: 480, mx: 'auto' }}
+          >
+            Start by adding your first {selectedMasterType.toLowerCase()} entry
+          </Typography>
+          {!showInlineForm && (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setShowInlineForm(true)}
+              sx={{
+                borderRadius: 3,
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 4,
+                py: 1.5,
+                backgroundColor: '#1765D8',
+                '&:hover': {
+                  backgroundColor: '#0f4baa',
+                },
               }}
             >
-              <Box sx={{ 
-                p: 3, 
-                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontWeight: 700, 
-                      color: theme.palette.text.primary,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1
+              Add First Entry
+            </Button>
+          )}
+        </Box>
+      ) : (
+        <TableContainer sx={{ maxHeight: 700 }}>
+          <Table stickyHeader>
+            <TableHead>
+              <TableRow>
+                {['Company', 'Location', 'Due Date', 'Status', 'Actions'].map((header, i) => (
+                  <TableCell
+                    key={header}
+                    sx={{
+                      fontWeight: 700,
+                      backgroundColor: i === 0 ? '#f6f8fb' : 'transparent',
+                      color: i === 0 ? '#1765D8' : '#222',
+                      borderBottom: `2px solid ${alpha('#1765D8', 0.15)}`,
+                      py: 2,
+                      width: header === 'Actions' ? 140 : 'auto',
                     }}
                   >
-                    <Assignment color="primary" />
-                    {selectedMasterType} Records
-                    <Chip 
-                      label={filteredEntries.length} 
-                      color="primary" 
-                      size="small" 
-                      sx={{ fontWeight: 600 }}
-                    />
-                  </Typography>
-                </Box>
-              </Box>
+                    {header}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredEntries.map((entry, index) => {
+                const daysUntilDue = getDaysUntilDue(entry.defaultFields.dueDate);
+                const statusColor = getStatusColor(daysUntilDue);
 
-              {filteredEntries.length === 0 ? (
-                <Box sx={{ p: 8, textAlign: 'center' }}>
-                  <Avatar
-                    sx={{ 
-                      width: 80, 
-                      height: 80, 
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      mx: 'auto',
-                      mb: 3
+                return (
+                  <TableRow
+                    key={entry._id}
+                    hover
+                    sx={{
+                      cursor: 'pointer',
+                      backgroundColor:
+                        editMode && masterData.id === entry._id
+                          ? alpha('#ffc107', 0.15)
+                          : 'inherit',
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        backgroundColor: alpha('#1765D8', 0.1),
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 10px rgba(23, 101, 216, 0.1)',
+                      },
                     }}
                   >
-                    <Business sx={{ fontSize: 40, color: theme.palette.primary.main }} />
-                  </Avatar>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: theme.palette.text.primary }}>
-                    No entries found
-                  </Typography>
-                  <Typography color="text.secondary" sx={{ mb: 4, fontSize: '1.1rem' }}>
-                    Start by adding your first {selectedMasterType.toLowerCase()} entry
-                  </Typography>
-                  {!showInlineForm && (
-                    <Button
-                      variant="contained"
-                      startIcon={<Add />}
-                      onClick={() => setShowInlineForm(true)}
-                      sx={{
-                        borderRadius: 3,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        px: 4,
-                        py: 1.5
-                      }}
-                    >
-                      Add First Entry
-                    </Button>
-                  )}
-                </Box>
-              ) : (
-                <TableContainer sx={{ maxHeight: 700 }}>
-                  <Table stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ 
-                          fontWeight: 700, 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04), 
-                          color: theme.palette.text.primary,
-                          borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                          py: 2
-                        }}>
-                          Company
-                        </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 700, 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04), 
-                          color: theme.palette.text.primary,
-                          borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.12)}`
-                        }}>
-                          Location
-                        </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 700, 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04), 
-                          color: theme.palette.text.primary,
-                          borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.12)}`
-                        }}>
-                          Due Date
-                        </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 700, 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04), 
-                          color: theme.palette.text.primary,
-                          borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.12)}`
-                        }}>
-                          Status
-                        </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 700, 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04), 
-                          color: theme.palette.text.primary,
-                          borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                          width: 140
-                        }}>
-                          Actions
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {filteredEntries.map((entry, index) => {
-                        const daysUntilDue = getDaysUntilDue(entry.defaultFields.dueDate);
-                        const statusColor = getStatusColor(daysUntilDue);
-                        
-                        return (
-                          <TableRow 
-                            key={entry._id} 
-                            hover
+                    <TableCell sx={{ py: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            bgcolor: '#1765D8',
+                            fontSize: '0.875rem',
+                            fontWeight: 700,
+                            color: '#fff',
+                          }}
+                        >
+                          {getCompanyInitials(entry.defaultFields.companyName)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#222' }}>
+                            {entry.defaultFields.companyName}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#6c757d', fontWeight: 500 }}>
+                            Entry #{index + 1}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          maxWidth: 200,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontWeight: 500,
+                          color: '#6c757d',
+                        }}
+                      >
+                        {entry.defaultFields.address || 'Not provided'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CalendarToday sx={{ fontSize: 16, color: '#6c757d' }} />
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#222' }}>
+                          {formatDate(entry.defaultFields.dueDate)}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {daysUntilDue !== null && (
+                        <Chip
+                          size="small"
+                          icon={getStatusIcon(daysUntilDue)}
+                          label={
+                            daysUntilDue < 0
+                              ? `${Math.abs(daysUntilDue)}d overdue`
+                              : `${daysUntilDue}d left`
+                          }
+                          color={statusColor}
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                            borderRadius: 2,
+                            '& .MuiChip-icon': { fontSize: 14 },
+                          }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1}>
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleViewEntry(entry)}
                             sx={{
-                              '&:hover': { 
-                                bgcolor: alpha(theme.palette.primary.main, 0.04),
-                                transform: 'translateY(-1px)',
-                                transition: 'all 0.2s ease-in-out'
+                              bgcolor: alpha('#2196f3', 0.1),
+                              color: '#2196f3',
+                              borderRadius: 2,
+                              '&:hover': {
+                                bgcolor: alpha('#2196f3', 0.2),
+                                transform: 'scale(1.1)',
                               },
-                              cursor: 'pointer',
-                              bgcolor: editMode && masterData.id === entry._id 
-                                ? alpha(theme.palette.warning.main, 0.1) 
-                                : 'inherit'
                             }}
                           >
-                            <TableCell sx={{ py: 2 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar 
-                                  sx={{ 
-                                    width: 40, 
-                                    height: 40,
-                                    bgcolor: theme.palette.primary.main,
-                                    fontSize: '0.875rem',
-                                    fontWeight: 700
-                                  }}
-                                >
-                                  {getCompanyInitials(entry.defaultFields.companyName)}
-                                </Avatar>
-                                <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
-                                    {entry.defaultFields.companyName}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                                    Entry #{index + 1}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Typography 
-                                variant="body2" 
-                                color="text.secondary" 
-                                sx={{ 
-                                  maxWidth: 200,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  fontWeight: 500
-                                }}
-                              >
-                                {entry.defaultFields.address || 'Not provided'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <CalendarToday sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {formatDate(entry.defaultFields.dueDate)}
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              {daysUntilDue !== null && (
-                                <Chip
-                                  size="small"
-                                  icon={getStatusIcon(daysUntilDue)}
-                                  label={
-                                    daysUntilDue < 0 
-                                      ? `${Math.abs(daysUntilDue)}d overdue`
-                                      : `${daysUntilDue}d left`
-                                  }
-                                  color={statusColor}
-                                  sx={{ 
-                                    fontWeight: 600, 
-                                    fontSize: '0.75rem',
-                                    borderRadius: 2,
-                                    '& .MuiChip-icon': { fontSize: 14 }
-                                  }}
-                                />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Stack direction="row" spacing={1}>
-                                <Tooltip title="View Details">
-                                  <IconButton 
-                                    size="small"
-                                    onClick={() => handleViewEntry(entry)}
-                                    sx={{ 
-                                      bgcolor: alpha(theme.palette.info.main, 0.1),
-                                      color: theme.palette.info.main,
-                                      '&:hover': { 
-                                        bgcolor: alpha(theme.palette.info.main, 0.2),
-                                        transform: 'scale(1.1)'
-                                      },
-                                      borderRadius: 2
-                                    }}
-                                  >
-                                    <Visibility fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Edit Entry">
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => handleEdit(entry)}
-                                    sx={{ 
-                                      bgcolor: alpha(theme.palette.warning.main, 0.1),
-                                      color: theme.palette.warning.main,
-                                      '&:hover': { 
-                                        bgcolor: alpha(theme.palette.warning.main, 0.2),
-                                        transform: 'scale(1.1)'
-                                      },
-                                      borderRadius: 2
-                                    }}
-                                  >
-                                    <Edit fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </Card>
-          </Grid>
-        )}
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit Entry">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEdit(entry)}
+                            sx={{
+                              bgcolor: alpha('#ffc107', 0.1),
+                              color: '#ffc107',
+                              borderRadius: 2,
+                              '&:hover': {
+                                bgcolor: alpha('#ffc107', 0.2),
+                                transform: 'scale(1.1)',
+                              },
+                            }}
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Card>
+  </Grid>
+)}
+
 
         {/* Enhanced Master Type Cards */}
         {!selectedMasterType && (
@@ -1394,56 +1440,84 @@ const MasterTypeManager: React.FC = () => {
                   
                   {/* Create New Master Type Card */}
                   <Grid item xs={12} sm={6} md={4} lg={3}>
-                    <Card 
-                      elevation={0}
-                      sx={{ 
-                        borderRadius: 4,
-                        border: `2px dashed ${alpha(theme.palette.success.main, 0.3)}`,
-                        cursor: 'pointer',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.02)} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
-                        '&:hover': {
-                          borderColor: theme.palette.success.main,
-                          bgcolor: alpha(theme.palette.success.main, 0.04),
-                          transform: 'translateY(-4px)'
-                        }
-                      }}
-                      onClick={() => {
-                        resetForm();
-                        setOpenDialog(true);
-                      }}
-                    >
-                      <CardContent sx={{ p: 4, textAlign: 'center' }}>
-                        <Avatar
-                          sx={{ 
-                            width: 64, 
-                            height: 64,
-                            bgcolor: alpha(theme.palette.success.main, 0.1),
-                            border: `2px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                            mb: 2,
-                            mx: 'auto'
-                          }}
-                        >
-                          <Add sx={{ fontSize: 32, color: theme.palette.success.main }} />
-                        </Avatar>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.primary, mb: 1 }}>
-                          Create New Master
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.875rem', mb: 3 }}>
-                          Set up a new master type with custom fields for your business needs
-                        </Typography>
-                        <Chip
-                          label="+ New Master Type"
-                          sx={{ 
-                            bgcolor: theme.palette.success.main, 
-                            color: 'white',
-                            fontSize: '0.75rem',
-                            fontWeight: 700
-                          }}
-                        />
-                      </CardContent>
-                    </Card>
-                  </Grid>
+  <Card
+    elevation={0}
+    sx={{
+      borderRadius: 4,
+      border: `2px dashed ${alpha("#1765D8", 0.3)}`, // Primary blue dashed border
+      cursor: "pointer",
+      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+      background: `linear-gradient(135deg, ${alpha("#1765D8", 0.05)} 0%, ${alpha("#3ed6cb", 0.10)} 100%)`, // Gradient blue to teal
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      p: 4,
+      height: '100%',
+      "&:hover": {
+        borderColor: "#1765D8",
+        bgcolor: alpha("#1765D8", 0.12),
+        transform: "translateY(-6px)",
+        boxShadow: "0 8px 20px rgba(23, 101, 216, 0.3)",
+      },
+    }}
+    onClick={() => {
+      resetForm();
+      setOpenDialog(true);
+    }}
+  >
+    <Avatar
+      sx={{
+        width: 72,
+        height: 72,
+        bgcolor: alpha("#3ed6cb", 0.15),
+        border: `2px solid ${alpha("#1765D8", 0.25)}`,
+        mb: 3,
+      }}
+    >
+      <Add sx={{ fontSize: 36, color: "#1765D8" }} />
+    </Avatar>
+
+    <Typography
+      variant="h6"
+      sx={{
+        fontWeight: 700,
+        color: "#1765D8",
+        mb: 1,
+        textAlign: "center",
+      }}
+    >
+      Create New Master
+    </Typography>
+
+    <Typography
+      variant="body2"
+      sx={{
+        color: "#4a5768",
+        fontSize: "0.9rem",
+        mb: 3,
+        maxWidth: 220,
+        textAlign: "center",
+      }}
+    >
+      Set up a new master type with custom fields for your business needs
+    </Typography>
+
+    <Chip
+      label="+ New Master Type"
+      sx={{
+        bgcolor: "#3ed6cb",
+        color: "#fff",
+        fontSize: "0.75rem",
+        fontWeight: 700,
+        px: 2,
+        py: 0.5,
+        borderRadius: 2,
+      }}
+    />
+  </Card>
+</Grid>
+
                 </Grid>
               )}
             </Box>
@@ -1466,10 +1540,10 @@ const MasterTypeManager: React.FC = () => {
         }}
       >
         <DialogTitle sx={{ 
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-          color: theme.palette.text.primary,
-          fontWeight: 700,
+          background: SIDEBAR_BG,
+          borderBottom: `1px solid ${alpha(PRIMARY_COLOR, 0.15)}`,
+          color: PRIMARY_COLOR,
+          fontWeight: 600,
           fontSize: '1.25rem',
           display: 'flex',
           alignItems: 'center',
@@ -1481,254 +1555,454 @@ const MasterTypeManager: React.FC = () => {
           Create New Master Type
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 3 }}>
-          <Stack spacing={3}>
-            <TextField
-              fullWidth
-              label="Master Type Name"
-              value={masterData.masterType}
-              onChange={(e) => setMasterData(prev => ({ ...prev, masterType: e.target.value }))}
-              required
-              placeholder="e.g., GST Returns, Income Tax, Compliance"
+       <DialogContent sx={{ 
+  pt: 3,
+  pb: 2,
+  px: 3,
+  backgroundColor: '#fafbfc'
+}}>
+  <Stack spacing={3}>
+    <TextField
+      fullWidth
+      label="Master Type Name"
+      value={masterData.masterType}
+      onChange={(e) => setMasterData(prev => ({ ...prev, masterType: e.target.value }))}
+      required
+      placeholder="e.g., GST Returns, Income Tax, Compliance"
+      sx={{
+        '& .MuiOutlinedInput-root': {
+          borderRadius: 2,
+          backgroundColor: '#ffffff',
+          border: '1.5px solid #e5e7eb',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            borderColor: '#6366f1',
+            backgroundColor: '#f8fafc',
+          },
+          '&.Mui-focused': {
+            borderColor: '#6366f1',
+            backgroundColor: '#ffffff',
+            boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.08)',
+          }
+        },
+        '& .MuiInputLabel-root': {
+          fontWeight: 500,
+          color: '#374151',
+          '&.Mui-focused': {
+            color: '#6366f1'
+          }
+        }
+      }}
+    />
+
+    <Box sx={{
+      backgroundColor: '#ffffff',
+      border: '1px solid #e5e7eb',
+      borderRadius: 3,
+      p: 3
+    }}>
+      <Typography 
+        variant="subtitle1" 
+        sx={{ 
+          fontWeight: 600, 
+          color: '#1f2937',
+          mb: 2.5,
+          fontSize: '0.95rem'
+        }}
+      >
+        Company Information
+      </Typography>
+      
+      <Grid container spacing={2.5}>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Company Name"
+            value={masterData.defaultFields.companyName}
+            onChange={(e) => handleDefaultFieldChange('companyName', e.target.value)}
+            required
+            size="small"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                border: '1px solid #d1d5db',
+                backgroundColor: '#ffffff',
+                '&:hover': {
+                  borderColor: '#6366f1',
+                },
+                '&.Mui-focused': {
+                  borderColor: '#6366f1',
+                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
+                }
+              },
+              '& .MuiInputLabel-root': {
+                color: '#6b7280',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }
+            }}
+          />
+        </Grid>
+        
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Address"
+            value={masterData.defaultFields.address}
+            onChange={(e) => handleDefaultFieldChange('address', e.target.value)}
+            size="small"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                border: '1px solid #d1d5db',
+                backgroundColor: '#ffffff',
+                '&:hover': {
+                  borderColor: '#6366f1',
+                },
+                '&.Mui-focused': {
+                  borderColor: '#6366f1',
+                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
+                }
+              },
+              '& .MuiInputLabel-root': {
+                color: '#6b7280',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }
+            }}
+          />
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth
+            label="Billing Date"
+            type="date"
+            value={masterData.defaultFields.billingDate}
+            onChange={(e) => handleDefaultFieldChange('billingDate', e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                border: '1px solid #d1d5db',
+                backgroundColor: '#ffffff',
+                '&:hover': {
+                  borderColor: '#6366f1',
+                },
+                '&.Mui-focused': {
+                  borderColor: '#6366f1',
+                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
+                }
+              },
+              '& .MuiInputLabel-root': {
+                color: '#6b7280',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }
+            }}
+          />
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth
+            label="Due Date"
+            type="date"
+            value={masterData.defaultFields.dueDate}
+            onChange={(e) => handleDefaultFieldChange('dueDate', e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                border: '1px solid #d1d5db',
+                backgroundColor: '#ffffff',
+                '&:hover': {
+                  borderColor: '#6366f1',
+                },
+                '&.Mui-focused': {
+                  borderColor: '#6366f1',
+                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
+                }
+              },
+              '& .MuiInputLabel-root': {
+                color: '#6b7280',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }
+            }}
+          />
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth size="small">
+            <InputLabel sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>
+              Reminder
+            </InputLabel>
+            <Select
+              value={masterData.defaultFields.reminder}
+              label="Reminder"
+              onChange={(e) => handleDefaultFieldChange('reminder', e.target.value)}
               sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 3,
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: theme.palette.primary.main,
-                  }
+                borderRadius: 2,
+                border: '1px solid #d1d5db',
+                backgroundColor: '#ffffff',
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#6366f1',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#6366f1',
+                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
                 }
               }}
-            />
+            >
+              {reminderOptions.map(option => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+      </Grid>
+    </Box>
 
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: theme.palette.primary.main, mb: 2 }}>
-                Company Information Fields
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Company Name"
-                    value={masterData.defaultFields.companyName}
-                    onChange={(e) => handleDefaultFieldChange('companyName', e.target.value)}
-                    required
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 3
+    <Box sx={{
+      backgroundColor: '#ffffff',
+      border: '1px solid #e5e7eb',
+      borderRadius: 3,
+      p: 3
+    }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
+        <Typography 
+          variant="subtitle1" 
+          sx={{ 
+            fontWeight: 600, 
+            color: '#1f2937',
+            fontSize: '0.95rem'
+          }}
+        >
+          Custom Fields
+        </Typography>
+        
+        <Button 
+          startIcon={<Add />} 
+          onClick={addCustomField}
+          variant="contained"
+          size="small"
+          sx={{ 
+            borderRadius: 2, 
+            textTransform: 'none', 
+            fontWeight: 500,
+            backgroundColor: '#6366f1',
+            fontSize: '0.875rem',
+            px: 2,
+            py: 0.75,
+            minHeight: 'auto',
+            '&:hover': {
+              backgroundColor: '#4f46e5',
+            }
+          }}
+        >
+          Add Field
+        </Button>
+      </Box>
+      
+      {masterData.customFields.map((field, index) => (
+        <Paper 
+          key={field.id}
+          elevation={0}
+          sx={{ 
+            p: 2.5, 
+            mb: 2,
+            backgroundColor: '#f9fafb',
+            border: '1px solid #e5e7eb',
+            borderRadius: 2.5,
+            transition: 'all 0.15s ease',
+            '&:hover': {
+              borderColor: '#d1d5db',
+              backgroundColor: '#f3f4f6',
+            }
+          }}
+        >
+          <Grid container spacing={2} alignItems="flex-start">
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Field Name"
+                size="small"
+                value={field.name}
+                onChange={(e) => updateCustomField(field.id, 'name', e.target.value)}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1.5,
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #d1d5db',
+                    '&:hover': {
+                      borderColor: '#6366f1',
+                    },
+                    '&.Mui-focused': {
+                      borderColor: '#6366f1',
+                      boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
+                    }
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: '#6b7280',
+                    fontSize: '0.875rem'
+                  }
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={field.type === 'upload' ? 6 : 3}>
+              {field.type === 'date' ? (
+                <TextField
+                  fullWidth
+                  label="Default Value"
+                  size="small"
+                  type="date"
+                  value={typeof field.value === 'string' ? field.value : ''}
+                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1.5,
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #d1d5db',
+                      '&:hover': {
+                        borderColor: '#6366f1',
+                      },
+                      '&.Mui-focused': {
+                        borderColor: '#6366f1',
+                        boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }
+                  }}
+                />
+              ) : field.type === 'upload' ? (
+                <Box>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CloudUpload />}
+                    size="small"
+                    sx={{ 
+                      borderRadius: 1.5,
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      borderColor: '#d1d5db',
+                      color: '#6b7280',
+                      fontSize: '0.875rem',
+                      '&:hover': {
+                        borderColor: '#6366f1',
+                        color: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.04)'
                       }
                     }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Address"
-                    value={masterData.defaultFields.address}
-                    onChange={(e) => handleDefaultFieldChange('address', e.target.value)}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 3
+                  >
+                    Upload Files
+                  </Button>
+                  {Array.isArray(field.value) && field.value.length > 0 && (
+                    <Typography variant="caption" display="block" sx={{ mt: 0.5, color: '#6b7280' }}>
+                      {field.value.length} file(s) selected
+                    </Typography>
+                  )}
+                </Box>
+              ) : (
+                <TextField
+                  fullWidth
+                  label="Default Value"
+                  size="small"
+                  type={field.type}
+                  value={typeof field.value === 'string' ? field.value : ''}
+                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1.5,
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #d1d5db',
+                      '&:hover': {
+                        borderColor: '#6366f1',
+                      },
+                      '&.Mui-focused': {
+                        borderColor: '#6366f1',
+                        boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
                       }
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Billing Date"
-                    type="date"
-                    value={masterData.defaultFields.billingDate}
-                    onChange={(e) => handleDefaultFieldChange('billingDate', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 3
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Due Date"
-                    type="date"
-                    value={masterData.defaultFields.dueDate}
-                    onChange={(e) => handleDefaultFieldChange('dueDate', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 3
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <FormControl fullWidth>
-                    <InputLabel>Reminder</InputLabel>
-                    <Select
-                      value={masterData.defaultFields.reminder}
-                      label="Reminder"
-                      onChange={(e) => handleDefaultFieldChange('reminder', e.target.value as DefaultFields['reminder'])}
-                      sx={{
-                        borderRadius: 3
-                      }}
-                    >
-                      {reminderOptions.map(option => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </Box>
-
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: theme.palette.secondary.main }}>
-                  Additional Custom Fields
-                </Typography>
-                <Button 
-                  startIcon={<Add />} 
-                  onClick={addCustomField}
-                  variant="outlined"
-                  sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 600 }}
-                >
-                  Add Field
-                </Button>
-              </Box>
-              
-              {masterData.customFields.map((field) => (
-                <Paper 
-                  key={field.id}
-                  elevation={0}
-                  sx={{ 
-                    p: 2.5, 
-                    mb: 2,
-                    bgcolor: alpha(theme.palette.primary.main, 0.04),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                    borderRadius: 3
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#6b7280',
+                      fontSize: '0.875rem'
+                    }
+                  }}
+                />
+              )}
+            </Grid>
+            
+            <Grid item xs={6} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ color: '#6b7280', fontSize: '0.875rem' }}>Type</InputLabel>
+                <Select
+                  value={field.type}
+                  label="Type"
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    updateCustomField(field.id, 'type', newType);
+                    updateCustomField(field.id, 'value', newType === 'upload' ? [] : '');
+                  }}
+                  sx={{
+                    borderRadius: 1.5,
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #d1d5db',
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#6366f1',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#6366f1',
+                      boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
+                    }
                   }}
                 >
-                  <Grid container spacing={2} alignItems="flex-start">
-                    <Grid item xs={12} md={3}>
-                      <TextField
-                        fullWidth
-                        label="Field Name"
-                        size="small"
-                        value={field.name}
-                        onChange={(e) => updateCustomField(field.id, 'name', e.target.value)}
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 2
-                          }
-                        }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} md={field.type === 'upload' ? 6 : 3}>
-                      {field.type === 'date' ? (
-                        <TextField
-                          fullWidth
-                          label="Default Value"
-                          size="small"
-                          type="date"
-                          value={typeof field.value === 'string' ? field.value : ''}
-                          onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                          InputLabelProps={{ shrink: true }}
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              borderRadius: 2
-                            }
-                          }}
-                        />
-                      ) : field.type === 'upload' ? (
-                        <Box>
-                          <Button
-                            variant="outlined"
-                            startIcon={<CloudUpload />}
-                            size="small"
-                            sx={{ 
-                              borderRadius: 2,
-                              textTransform: 'none',
-                              fontWeight: 600
-                            }}
-                          >
-                            Upload Files
-                          </Button>
-                          {Array.isArray(field.value) && field.value.length > 0 && (
-                            <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                              {field.value.length} file(s) selected
-                            </Typography>
-                          )}
-                        </Box>
-                      ) : (
-                        <TextField
-                          fullWidth
-                          label="Default Value"
-                          size="small"
-                          type={field.type}
-                          value={typeof field.value === 'string' ? field.value : ''}
-                          onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              borderRadius: 2
-                            }
-                          }}
-                        />
-                      )}
-                    </Grid>
-                    
-                    <Grid item xs={6} md={2}>
-                      <FormControl fullWidth size="small">
-                        <InputLabel>Type</InputLabel>
-                        <Select
-                          value={field.type}
-                          label="Type"
-                          onChange={(e) => {
-                            const newType = e.target.value as CustomField['type'];
-                            updateCustomField(field.id, 'type', newType);
-                            updateCustomField(field.id, 'value', newType === 'upload' ? [] : '');
-                          }}
-                          sx={{
-                            borderRadius: 2
-                          }}
-                        >
-                          <MenuItem value="text">Text</MenuItem>
-                          <MenuItem value="number">Number</MenuItem>
-                          <MenuItem value="date">Date</MenuItem>
-                          <MenuItem value="email">Email</MenuItem>
-                          <MenuItem value="phone">Phone</MenuItem>
-                          <MenuItem value="upload">Upload</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    
-                    <Grid item xs={6} md={1}>
-                      <Tooltip title="Remove Field">
-                        <IconButton 
-                          color="error" 
-                          onClick={() => removeCustomField(field.id)}
-                          size="small"
-                          sx={{ 
-                            '&:hover': { 
-                              bgcolor: alpha(theme.palette.error.main, 0.1)
-                            },
-                            border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-                            borderRadius: 2
-                          }}
-                        >
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              ))}
-            </Box>
-          </Stack>
-        </DialogContent>
+                  <MenuItem value="text">Text</MenuItem>
+                  <MenuItem value="number">Number</MenuItem>
+                  <MenuItem value="date">Date</MenuItem>
+                  <MenuItem value="email">Email</MenuItem>
+                  <MenuItem value="phone">Phone</MenuItem>
+                  <MenuItem value="upload">Upload</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={6} md={1}>
+              <Tooltip title="Remove Field">
+                <IconButton 
+                  color="error" 
+                  onClick={() => removeCustomField(field.id)}
+                  size="small"
+                  sx={{ 
+                    color: '#9ca3af',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 1.5,
+                    '&:hover': { 
+                      color: '#ef4444',
+                      borderColor: '#fecaca',
+                      backgroundColor: '#fef2f2',
+                    }
+                  }}
+                >
+                  <Delete fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Grid>
+          </Grid>
+        </Paper>
+      ))}
+    </Box>
+  </Stack>
+</DialogContent>
 
         <DialogActions sx={{ 
           p: 3, 
@@ -1750,9 +2024,9 @@ const MasterTypeManager: React.FC = () => {
               fontWeight: 700,
               borderRadius: 3,
               px: 4,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              background: HEADER_GRADIENT,
               '&:hover': {
-                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
+                background: `linear-gradient(90deg, ${PRIMARY_COLOR} 0%, ${SECONDARY_COLOR} 100%)`,
               }
             }}
           >
