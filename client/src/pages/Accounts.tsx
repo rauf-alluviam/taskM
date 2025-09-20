@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Paper } from '@mui/material';
-import AccountsComponent from '../components/accounts/Accounts';
+import AccountsComponent from '../components/accounts/MasterTypeManager';
 
 const Accounts: React.FC = () => {
   return (

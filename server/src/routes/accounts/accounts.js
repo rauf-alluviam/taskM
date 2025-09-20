@@ -91,26 +91,19 @@ router.delete('/master-types/:id', async (req, res) => {
 router.post('/masters', async (req, res) => {
   try {
     const { masterType, defaultFields, customFields } = req.body;
-    const userId = req.user.id; // Assuming you have auth middleware setting user
     
     // Find or create master type if it doesn't exist
-    let masterTypeDoc = await MasterType.findOne({ name: masterType, status: 'active' });
+    let masterTypeDoc = await MasterType.findOne({ name: masterType, isActive: true });
     if (!masterTypeDoc) {
       // Create new master type with custom fields structure
       masterTypeDoc = new MasterType({
         name: masterType,
-        customFields: customFields.map(cf => ({
+        fields: customFields.map(cf => ({
           name: cf.name,
           type: cf.type,
-          required: cf.required || false,
-          validation: cf.validation || {},
-          description: cf.description
+          required: cf.required || false
         })),
-        metadata: {
-          createdBy: userId,
-          version: 1
-        },
-        status: 'active'
+        isActive: true
       });
       await masterTypeDoc.save();
     }
@@ -120,43 +113,18 @@ router.post('/masters', async (req, res) => {
       masterTypeId: masterTypeDoc._id,
       masterTypeName: masterType,
       defaultFields: {
-        companyName: {
-          value: defaultFields.companyName,
-          lastUpdated: new Date()
-        },
-        address: {
-          value: defaultFields.address,
-          lastUpdated: new Date()
-        },
-        billingDate: {
-          value: defaultFields.billingDate,
-          lastUpdated: new Date()
-        },
-        dueDate: {
-          value: defaultFields.dueDate,
-          lastUpdated: new Date()
-        },
-        reminder: {
-          frequency: defaultFields.reminder || 'monthly',
-          lastSent: null,
-          nextReminder: null
-        }
+        companyName: defaultFields.companyName,
+        address: defaultFields.address,
+        billingDate: defaultFields.billingDate,
+        dueDate: defaultFields.dueDate,
+        reminder: defaultFields.reminder
       },
       customFields: customFields.map(cf => ({
         name: cf.name,
         value: cf.value,
         type: cf.type,
-        lastUpdated: new Date()
-      })),
-      reminderStatus: {
-        shouldSendReminder: true,
-        lastSentDate: null,
-        nextReminderDate: null
-      },
-      metadata: {
-        createdBy: userId,
-        version: 1
-      }
+        required: cf.required || false
+      }))
     });
 
     const newEntry = await accountEntry.save();
@@ -205,75 +173,17 @@ router.get('/masters/:id', async (req, res) => {
 router.put('/masters/:id', async (req, res) => {
   try {
     const { defaultFields, customFields } = req.body;
-    const userId = req.user.id; // Assuming you have auth middleware
-    const now = new Date();
-
-    // First get the existing entry
-    const existingEntry = await AccountEntry.findById(req.params.id);
-    if (!existingEntry) {
-      return res.status(404).json({ message: 'Master entry not found' });
-    }
-
-    // Prepare the update object with proper timestamps
-    const updateData = {
-      defaultFields: {
-        companyName: {
-          value: defaultFields.companyName,
-          lastUpdated: existingEntry.defaultFields.companyName.value !== defaultFields.companyName ? now : existingEntry.defaultFields.companyName.lastUpdated
-        },
-        address: {
-          value: defaultFields.address,
-          lastUpdated: existingEntry.defaultFields.address.value !== defaultFields.address ? now : existingEntry.defaultFields.address.lastUpdated
-        },
-        billingDate: {
-          value: defaultFields.billingDate,
-          lastUpdated: existingEntry.defaultFields.billingDate.value !== defaultFields.billingDate ? now : existingEntry.defaultFields.billingDate.lastUpdated
-        },
-        dueDate: {
-          value: defaultFields.dueDate,
-          lastUpdated: existingEntry.defaultFields.dueDate.value !== defaultFields.dueDate ? now : existingEntry.defaultFields.dueDate.lastUpdated
-        },
-        reminder: {
-          frequency: defaultFields.reminder.frequency || existingEntry.defaultFields.reminder.frequency,
-          lastSent: existingEntry.defaultFields.reminder.lastSent,
-          nextReminder: existingEntry.defaultFields.reminder.nextReminder
-        }
-      },
-      customFields: customFields.map(cf => {
-        const existingField = existingEntry.customFields.find(ecf => ecf.name === cf.name);
-        return {
-          name: cf.name,
-          value: cf.value,
-          type: cf.type,
-          lastUpdated: existingField && existingField.value !== cf.value ? now : (existingField ? existingField.lastUpdated : now)
-        };
-      }),
-      'metadata.updatedBy': userId,
-      'metadata.version': existingEntry.metadata.version + 1,
-      'metadata.lastActivity': now,
-      updatedAt: now
-    };
-
-    // Add timeline entry for the update
-    existingEntry.addTimeline('updated', userId, {
-      changes: {
-        defaultFields: Object.keys(defaultFields).filter(key => 
-          JSON.stringify(defaultFields[key]) !== JSON.stringify(existingEntry.defaultFields[key].value)
-        ),
-        customFields: customFields.filter(cf => {
-          const existingField = existingEntry.customFields.find(ecf => ecf.name === cf.name);
-          return !existingField || JSON.stringify(cf.value) !== JSON.stringify(existingField.value);
-        }).map(cf => cf.name)
-      }
-    });
-
-    // Perform the update
     const entry = await AccountEntry.findByIdAndUpdate(
       req.params.id,
-      updateData,
+      {
+        defaultFields,
+        customFields,
+        updatedAt: Date.now()
+      },
       { new: true, runValidators: true }
     ).populate('masterTypeId');
     
+    if (!entry) return res.status(404).json({ message: 'Master entry not found' });
     res.json(entry);
   } catch (error) {
     res.status(400).json({ message: error.message });
