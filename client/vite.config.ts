@@ -13,6 +13,9 @@ export default defineConfig({
       },
     },
   },
+  define: {
+            global: "window",
+          },
   optimizeDeps: {
     exclude: ['lucide-react'],
   },

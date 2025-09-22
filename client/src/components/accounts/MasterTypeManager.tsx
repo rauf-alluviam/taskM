@@ -5,6 +5,7 @@ import {
   Box,
   Paper,
   Grid,
+
   Typography,
   Avatar,
   Button,
@@ -52,11 +53,22 @@ import {
   CheckCircle,
   Warning,
   Error as ErrorIcon,
-  CalendarToday
+
+  Extension,          // For "Additional Information" section
+          // For "Basic Information" section  
+  LocationOn,         // For address display
+  CalendarToday,      // For "Important Dates" section and billing date
+  Event,              // For due date
+  NotificationsActive, // For reminder
+  AttachFile,         // For file attachments
+  Close,              // For close button in header
+              
 } from '@mui/icons-material';
 
 import { SelectChangeEvent } from '@mui/material/Select';
 import { CustomField, DefaultFields, MasterType, MasterEntry, MasterData } from './master.types';
+import FileUpload from "../gallery/FileUpload";
+import ImagePreview from "../gallery/ImagePreview";
 
 const API_BASE_URL = import.meta.env.VITE_APP_URL;
 
@@ -68,6 +80,8 @@ interface ReminderOption {
 const MasterTypeManager: React.FC = () => {
   const theme = useTheme();
   const [masterTypes, setMasterTypes] = useState<MasterType[]>([]);
+  const [uploadedFiles, setUploadedFiles] = React.useState<string[]>([]);
+
   const [masterEntries, setMasterEntries] = useState<MasterEntry[]>([]);
   const [selectedMasterType, setSelectedMasterType] = useState<string>('');
   const [filteredEntries, setFilteredEntries] = useState<MasterEntry[]>([]);
@@ -97,6 +111,46 @@ const SIDEBAR_BG = "#f6f9fd";
 const HEADER_GRADIENT = "linear-gradient(90deg, #2186eb 0%, #3ed6cb 100%)";
 const CARD_BG = "#fff";
 const ICON_BG = "#eaf3fb";
+// Called when files are uploaded successfully to backend
+const handleFilesUploaded = (fieldId: string | number, files: { url: string; key: string }[]) => {
+  setMasterData(prev => {
+    const updatedFields = prev.customFields.map(cf => {
+      if (cf.id === fieldId) {
+        const existingValues = Array.isArray(cf.value) ? cf.value : [];
+        const newUrls = files.map(f => f.url);
+        return { ...cf, value: [...existingValues, ...newUrls] };
+      }
+      return cf;
+    });
+    return { ...prev, customFields: updatedFields };
+  });
+};
+
+// Delete single uploaded file by URL
+const handleDeleteUploadFile = async (fieldId: string | number, fileUrl: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/delete`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileUrl }),
+    });
+    if (!response.ok) throw new Error('Failed to delete file from server');
+
+    setMasterData(prev => {
+      const updatedFields = prev.customFields.map(cf => {
+        if (cf.id === fieldId && Array.isArray(cf.value)) {
+          return { ...cf, value: cf.value.filter((v: string) => v !== fileUrl) };
+        }
+        return cf;
+      });
+      return { ...prev, customFields: updatedFields };
+    });
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+
 
   const reminderOptions: ReminderOption[] = [
     { value: 'weekly', label: 'Weekly' },
@@ -469,202 +523,110 @@ const ICON_BG = "#eaf3fb";
       .toUpperCase() || '??';
   };
 
-  return (
-    <Box sx={{ 
-      p: { xs: 1, sm: 2, md: 3 }, 
-      maxWidth: 1600, 
-      mx: 'auto',
-      bgcolor: SIDEBAR_BG,
-      minHeight: '100vh'
-    }}>
-      {/* Enhanced Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 2, 
-        mb: 4,
-        position: 'relative'
-      }}>
-        <Box sx={{ 
-          width: 56, 
-          height: 56, 
-          borderRadius: '12px', 
-          background: HEADER_GRADIENT,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: `0 8px 24px ${alpha(PRIMARY_COLOR, 0.25)}`
-        }}>
-          <Business sx={{ color: 'white', fontSize: 28 }} />
-        </Box>
-        <Box>
-          <Typography 
-            variant="h4" 
-            sx={{ 
-              fontWeight: 800, 
-              letterSpacing: '-0.025em',
-              fontSize: { xs: '1.75rem', sm: '2.125rem', md: '2.5rem' },
-              background: HEADER_GRADIENT,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}
-          >
-            Master Management
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-            Manage your business records with advanced tracking
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Enhanced Master Type Selection */}
-  <Fade in timeout={600}>
-  <Paper
-    elevation={1}
-    sx={{
-      p: 3,
-      mb: 4,
-      borderRadius: 3,
-      border: `1px solid ${alpha('#1765D8', 0.15)}`,
-      backgroundColor: '#fff',
-      boxShadow: '0 4px 12px rgba(23, 101, 216, 0.1)',
-    }}
-  >
-    <Grid container spacing={3} alignItems="center">
-      <Grid item xs={12} md={6}>
-        <FormControl fullWidth>
-          <InputLabel
-            sx={{
-              fontSize: '1rem',
-              fontWeight: 700,
-              color: '#1765D8',
-              letterSpacing: 0.5,
-            }}
-          >
-            Select Master Type
-          </InputLabel>
-          <Select
-            value={selectedMasterType}
-            label="Select Master Type"
-            onChange={handleMasterTypeChange}
-            sx={{
-              borderRadius: 2,
-              '& .MuiOutlinedInput-root': {
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#1765D8',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#1765D8',
-                  borderWidth: 2,
-                },
-              },
-              fontSize: '1rem',
-            }}
-          >
-            {getMasterTypeOptions().map((type) => (
-              <MenuItem
-                key={type}
-                value={type}
+return (
+    <Box sx={{ p: { xs: 2, md: 3 }, background: '#f7fafd', minHeight: '100vh' }}>
+      {/* Header with Back Button and Master Type Selection */}
+      <Paper
+        sx={{
+          p: 3,
+          mb: 4,
+          borderRadius: 3,
+          border: `1px solid ${alpha('#dbeafe', 0.8)}`,
+          background: '#f0f4ff',
+          boxShadow: 'none',
+        }}
+      >
+        <Grid container spacing={3} alignItems="center">
+          {selectedMasterType && selectedMasterType !== 'CREATE_NEW' && (
+            <Grid item xs={12} md={1}>
+              <IconButton 
+                onClick={() => {
+                  setSelectedMasterType('');
+                  setShowInlineForm(false);
+                }}
                 sx={{
-                  fontSize: '1rem',
-                  py: 1.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  color: '#222',
+                  bgcolor: '#3b82f6',
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: '#2563eb',
+                  }
                 }}
               >
-                <Avatar
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    bgcolor: '#1765D8',
-                    fontSize: 16,
-                  }}
-                >
-                  <Business fontSize="small" />
-                </Avatar>
-                {type}
-              </MenuItem>
-            ))}
-            <MenuItem
-              value="CREATE_NEW"
+                <Clear />
+              </IconButton>
+            </Grid>
+          )}
+          
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <FormControl sx={{ minWidth: 280 }} size="small">
+            <InputLabel sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#374151' }}>
+              Select Master Type
+            </InputLabel>
+            <Select
+              value={selectedMasterType}
+              label="Select Master Type"
+              onChange={handleMasterTypeChange}
               sx={{
-                fontSize: '1rem',
-                color: '#3ed6cb',
-                py: 1.5,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
+                borderRadius: 2,
+                backgroundColor: '#fff',
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: '#d1d5db' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#3b82f6' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#3b82f6' },
               }}
             >
-              <Avatar
-                sx={{
-                  width: 28,
-                  height: 28,
-                  bgcolor: '#3ed6cb',
-                  fontSize: 16,
-                }}
-              >
-                <Add fontSize="small" />
-              </Avatar>
-              Create New Master Type
-            </MenuItem>
-          </Select>
-        </FormControl>
-      </Grid>
+              {getMasterTypeOptions().map((type) => (
+                <MenuItem key={type} value={type}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Avatar sx={{ width: 24, height: 24, bgcolor: '#3b82f6' }}>
+                      <Business sx={{ fontSize: 14 }} />
+                    </Avatar>
+                    {type}
+                  </Box>
+                </MenuItem>
+              ))}
+              <MenuItem value="CREATE_NEW">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Avatar sx={{ width: 24, height: 24, bgcolor: '#10b981' }}>
+                    <Add sx={{ fontSize: 14 }} />
+                  </Avatar>
+                  Create New Type
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
 
-      {selectedMasterType && selectedMasterType !== 'CREATE_NEW' && (
-        <Grid item xs={12} md={6}>
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 2,
-              flexWrap: 'wrap',
-              justifyContent: { xs: 'flex-start', md: 'flex-end' },
-            }}
-          >
-            {(() => {
-              const stats = getMasterTypeStats(selectedMasterType);
-              return (
-                <>
-                  <Chip
-                    icon={<TrendingUp />}
-                    label={`${stats.total} Total`}
-                    color="primary"
-                    variant="outlined"
-                    sx={{ fontWeight: 700, borderRadius: 2, fontSize: '0.9rem' }}
-                  />
-                  <Chip
-                    icon={<Schedule />}
-                    label={`${stats.upcoming} Due Soon`}
-                    color="warning"
-                    variant="outlined"
-                    sx={{
-                      fontWeight: 700,
-                      borderRadius: 2,
-                      fontSize: '0.9rem',
-                    }}
-                  />
-                  <Chip
-                    icon={<ErrorIcon />}
-                    label={`${stats.overdue} Overdue`}
-                    color="error"
-                    variant="outlined"
-                    sx={{ fontWeight: 700, borderRadius: 2, fontSize: '0.9rem' }}
-                  />
-                </>
-              );
-            })()}
+          {selectedMasterType && selectedMasterType !== 'CREATE_NEW' && (
+            <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+              {(() => {
+                const stats = getMasterTypeStats(selectedMasterType);
+                return (
+                  <>
+                    <Chip 
+                      label={`${stats.total} Total`} 
+                      size="small" 
+                      color="primary" 
+                      sx={{ fontSize: '0.75rem' }} 
+                    />
+                    <Chip 
+                      label={`${stats.upcoming} Due`} 
+                      size="small" 
+                      color="warning" 
+                      sx={{ fontSize: '0.75rem' }} 
+                    />
+                    <Chip 
+                      label={`${stats.overdue} Overdue`} 
+                      size="small" 
+                      color="error" 
+                      sx={{ fontSize: '0.75rem' }} 
+                    />
+                  </>
+                );
+              })()}
+            </Box>
+          )}
           </Box>
         </Grid>
-      )}
-    </Grid>
-  </Paper>
-</Fade>
-
-
+      </Paper>
 
       <Grid container spacing={3}>
         {/* Enhanced Inline Form */}
@@ -675,11 +637,11 @@ const ICON_BG = "#eaf3fb";
                 elevation={0}
                 sx={{ 
                   borderRadius: 2,
-                  border: `1px solid ${alpha(PRIMARY_COLOR, 0.15)}`,
-                  background: CARD_BG,
+                  border: `1px solid ${alpha('#3b82f6', 0.15)}`,
+                  background: '#fff',
                   position: 'sticky',
                   top: 20,
-                  boxShadow: `0 4px 16px ${alpha(PRIMARY_COLOR, 0.08)}`
+                  boxShadow: `0 4px 16px ${alpha('#3b82f6', 0.08)}`
                 }}
               >
                 <CardHeader
@@ -688,14 +650,14 @@ const ICON_BG = "#eaf3fb";
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Avatar 
                           sx={{ 
-                            bgcolor: editMode ? theme.palette.warning.main : theme.palette.primary.main,
+                            bgcolor: editMode ? '#f59e0b' : '#3b82f6',
                             width: 32,
                             height: 32
                           }}
                         >
                           {editMode ? <Edit fontSize="small" /> : <PersonAdd fontSize="small" />}
                         </Avatar>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937' }}>
                           {editMode ? 'Edit Entry' : 'Add New Entry'}
                         </Typography>
                       </Box>
@@ -703,10 +665,10 @@ const ICON_BG = "#eaf3fb";
                         size="small" 
                         onClick={clearInlineForm}
                         sx={{ 
-                          color: theme.palette.text.secondary,
+                          color: '#6b7280',
                           '&:hover': { 
-                            bgcolor: alpha(theme.palette.error.main, 0.1),
-                            color: theme.palette.error.main
+                            bgcolor: alpha('#ef4444', 0.1),
+                            color: '#ef4444'
                           }
                         }}
                       >
@@ -725,7 +687,7 @@ const ICON_BG = "#eaf3fb";
                         sx={{ 
                           mb: 2, 
                           fontWeight: 700, 
-                          color: theme.palette.primary.main,
+                          color: '#3b82f6',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 1
@@ -746,7 +708,7 @@ const ICON_BG = "#eaf3fb";
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 3,
                               '&:hover .MuiOutlinedInput-notchedOutline': {
-                                borderColor: theme.palette.primary.main,
+                                borderColor: '#3b82f6',
                               }
                             }
                           }}
@@ -826,7 +788,7 @@ const ICON_BG = "#eaf3fb";
                           variant="subtitle1" 
                           sx={{ 
                             fontWeight: 700, 
-                            color: theme.palette.secondary.main,
+                            color: '#14b8a6',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 1
@@ -843,7 +805,9 @@ const ICON_BG = "#eaf3fb";
                           sx={{ 
                             borderRadius: 3, 
                             textTransform: 'none',
-                            fontWeight: 600
+                            fontWeight: 600,
+                            borderColor: '#14b8a6',
+                            color: '#14b8a6'
                           }}
                         >
                           Add Field
@@ -851,15 +815,15 @@ const ICON_BG = "#eaf3fb";
                       </Box>
                       
                       {masterData.customFields.map((field) => (
-                        <Paper 
+                        <Paper
                           key={field.id}
                           elevation={0}
-                          sx={{ 
-                            p: 2.5, 
+                          sx={{
+                            p: 2.5,
                             mb: 2,
-                            bgcolor: alpha(theme.palette.primary.main, 0.04),
-                            border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                            borderRadius: 3
+                            bgcolor: alpha('#3b82f6', 0.04),
+                            border: `1px solid ${alpha('#3b82f6', 0.12)}`,
+                            borderRadius: 3,
                           }}
                         >
                           <Grid container spacing={2} alignItems="flex-start">
@@ -872,12 +836,12 @@ const ICON_BG = "#eaf3fb";
                                 onChange={(e) => updateCustomField(field.id, 'name', e.target.value)}
                                 sx={{
                                   '& .MuiOutlinedInput-root': {
-                                    borderRadius: 2
-                                  }
+                                    borderRadius: 2,
+                                  },
                                 }}
                               />
                             </Grid>
-                            
+
                             <Grid item xs={12} sm={field.type === 'upload' ? 4 : 3}>
                               {field.type === 'date' ? (
                                 <TextField
@@ -890,30 +854,12 @@ const ICON_BG = "#eaf3fb";
                                   InputLabelProps={{ shrink: true }}
                                   sx={{
                                     '& .MuiOutlinedInput-root': {
-                                      borderRadius: 2
-                                    }
+                                      borderRadius: 2,
+                                    },
                                   }}
                                 />
                               ) : field.type === 'upload' ? (
-                                <Box>
-                                  <Button
-                                    variant="outlined"
-                                    startIcon={<CloudUpload />}
-                                    size="small"
-                                    sx={{ 
-                                      borderRadius: 2,
-                                      textTransform: 'none',
-                                      fontWeight: 600
-                                    }}
-                                  >
-                                    Upload Files
-                                  </Button>
-                                  {Array.isArray(field.value) && field.value.length > 0 && (
-                                    <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                                      {field.value.length} file(s) selected
-                                    </Typography>
-                                  )}
-                                </Box>
+                                null
                               ) : (
                                 <TextField
                                   fullWidth
@@ -924,13 +870,13 @@ const ICON_BG = "#eaf3fb";
                                   onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
                                   sx={{
                                     '& .MuiOutlinedInput-root': {
-                                      borderRadius: 2
-                                    }
+                                      borderRadius: 2,
+                                    },
                                   }}
                                 />
                               )}
                             </Grid>
-                            
+
                             <Grid item xs={6} sm={field.type === 'upload' ? 2 : 3}>
                               <FormControl fullWidth size="small">
                                 <InputLabel>Type</InputLabel>
@@ -943,7 +889,7 @@ const ICON_BG = "#eaf3fb";
                                     updateCustomField(field.id, 'value', newType === 'upload' ? [] : '');
                                   }}
                                   sx={{
-                                    borderRadius: 2
+                                    borderRadius: 2,
                                   }}
                                 >
                                   <MenuItem value="text">Text</MenuItem>
@@ -951,23 +897,22 @@ const ICON_BG = "#eaf3fb";
                                   <MenuItem value="date">Date</MenuItem>
                                   <MenuItem value="email">Email</MenuItem>
                                   <MenuItem value="phone">Phone</MenuItem>
-                                  <MenuItem value="upload">Upload</MenuItem>
                                 </Select>
                               </FormControl>
                             </Grid>
-                            
+
                             <Grid item xs={6} sm={field.type === 'upload' ? 2 : 2}>
                               <Tooltip title="Remove Field">
-                                <IconButton 
-                                  color="error" 
+                                <IconButton
+                                  color="error"
                                   onClick={() => removeCustomField(field.id)}
                                   size="small"
-                                  sx={{ 
-                                    '&:hover': { 
-                                      bgcolor: alpha(theme.palette.error.main, 0.1)
+                                  sx={{
+                                    '&:hover': {
+                                      bgcolor: alpha('#ef4444', 0.1),
                                     },
-                                    border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-                                    borderRadius: 2
+                                    border: `1px solid ${alpha('#ef4444', 0.2)}`,
+                                    borderRadius: 2,
                                   }}
                                 >
                                   <Delete fontSize="small" />
@@ -991,9 +936,9 @@ const ICON_BG = "#eaf3fb";
                           textTransform: 'none',
                           fontWeight: 700,
                           py: 1.5,
-                          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                          background: `linear-gradient(135deg, #3b82f6 0%, #14b8a6 100%)`,
                           '&:hover': {
-                            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
+                            background: `linear-gradient(135deg, #2563eb 0%, #0d9488 100%)`,
                           }
                         }}
                       >
@@ -1007,7 +952,9 @@ const ICON_BG = "#eaf3fb";
                           textTransform: 'none',
                           fontWeight: 600,
                           py: 1.5,
-                          px: 3
+                          px: 3,
+                          borderColor: '#6b7280',
+                          color: '#6b7280'
                         }}
                       >
                         Clear
@@ -1022,252 +969,251 @@ const ICON_BG = "#eaf3fb";
 
         {/* Enhanced Entries Table */}
         {selectedMasterType && selectedMasterType !== 'CREATE_NEW' && (
-  <Grid item xs={12} lg={showInlineForm ? 7 : 12}>
-    <Card
-      elevation={1}
-      sx={{
-        borderRadius: 4,
-        border: `1px solid ${alpha('#dee2e6', 0.6)}`,
-        overflow: 'hidden',
-        background: '#fff',
-        boxShadow: 'none',
-      }}
-    >
-      <Box
-        sx={{
-          p: 3,
-          background: 'linear-gradient(135deg, #f0f4ff 0%, #e0f0ff 100%)',
-          borderBottom: `1px solid ${alpha('#dee2e6', 0.8)}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 700,
-            color: '#222',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-          }}
-        >
-          <Assignment color="primary" />
-          {selectedMasterType} Records
-          <Chip
-            label={filteredEntries.length}
-            color="primary"
-            size="small"
-            sx={{ fontWeight: 600, ml: 1 }}
-          />
-        </Typography>
-      </Box>
-
-      {filteredEntries.length === 0 ? (
-        <Box sx={{ p: 8, textAlign: 'center', color: '#555' }}>
-          <Avatar
-            sx={{
-              width: 80,
-              height: 80,
-              bgcolor: alpha('#1765D8', 0.1),
-              mx: 'auto',
-              mb: 3,
-            }}
-          >
-            <Business sx={{ fontSize: 40, color: '#1765D8' }} />
-          </Avatar>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#222' }}>
-            No entries found
-          </Typography>
-          <Typography
-            color="textSecondary"
-            sx={{ mb: 4, fontSize: '1.1rem', maxWidth: 480, mx: 'auto' }}
-          >
-            Start by adding your first {selectedMasterType.toLowerCase()} entry
-          </Typography>
-          {!showInlineForm && (
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => setShowInlineForm(true)}
+          <Grid item xs={12} lg={showInlineForm ? 7 : 12}>
+            <Card
+              elevation={1}
               sx={{
-                borderRadius: 3,
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 4,
-                py: 1.5,
-                backgroundColor: '#1765D8',
-                '&:hover': {
-                  backgroundColor: '#0f4baa',
-                },
+                borderRadius: 4,
+                border: `1px solid ${alpha('#e5e7eb', 0.8)}`,
+                overflow: 'hidden',
+                background: '#fff',
+                boxShadow: 'none',
               }}
             >
-              Add First Entry
-            </Button>
-          )}
-        </Box>
-      ) : (
-        <TableContainer sx={{ maxHeight: 700 }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                {['Company', 'Location', 'Due Date', 'Status', 'Actions'].map((header, i) => (
-                  <TableCell
-                    key={header}
-                    sx={{
-                      fontWeight: 700,
-                      backgroundColor: i === 0 ? '#f6f8fb' : 'transparent',
-                      color: i === 0 ? '#1765D8' : '#222',
-                      borderBottom: `2px solid ${alpha('#1765D8', 0.15)}`,
-                      py: 2,
-                      width: header === 'Actions' ? 140 : 'auto',
-                    }}
-                  >
-                    {header}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredEntries.map((entry, index) => {
-                const daysUntilDue = getDaysUntilDue(entry.defaultFields.dueDate);
-                const statusColor = getStatusColor(daysUntilDue);
+              <Box
+                sx={{
+                  p: 3,
+                  background: 'linear-gradient(135deg, #f0f4ff 0%, #e0f0ff 100%)',
+                  borderBottom: `1px solid ${alpha('#e5e7eb', 0.8)}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    color: '#1f2937',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <Assignment color="primary" />
+                  {selectedMasterType} Records
+                  <Chip
+                    label={filteredEntries.length}
+                    color="primary"
+                    size="small"
+                    sx={{ fontWeight: 600, ml: 1 }}
+                  />
+                </Typography>
+              </Box>
 
-                return (
-                  <TableRow
-                    key={entry._id}
-                    hover
+              {filteredEntries.length === 0 ? (
+                <Box sx={{ p: 8, textAlign: 'center', color: '#6b7280' }}>
+                  <Avatar
                     sx={{
-                      cursor: 'pointer',
-                      backgroundColor:
-                        editMode && masterData.id === entry._id
-                          ? alpha('#ffc107', 0.15)
-                          : 'inherit',
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': {
-                        backgroundColor: alpha('#1765D8', 0.1),
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 10px rgba(23, 101, 216, 0.1)',
-                      },
+                      width: 80,
+                      height: 80,
+                      bgcolor: alpha('#3b82f6', 0.1),
+                      mx: 'auto',
+                      mb: 3,
                     }}
                   >
-                    <TableCell sx={{ py: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            bgcolor: '#1765D8',
-                            fontSize: '0.875rem',
-                            fontWeight: 700,
-                            color: '#fff',
-                          }}
-                        >
-                          {getCompanyInitials(entry.defaultFields.companyName)}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#222' }}>
-                            {entry.defaultFields.companyName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#6c757d', fontWeight: 500 }}>
-                            Entry #{index + 1}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          maxWidth: 200,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          fontWeight: 500,
-                          color: '#6c757d',
-                        }}
-                      >
-                        {entry.defaultFields.address || 'Not provided'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CalendarToday sx={{ fontSize: 16, color: '#6c757d' }} />
-                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#222' }}>
-                          {formatDate(entry.defaultFields.dueDate)}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {daysUntilDue !== null && (
-                        <Chip
-                          size="small"
-                          icon={getStatusIcon(daysUntilDue)}
-                          label={
-                            daysUntilDue < 0
-                              ? `${Math.abs(daysUntilDue)}d overdue`
-                              : `${daysUntilDue}d left`
-                          }
-                          color={statusColor}
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: '0.75rem',
-                            borderRadius: 2,
-                            '& .MuiChip-icon': { fontSize: 14 },
-                          }}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewEntry(entry)}
+                    <Business sx={{ fontSize: 40, color: '#3b82f6' }} />
+                  </Avatar>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#1f2937' }}>
+                    No entries found
+                  </Typography>
+                  <Typography
+                    color="textSecondary"
+                    sx={{ mb: 4, fontSize: '1.1rem', maxWidth: 480, mx: 'auto' }}
+                  >
+                    Start by adding your first {selectedMasterType.toLowerCase()} entry
+                  </Typography>
+                  {!showInlineForm && (
+                    <Button
+                      variant="contained"
+                      startIcon={<Add />}
+                      onClick={() => setShowInlineForm(true)}
+                      sx={{
+                        borderRadius: 3,
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        px: 4,
+                        py: 1.5,
+                        backgroundColor: '#3b82f6',
+                        '&:hover': {
+                          backgroundColor: '#2563eb',
+                        },
+                      }}
+                    >
+                      Add First Entry
+                    </Button>
+                  )}
+                </Box>
+              ) : (
+                <TableContainer sx={{ maxHeight: 700 }}>
+                  <Table stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        {['Company', 'Location', 'Due Date', 'Status', 'Actions'].map((header, i) => (
+                          <TableCell
+                            key={header}
                             sx={{
-                              bgcolor: alpha('#2196f3', 0.1),
-                              color: '#2196f3',
-                              borderRadius: 2,
+                              fontWeight: 700,
+                              backgroundColor: i === 0 ? '#f6f8fb' : 'transparent',
+                              color: i === 0 ? '#3b82f6' : '#1f2937',
+                              borderBottom: `2px solid ${alpha('#3b82f6', 0.15)}`,
+                              py: 2,
+                              width: header === 'Actions' ? 140 : 'auto',
+                            }}
+                          >
+                            {header}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredEntries.map((entry, index) => {
+                        const daysUntilDue = getDaysUntilDue(entry.defaultFields.dueDate);
+                        const statusColor = getStatusColor(daysUntilDue);
+
+                        return (
+                          <TableRow
+                            key={entry._id}
+                            hover
+                            sx={{
+                              cursor: 'pointer',
+                              backgroundColor:
+                                editMode && masterData.id === entry._id
+                                  ? alpha('#f59e0b', 0.15)
+                                  : 'inherit',
+                              transition: 'all 0.2s ease-in-out',
                               '&:hover': {
-                                bgcolor: alpha('#2196f3', 0.2),
-                                transform: 'scale(1.1)',
+                                backgroundColor: alpha('#3b82f6', 0.1),
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 10px rgba(59, 130, 246, 0.1)',
                               },
                             }}
                           >
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Entry">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEdit(entry)}
-                            sx={{
-                              bgcolor: alpha('#ffc107', 0.1),
-                              color: '#ffc107',
-                              borderRadius: 2,
-                              '&:hover': {
-                                bgcolor: alpha('#ffc107', 0.2),
-                                transform: 'scale(1.1)',
-                              },
-                            }}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-    </Card>
-  </Grid>
-)}
-
+                            <TableCell sx={{ py: 2 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Avatar
+                                  sx={{
+                                    width: 40,
+                                    height: 40,
+                                    bgcolor: '#3b82f6',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 700,
+                                    color: '#fff',
+                                  }}
+                                >
+                                  {getCompanyInitials(entry.defaultFields.companyName)}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>
+                                    {entry.defaultFields.companyName}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                                    Entry #{index + 1}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  maxWidth: 200,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  fontWeight: 500,
+                                  color: '#6b7280',
+                                }}
+                              >
+                                {entry.defaultFields.address || 'Not provided'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <CalendarToday sx={{ fontSize: 16, color: '#6b7280' }} />
+                                <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                                  {formatDate(entry.defaultFields.dueDate)}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              {daysUntilDue !== null && (
+                                <Chip
+                                  size="small"
+                                  icon={getStatusIcon(daysUntilDue)}
+                                  label={
+                                    daysUntilDue < 0
+                                      ? `${Math.abs(daysUntilDue)}d overdue`
+                                      : `${daysUntilDue}d left`
+                                  }
+                                  color={statusColor}
+                                  sx={{
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    borderRadius: 2,
+                                    '& .MuiChip-icon': { fontSize: 14 },
+                                  }}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Stack direction="row" spacing={1}>
+                                <Tooltip title="View Details">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleViewEntry(entry)}
+                                    sx={{
+                                      bgcolor: alpha('#3b82f6', 0.1),
+                                      color: '#3b82f6',
+                                      borderRadius: 2,
+                                      '&:hover': {
+                                        bgcolor: alpha('#3b82f6', 0.2),
+                                        transform: 'scale(1.1)',
+                                      },
+                                    }}
+                                  >
+                                    <Visibility fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Edit Entry">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEdit(entry)}
+                                    sx={{
+                                      bgcolor: alpha('#f59e0b', 0.1),
+                                      color: '#f59e0b',
+                                      borderRadius: 2,
+                                      '&:hover': {
+                                        bgcolor: alpha('#f59e0b', 0.2),
+                                        transform: 'scale(1.1)',
+                                      },
+                                    }}
+                                  >
+                                    <Edit fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Card>
+          </Grid>
+        )}
 
         {/* Enhanced Master Type Cards */}
         {!selectedMasterType && (
@@ -1277,14 +1223,14 @@ const ICON_BG = "#eaf3fb";
                 variant="h5" 
                 sx={{ 
                   fontWeight: 700, 
-                  color: theme.palette.text.primary, 
+                  color: '#1f2937', 
                   mb: 4,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 2
                 }}
               >
-                <Assignment sx={{ color: theme.palette.primary.main, fontSize: 32 }} />
+                <Assignment sx={{ color: '#3b82f6', fontSize: 32 }} />
                 Your Master Types
               </Typography>
               
@@ -1295,22 +1241,22 @@ const ICON_BG = "#eaf3fb";
                     p: 8, 
                     textAlign: 'center',
                     borderRadius: 4,
-                    border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.04)} 100%)`
+                    border: `2px dashed ${alpha('#3b82f6', 0.3)}`,
+                    background: `linear-gradient(135deg, ${alpha('#fff', 0.8)} 0%, ${alpha('#3b82f6', 0.04)} 100%)`
                   }}
                 >
                   <Avatar
                     sx={{ 
                       width: 100, 
                       height: 100, 
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      bgcolor: alpha('#3b82f6', 0.1),
                       mx: 'auto',
                       mb: 3
                     }}
                   >
-                    <Business sx={{ fontSize: 48, color: theme.palette.primary.main }} />
+                    <Business sx={{ fontSize: 48, color: '#3b82f6' }} />
                   </Avatar>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: theme.palette.text.primary }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: '#1f2937' }}>
                     No master types created yet
                   </Typography>
                   <Typography color="text.secondary" sx={{ mb: 4, fontSize: '1.1rem', maxWidth: 500, mx: 'auto' }}>
@@ -1331,9 +1277,9 @@ const ICON_BG = "#eaf3fb";
                       px: 4,
                       py: 1.5,
                       fontSize: '1.1rem',
-                      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                      background: `linear-gradient(135deg, #3b82f6 0%, #14b8a6 100%)`,
                       '&:hover': {
-                        background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
+                        background: `linear-gradient(135deg, #2563eb 0%, #0d9488 100%)`,
                       }
                     }}
                   >
@@ -1350,14 +1296,14 @@ const ICON_BG = "#eaf3fb";
                           elevation={0}
                           sx={{ 
                             borderRadius: 4,
-                            border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+                            border: `1px solid ${alpha('#3b82f6', 0.12)}`,
                             cursor: 'pointer',
                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+                            background: `linear-gradient(135deg, #fff 0%, ${alpha('#3b82f6', 0.02)} 100%)`,
                             '&:hover': {
                               transform: 'translateY(-8px)',
-                              boxShadow: `0 20px 40px ${alpha(theme.palette.primary.main, 0.15)}`,
-                              borderColor: theme.palette.primary.main
+                              boxShadow: `0 20px 40px ${alpha('#3b82f6', 0.15)}`,
+                              borderColor: '#3b82f6'
                             }
                           }}
                           onClick={() => handleMasterTypeCardClick(masterType.name)}
@@ -1368,17 +1314,17 @@ const ICON_BG = "#eaf3fb";
                                 sx={{ 
                                   width: 48, 
                                   height: 48,
-                                  bgcolor: theme.palette.primary.main,
+                                  bgcolor: '#3b82f6',
                                   mr: 2
                                 }}
                               >
                                 <Business sx={{ fontSize: 24 }} />
                               </Avatar>
                               <Box sx={{ flex: 1 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '1.1rem' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
                                   {masterType.name}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+                                <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>
                                   {masterType.fields?.length || 0} custom fields
                                 </Typography>
                               </Box>
@@ -1389,30 +1335,30 @@ const ICON_BG = "#eaf3fb";
                             <Grid container spacing={2} sx={{ mb: 2 }}>
                               <Grid item xs={4}>
                                 <Box sx={{ textAlign: 'center' }}>
-                                  <Typography variant="h5" sx={{ fontWeight: 800, color: theme.palette.primary.main }}>
+                                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#3b82f6' }}>
                                     {stats.total}
                                   </Typography>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 600 }}>
+                                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>
                                     Total
                                   </Typography>
                                 </Box>
                               </Grid>
                               <Grid item xs={4}>
                                 <Box sx={{ textAlign: 'center' }}>
-                                  <Typography variant="h5" sx={{ fontWeight: 800, color: theme.palette.warning.main }}>
+                                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#f59e0b' }}>
                                     {stats.upcoming}
                                   </Typography>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 600 }}>
+                                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>
                                     Due Soon
                                   </Typography>
                                 </Box>
                               </Grid>
                               <Grid item xs={4}>
                                 <Box sx={{ textAlign: 'center' }}>
-                                  <Typography variant="h5" sx={{ fontWeight: 800, color: theme.palette.error.main }}>
+                                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#ef4444' }}>
                                     {stats.overdue}
                                   </Typography>
-                                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 600 }}>
+                                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>
                                     Overdue
                                   </Typography>
                                 </Box>
@@ -1425,8 +1371,8 @@ const ICON_BG = "#eaf3fb";
                                 size="small"
                                 variant="outlined"
                                 sx={{ 
-                                  color: theme.palette.primary.main, 
-                                  borderColor: theme.palette.primary.main,
+                                  color: '#3b82f6', 
+                                  borderColor: '#3b82f6',
                                   fontSize: '0.75rem',
                                   fontWeight: 600
                                 }}
@@ -1440,84 +1386,83 @@ const ICON_BG = "#eaf3fb";
                   
                   {/* Create New Master Type Card */}
                   <Grid item xs={12} sm={6} md={4} lg={3}>
-  <Card
-    elevation={0}
-    sx={{
-      borderRadius: 4,
-      border: `2px dashed ${alpha("#1765D8", 0.3)}`, // Primary blue dashed border
-      cursor: "pointer",
-      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-      background: `linear-gradient(135deg, ${alpha("#1765D8", 0.05)} 0%, ${alpha("#3ed6cb", 0.10)} 100%)`, // Gradient blue to teal
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      p: 4,
-      height: '100%',
-      "&:hover": {
-        borderColor: "#1765D8",
-        bgcolor: alpha("#1765D8", 0.12),
-        transform: "translateY(-6px)",
-        boxShadow: "0 8px 20px rgba(23, 101, 216, 0.3)",
-      },
-    }}
-    onClick={() => {
-      resetForm();
-      setOpenDialog(true);
-    }}
-  >
-    <Avatar
-      sx={{
-        width: 72,
-        height: 72,
-        bgcolor: alpha("#3ed6cb", 0.15),
-        border: `2px solid ${alpha("#1765D8", 0.25)}`,
-        mb: 3,
-      }}
-    >
-      <Add sx={{ fontSize: 36, color: "#1765D8" }} />
-    </Avatar>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        borderRadius: 4,
+                        border: `2px dashed ${alpha('#3b82f6', 0.3)}`,
+                        cursor: "pointer",
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                        background: `linear-gradient(135deg, ${alpha('#3b82f6', 0.05)} 0%, ${alpha('#14b8a6', 0.10)} 100%)`,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        p: 4,
+                        height: '100%',
+                        "&:hover": {
+                          borderColor: '#3b82f6',
+                          bgcolor: alpha('#3b82f6', 0.12),
+                          transform: "translateY(-6px)",
+                          boxShadow: "0 8px 20px rgba(59, 130, 246, 0.3)",
+                        },
+                      }}
+                      onClick={() => {
+                        resetForm();
+                        setOpenDialog(true);
+                      }}
+                    >
+                      <Avatar
+                        sx={{
+                          width: 72,
+                          height: 72,
+                          bgcolor: alpha('#14b8a6', 0.15),
+                          border: `2px solid ${alpha('#3b82f6', 0.25)}`,
+                          mb: 3,
+                        }}
+                      >
+                        <Add sx={{ fontSize: 36, color: '#3b82f6' }} />
+                      </Avatar>
 
-    <Typography
-      variant="h6"
-      sx={{
-        fontWeight: 700,
-        color: "#1765D8",
-        mb: 1,
-        textAlign: "center",
-      }}
-    >
-      Create New Master
-    </Typography>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight: 700,
+                          color: '#3b82f6',
+                          mb: 1,
+                          textAlign: "center",
+                        }}
+                      >
+                        Create New Master
+                      </Typography>
 
-    <Typography
-      variant="body2"
-      sx={{
-        color: "#4a5768",
-        fontSize: "0.9rem",
-        mb: 3,
-        maxWidth: 220,
-        textAlign: "center",
-      }}
-    >
-      Set up a new master type with custom fields for your business needs
-    </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: '#4a5768',
+                          fontSize: "0.9rem",
+                          mb: 3,
+                          maxWidth: 220,
+                          textAlign: "center",
+                        }}
+                      >
+                        Set up a new master type with custom fields for your business needs
+                      </Typography>
 
-    <Chip
-      label="+ New Master Type"
-      sx={{
-        bgcolor: "#3ed6cb",
-        color: "#fff",
-        fontSize: "0.75rem",
-        fontWeight: 700,
-        px: 2,
-        py: 0.5,
-        borderRadius: 2,
-      }}
-    />
-  </Card>
-</Grid>
-
+                      <Chip
+                        label="+ New Master Type"
+                        sx={{
+                          bgcolor: '#14b8a6',
+                          color: '#fff',
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          px: 2,
+                          py: 0.5,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </Card>
+                  </Grid>
                 </Grid>
               )}
             </Box>
@@ -1526,645 +1471,934 @@ const ICON_BG = "#eaf3fb";
       </Grid>
 
       {/* Enhanced Create Dialog */}
-      <Dialog 
-        open={openDialog} 
-        onClose={() => setOpenDialog(false)} 
-        maxWidth="md" 
+<Dialog
+  open={openDialog}
+  onClose={() => setOpenDialog(false)}
+  maxWidth="md"
+  fullWidth
+  PaperProps={{
+    sx: {
+      borderRadius: 4,
+      maxHeight: '90vh',
+      backgroundColor: '#ffffff', // Set solid white background
+      boxShadow: '0 12px 24px rgba(59, 130, 246, 0.1)', // softened shadow
+      p: 0,
+    },
+  }}
+>
+  <DialogTitle
+    sx={{
+      backgroundColor: '#f0f4ff',
+      borderBottom: '1px solid #93c5fd', // primary 300 from your palette
+      color: '#2563eb', // primary 600
+      fontWeight: 700,
+      fontSize: '1.4rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 2,
+      px: 5,
+      py: 4,
+      mb: 3,
+      letterSpacing: '0.03em',
+      userSelect: 'none',
+    }}
+  >
+    <Avatar sx={{ bgcolor: '#2563eb', width: 36, height: 36 }}>
+      <Add fontSize="small" />
+    </Avatar>
+    Create New Master Type
+  </DialogTitle>
+
+  <DialogContent
+    sx={{
+      pt: 6,
+      pb: 4,
+      px: 5,
+      backgroundColor: '#ffffff', // solid white background here
+      overflowY: 'auto',
+      maxHeight: 'calc(90vh - 120px)',
+    }}
+  >
+    <Stack spacing={3}>
+      <TextField
         fullWidth
-        PaperProps={{ 
-          sx: { 
-            borderRadius: 4,
-            maxHeight: '90vh',
-            background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
-          } 
-        }}
-      >
-        <DialogTitle sx={{ 
-          background: SIDEBAR_BG,
-          borderBottom: `1px solid ${alpha(PRIMARY_COLOR, 0.15)}`,
-          color: PRIMARY_COLOR,
-          fontWeight: 600,
-          fontSize: '1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2
-        }}>
-          <Avatar sx={{ bgcolor: theme.palette.primary.main, width: 32, height: 32 }}>
-            <Add fontSize="small" />
-          </Avatar>
-          Create New Master Type
-        </DialogTitle>
-
-       <DialogContent sx={{ 
-  pt: 3,
-  pb: 2,
-  px: 3,
-  backgroundColor: '#fafbfc'
-}}>
-  <Stack spacing={3}>
-    <TextField
-      fullWidth
-      label="Master Type Name"
-      value={masterData.masterType}
-      onChange={(e) => setMasterData(prev => ({ ...prev, masterType: e.target.value }))}
-      required
-      placeholder="e.g., GST Returns, Income Tax, Compliance"
-      sx={{
-        '& .MuiOutlinedInput-root': {
-          borderRadius: 2,
-          backgroundColor: '#ffffff',
-          border: '1.5px solid #e5e7eb',
-          transition: 'all 0.2s ease',
-          '&:hover': {
-            borderColor: '#6366f1',
-            backgroundColor: '#f8fafc',
-          },
-          '&.Mui-focused': {
-            borderColor: '#6366f1',
+        label="Master Type Name"
+        value={masterData.masterType}
+        onChange={(e) => setMasterData((prev) => ({ ...prev, masterType: e.target.value }))}
+        required
+        placeholder="e.g., GST Returns, Income Tax, Compliance"
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 3,
             backgroundColor: '#ffffff',
-            boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.08)',
-          }
-        },
-        '& .MuiInputLabel-root': {
-          fontWeight: 500,
-          color: '#374151',
-          '&.Mui-focused': {
-            color: '#6366f1'
-          }
-        }
-      }}
-    />
+            border: '1.5px solid #e5e7eb',
+            transition: 'border-color 0.3s ease',
+            '&:hover': { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
+            '&.Mui-focused': {
+              borderColor: '#3b82f6',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 0 0 4px rgba(59,130,246,0.15)',
+            },
+          },
+          '& .MuiInputLabel-root': {
+            fontWeight: 600,
+            fontSize: '1rem',
+            color: '#374151',
+            '&.Mui-focused': { color: '#3b82f6' },
+          },
+        }}
+      />
 
-    <Box sx={{
-      backgroundColor: '#ffffff',
-      border: '1px solid #e5e7eb',
-      borderRadius: 3,
-      p: 3
-    }}>
-      <Typography 
-        variant="subtitle1" 
-        sx={{ 
-          fontWeight: 600, 
-          color: '#1f2937',
-          mb: 2.5,
-          fontSize: '0.95rem'
+      <Box
+        sx={{
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 4,
+          p: 5,
+          boxShadow: 'inset 0 0 10px rgba(0,0,0,0.03)',
         }}
       >
-        Company Information
-      </Typography>
-      
-      <Grid container spacing={2.5}>
-        <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            label="Company Name"
-            value={masterData.defaultFields.companyName}
-            onChange={(e) => handleDefaultFieldChange('companyName', e.target.value)}
-            required
-            size="small"
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                '&:hover': {
-                  borderColor: '#6366f1',
-                },
-                '&.Mui-focused': {
-                  borderColor: '#6366f1',
-                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                }
-              },
-              '& .MuiInputLabel-root': {
-                color: '#6b7280',
-                fontWeight: 500,
-                fontSize: '0.875rem'
-              }
-            }}
-          />
-        </Grid>
-        
-        <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            label="Address"
-            value={masterData.defaultFields.address}
-            onChange={(e) => handleDefaultFieldChange('address', e.target.value)}
-            size="small"
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                '&:hover': {
-                  borderColor: '#6366f1',
-                },
-                '&.Mui-focused': {
-                  borderColor: '#6366f1',
-                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                }
-              },
-              '& .MuiInputLabel-root': {
-                color: '#6b7280',
-                fontWeight: 500,
-                fontSize: '0.875rem'
-              }
-            }}
-          />
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
-          <TextField
-            fullWidth
-            label="Billing Date"
-            type="date"
-            value={masterData.defaultFields.billingDate}
-            onChange={(e) => handleDefaultFieldChange('billingDate', e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            size="small"
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                '&:hover': {
-                  borderColor: '#6366f1',
-                },
-                '&.Mui-focused': {
-                  borderColor: '#6366f1',
-                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                }
-              },
-              '& .MuiInputLabel-root': {
-                color: '#6b7280',
-                fontWeight: 500,
-                fontSize: '0.875rem'
-              }
-            }}
-          />
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
-          <TextField
-            fullWidth
-            label="Due Date"
-            type="date"
-            value={masterData.defaultFields.dueDate}
-            onChange={(e) => handleDefaultFieldChange('dueDate', e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            size="small"
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                '&:hover': {
-                  borderColor: '#6366f1',
-                },
-                '&.Mui-focused': {
-                  borderColor: '#6366f1',
-                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                }
-              },
-              '& .MuiInputLabel-root': {
-                color: '#6b7280',
-                fontWeight: 500,
-                fontSize: '0.875rem'
-              }
-            }}
-          />
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
-          <FormControl fullWidth size="small">
-            <InputLabel sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>
-              Reminder
-            </InputLabel>
-            <Select
-              value={masterData.defaultFields.reminder}
-              label="Reminder"
-              onChange={(e) => handleDefaultFieldChange('reminder', e.target.value)}
-              sx={{
-                borderRadius: 2,
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#6366f1',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#6366f1',
-                  boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                }
-              }}
-            >
-              {reminderOptions.map(option => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-      </Grid>
-    </Box>
-
-    <Box sx={{
-      backgroundColor: '#ffffff',
-      border: '1px solid #e5e7eb',
-      borderRadius: 3,
-      p: 3
-    }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
-        <Typography 
-          variant="subtitle1" 
-          sx={{ 
-            fontWeight: 600, 
-            color: '#1f2937',
-            fontSize: '0.95rem'
-          }}
+        <Typography
+          variant="subtitle1"
+          sx={{ fontWeight: 700, color: '#1f2937', mb: 4, fontSize: '1.125rem', letterSpacing: '0.02em' }}
         >
-          Custom Fields
+          Company Information
         </Typography>
-        
-        <Button 
-          startIcon={<Add />} 
-          onClick={addCustomField}
-          variant="contained"
-          size="small"
-          sx={{ 
-            borderRadius: 2, 
-            textTransform: 'none', 
-            fontWeight: 500,
-            backgroundColor: '#6366f1',
-            fontSize: '0.875rem',
-            px: 2,
-            py: 0.75,
-            minHeight: 'auto',
-            '&:hover': {
-              backgroundColor: '#4f46e5',
-            }
-          }}
-        >
-          Add Field
-        </Button>
-      </Box>
-      
-      {masterData.customFields.map((field, index) => (
-        <Paper 
-          key={field.id}
-          elevation={0}
-          sx={{ 
-            p: 2.5, 
-            mb: 2,
-            backgroundColor: '#f9fafb',
-            border: '1px solid #e5e7eb',
-            borderRadius: 2.5,
-            transition: 'all 0.15s ease',
-            '&:hover': {
-              borderColor: '#d1d5db',
-              backgroundColor: '#f3f4f6',
-            }
-          }}
-        >
-          <Grid container spacing={2} alignItems="flex-start">
-            <Grid item xs={12} md={3}>
+
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Company Name"
+              value={masterData.defaultFields.companyName}
+              onChange={(e) => handleDefaultFieldChange('companyName', e.target.value)}
+              required
+              size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 3,
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#ffffff',
+                  transition: 'border-color 0.3s ease',
+                  '&:hover': { borderColor: '#3b82f6' },
+                  '&.Mui-focused': {
+                    borderColor: '#3b82f6',
+                    boxShadow: '0 0 0 4px rgba(59,130,246,0.25)',
+                  },
+                },
+                '& .MuiInputLabel-root': { color: '#6b7280', fontWeight: 600, fontSize: '0.95rem' },
+              }}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Address"
+              value={masterData.defaultFields.address}
+              onChange={(e) => handleDefaultFieldChange('address', e.target.value)}
+              size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 3,
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#ffffff',
+                  transition: 'border-color 0.3s ease',
+                  '&:hover': { borderColor: '#6366f1' },
+                  '&.Mui-focused': {
+                    borderColor: '#6366f1',
+                    boxShadow: '0 0 0 4px rgba(99,102,241,0.25)',
+                  },
+                },
+                '& .MuiInputLabel-root': { color: '#6b7280', fontWeight: 600, fontSize: '0.95rem' },
+              }}
+            />
+          </Grid>
+
+          {[{ label: 'Billing Date', field: 'billingDate' }, { label: 'Due Date', field: 'dueDate' }].map(({ label, field }) => (
+            <Grid item xs={12} md={4} key={field}>
               <TextField
                 fullWidth
-                label="Field Name"
+                type="date"
+                label={label}
+                value={masterData.defaultFields[field]}
+                onChange={(e) => handleDefaultFieldChange(field as any, e.target.value)}
+                InputLabelProps={{ shrink: true }}
                 size="small"
-                value={field.name}
-                onChange={(e) => updateCustomField(field.id, 'name', e.target.value)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 1.5,
-                    backgroundColor: '#ffffff',
+                    borderRadius: 3,
                     border: '1px solid #d1d5db',
-                    '&:hover': {
-                      borderColor: '#6366f1',
-                    },
+                    backgroundColor: '#ffffff',
+                    transition: 'border-color 0.3s ease',
+                    '&:hover': { borderColor: '#6366f1' },
                     '&.Mui-focused': {
                       borderColor: '#6366f1',
-                      boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                    }
+                      boxShadow: '0 0 0 4px rgba(99,102,241,0.25)',
+                    },
                   },
-                  '& .MuiInputLabel-root': {
-                    color: '#6b7280',
-                    fontSize: '0.875rem'
-                  }
+                  '& .MuiInputLabel-root': { color: '#6b7280', fontWeight: 600, fontSize: '0.95rem' },
                 }}
               />
             </Grid>
-            
-            <Grid item xs={12} md={field.type === 'upload' ? 6 : 3}>
-              {field.type === 'date' ? (
-                <TextField
-                  fullWidth
-                  label="Default Value"
-                  size="small"
-                  type="date"
-                  value={typeof field.value === 'string' ? field.value : ''}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 1.5,
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #d1d5db',
-                      '&:hover': {
-                        borderColor: '#6366f1',
-                      },
-                      '&.Mui-focused': {
-                        borderColor: '#6366f1',
-                        boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                      }
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#6b7280',
-                      fontSize: '0.875rem'
-                    }
-                  }}
-                />
-              ) : field.type === 'upload' ? (
-                <Box>
-                  <Button
-                    variant="outlined"
-                    startIcon={<CloudUpload />}
-                    size="small"
-                    sx={{ 
-                      borderRadius: 1.5,
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      borderColor: '#d1d5db',
-                      color: '#6b7280',
-                      fontSize: '0.875rem',
-                      '&:hover': {
-                        borderColor: '#6366f1',
-                        color: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.04)'
-                      }
-                    }}
-                  >
-                    Upload Files
-                  </Button>
-                  {Array.isArray(field.value) && field.value.length > 0 && (
-                    <Typography variant="caption" display="block" sx={{ mt: 0.5, color: '#6b7280' }}>
-                      {field.value.length} file(s) selected
-                    </Typography>
-                  )}
-                </Box>
-              ) : (
-                <TextField
-                  fullWidth
-                  label="Default Value"
-                  size="small"
-                  type={field.type}
-                  value={typeof field.value === 'string' ? field.value : ''}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 1.5,
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #d1d5db',
-                      '&:hover': {
-                        borderColor: '#6366f1',
-                      },
-                      '&.Mui-focused': {
-                        borderColor: '#6366f1',
-                        boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                      }
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#6b7280',
-                      fontSize: '0.875rem'
-                    }
-                  }}
-                />
-              )}
-            </Grid>
-            
-            <Grid item xs={6} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: '#6b7280', fontSize: '0.875rem' }}>Type</InputLabel>
-                <Select
-                  value={field.type}
-                  label="Type"
-                  onChange={(e) => {
-                    const newType = e.target.value;
-                    updateCustomField(field.id, 'type', newType);
-                    updateCustomField(field.id, 'value', newType === 'upload' ? [] : '');
-                  }}
-                  sx={{
-                    borderRadius: 1.5,
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #d1d5db',
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#6366f1',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#6366f1',
-                      boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.08)',
-                    }
-                  }}
-                >
-                  <MenuItem value="text">Text</MenuItem>
-                  <MenuItem value="number">Number</MenuItem>
-                  <MenuItem value="date">Date</MenuItem>
-                  <MenuItem value="email">Email</MenuItem>
-                  <MenuItem value="phone">Phone</MenuItem>
-                  <MenuItem value="upload">Upload</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={6} md={1}>
-              <Tooltip title="Remove Field">
-                <IconButton 
-                  color="error" 
-                  onClick={() => removeCustomField(field.id)}
-                  size="small"
-                  sx={{ 
-                    color: '#9ca3af',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 1.5,
-                    '&:hover': { 
-                      color: '#ef4444',
-                      borderColor: '#fecaca',
-                      backgroundColor: '#fef2f2',
-                    }
-                  }}
-                >
-                  <Delete fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Grid>
+          ))}
+
+          <Grid item xs={12} md={4}>
+            <FormControl
+              fullWidth
+              size="small"
+              sx={{
+                borderRadius: 3,
+                backgroundColor: '#ffffff',
+                border: '1px solid #d1d5db',
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#6366f1' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#6366f1', boxShadow: '0 0 0 4px rgba(99,102,241,0.25)' },
+              }}
+            >
+              <InputLabel sx={{ color: '#6b7280', fontWeight: 600, fontSize: '0.95rem' }}>Reminder</InputLabel>
+              <Select
+                value={masterData.defaultFields.reminder}
+                label="Reminder"
+                onChange={(e) => handleDefaultFieldChange('reminder', e.target.value)}
+                sx={{ borderRadius: 3, backgroundColor: '#ffffff' }}
+              >
+                {reminderOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
-        </Paper>
-      ))}
-    </Box>
-  </Stack>
-</DialogContent>
+        </Grid>
+      </Box>
 
-        <DialogActions sx={{ 
-          p: 3, 
-          background: alpha(theme.palette.primary.main, 0.04), 
-          borderTop: `1px solid ${alpha(theme.palette.divider, 0.12)}` 
-        }}>
-          <Button 
-            onClick={() => setOpenDialog(false)}
-            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600 }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={!masterData.masterType || !masterData.defaultFields.companyName || loading}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 700,
-              borderRadius: 3,
-              px: 4,
-              background: HEADER_GRADIENT,
-              '&:hover': {
-                background: `linear-gradient(90deg, ${PRIMARY_COLOR} 0%, ${SECONDARY_COLOR} 100%)`,
-              }
-            }}
-          >
-            {loading ? 'Creating...' : 'Create Master Type'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Enhanced View Dialog */}
-      <Dialog 
-        open={viewDialog} 
-        onClose={() => setViewDialog(false)} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{ 
-          sx: { 
-            borderRadius: 4,
-            background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
-          } 
+      <Box
+        sx={{
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 4,
+          p: 4,
+          mt: 4,
         }}
       >
-        <DialogTitle sx={{ 
-          background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.1)} 100%)`,
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-          color: theme.palette.text.primary,
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2
-        }}>
-          <Avatar sx={{ bgcolor: theme.palette.info.main, width: 32, height: 32 }}>
-            <Visibility fontSize="small" />
-          </Avatar>
-          {selectedEntry?.defaultFields.companyName}
-        </DialogTitle>
-        
-        <DialogContent sx={{ pt: 3 }}>
-          {selectedEntry && (
-            <Grid container spacing={3}>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Type
-                </Typography>
-                <Chip 
-                  label={selectedEntry.masterTypeName} 
-                  color="primary"
-                  sx={{ fontWeight: 600 }}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.05rem' }}>
+            Custom Fields
+          </Typography>
+          <Button
+            startIcon={<Add />}
+            onClick={addCustomField}
+            variant="contained"
+            size="small"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              backgroundColor: '#6366f1',
+              fontSize: '0.9rem',
+              px: 3,
+              py: 1,
+              minHeight: 'auto',
+              transition: 'background-color 0.3s ease',
+              '&:hover': { backgroundColor: '#4f46e5' },
+            }}
+          >
+            Add Field
+          </Button>
+        </Box>
+
+        {masterData.customFields.map((field, index) => (
+          <Paper
+            key={field.id}
+            elevation={0}
+            sx={{
+              p: 3,
+              mb: 3,
+              backgroundColor: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 3,
+              transition: 'all 0.15s ease',
+              '&:hover': { borderColor: '#d1d5db', backgroundColor: '#f3f4f6' },
+            }}
+          >
+            <Grid container spacing={3} alignItems="center">
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Field Name"
+                  size="small"
+                  value={field.name}
+                  onChange={(e) => updateCustomField(field.id, 'name', e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #d1d5db',
+                      transition: 'border-color 0.3s ease',
+                      '&:hover': { borderColor: '#6366f1' },
+                      '&.Mui-focused': {
+                        borderColor: '#6366f1',
+                        boxShadow: '0 0 0 3px rgba(99,102,241,0.2)',
+                      },
+                    },
+                    '& .MuiInputLabel-root': { color: '#6b7280', fontSize: '0.9rem' },
+                  }}
                 />
               </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Address
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {selectedEntry.defaultFields.address || 'Not provided'}
-                </Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Billing Date
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {formatDate(selectedEntry.defaultFields.billingDate)}
-                </Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Due Date
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {formatDate(selectedEntry.defaultFields.dueDate)}
-                </Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Reminder
-                </Typography>
-                <Typography variant="body1" sx={{ textTransform: 'capitalize', fontWeight: 500 }}>
-                  {selectedEntry.defaultFields.reminder}
-                </Typography>
+
+              <Grid item xs={12} md={field.type === 'upload' ? 5 : 3}>
+                {field.type === 'date' ? (
+                  <TextField
+                    fullWidth
+                    label="Default Value"
+                    size="small"
+                    type="date"
+                    value={typeof field.value === 'string' ? field.value : ''}
+                    onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #d1d5db',
+                        transition: 'border-color 0.3s ease',
+                        '&:hover': { borderColor: '#6366f1' },
+                        '&.Mui-focused': {
+                          borderColor: '#6366f1',
+                          boxShadow: '0 0 0 3px rgba(99,102,241,0.2)',
+                        },
+                      },
+                      '& .MuiInputLabel-root': { color: '#6b7280', fontSize: '0.9rem' },
+                    }}
+                  />
+                ) : field.type === 'upload' ? (
+                  <Box>
+                    <label htmlFor={`upload-button-${field.id}`} style={{ display: 'inline-block' }}>
+                      <input
+                        id={`upload-button-${field.id}`}
+                        type="file"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          if (!e.target.files) return;
+                          const files = Array.from(e.target.files);
+                          const token = localStorage.getItem('token');
+
+                          const uploadedFiles = [];
+                          for (const file of files) {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            try {
+                              const response = await fetch(`${API_BASE_URL}/files/upload`, {
+                                method: 'POST',
+                                headers: {
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: formData,
+                              });
+                              if (response.ok) {
+                                const data = await response.json();
+                                uploadedFiles.push({ url: data.url, key: data.filename });
+                              }
+                            } catch (err) {
+                              console.error('Upload error:', err);
+                            }
+                          }
+                          if (uploadedFiles.length > 0) {
+                            handleFilesUploaded(field.id, uploadedFiles);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                      <Button
+                        component="span"
+                        variant="outlined"
+                        startIcon={<CloudUpload />}
+                        size="small"
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderColor: '#d1d5db',
+                          color: '#6b7280',
+                          fontSize: '0.9rem',
+                          '&:hover': {
+                            borderColor: '#6366f1',
+                            color: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                          },
+                        }}
+                      >
+                        Upload Files
+                      </Button>
+                    </label>
+                    {Array.isArray(field.value) && field.value.length > 0 && (
+                      <Typography variant="caption" display="block" sx={{ mt: 1, color: '#6b7280' }}>
+                        {field.value.length} file{field.value.length > 1 ? 's' : ''} selected
+                      </Typography>
+                    )}
+                  </Box>
+                ) : (
+                  <TextField
+                    fullWidth
+                    label="Default Value"
+                    size="small"
+                    type={field.type}
+                    value={typeof field.value === 'string' ? field.value : ''}
+                    onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #d1d5db',
+                        transition: 'border-color 0.3s ease',
+                        '&:hover': {
+                          borderColor: '#6366f1',
+                        },
+                        '&.Mui-focused': {
+                          borderColor: '#6366f1',
+                          boxShadow: '0 0 0 3px rgba(99,102,241,0.2)',
+                        },
+                      },
+                      '& .MuiInputLabel-root': {
+                        color: '#6b7280',
+                        fontSize: '0.9rem',
+                      },
+                    }}
+                  />
+                )}
               </Grid>
 
-              {selectedEntry.customFields && selectedEntry.customFields.length > 0 && (
-                <>
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: theme.palette.primary.main, mb: 2 }}>
-                      Additional Information
-                    </Typography>
-                  </Grid>
-                  {selectedEntry.customFields.map((field, index) => (
-                    <Grid item xs={6} key={index}>
-                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mb: 0.5 }}>
+              <Grid item xs={6} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: '#6b7280', fontSize: '0.9rem' }}>Type</InputLabel>
+                  <Select
+                    value={field.type}
+                    label="Type"
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      updateCustomField(field.id, 'type', newType);
+                      updateCustomField(field.id, 'value', newType === 'upload' ? [] : '');
+                    }}
+                    sx={{
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #d1d5db',
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#6366f1',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#6366f1',
+                        boxShadow: '0 0 0 3px rgba(99,102,241,0.2)',
+                      },
+                    }}
+                  >
+                    <MenuItem value="text">Text</MenuItem>
+                    <MenuItem value="number">Number</MenuItem>
+                    <MenuItem value="date">Date</MenuItem>
+                    <MenuItem value="email">Email</MenuItem>
+                    <MenuItem value="phone">Phone</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={6} md={1}>
+                <Tooltip title="Remove Field">
+                  <IconButton
+                    color="error"
+                    onClick={() => removeCustomField(field.id)}
+                    size="small"
+                    sx={{
+                      color: '#9ca3af',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 2,
+                      '&:hover': {
+                        color: '#ef4444',
+                        borderColor: '#fecaca',
+                        backgroundColor: '#fef2f2',
+                      },
+                    }}
+                  >
+                    <Delete fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Grid>
+            </Grid>
+          </Paper>
+        ))}
+      </Box>
+    </Stack>
+</DialogContent>
+
+  <DialogActions
+    sx={{
+      p: 3,
+      backgroundColor: '#ffffff', // solid white background
+      borderTop: '1px solid #e0e7ff', // lighter primary 200-ish
+      justifyContent: 'flex-end',
+      gap: 2,
+    }}
+  >
+    <Button
+      onClick={() => setOpenDialog(false)}
+      sx={{
+        textTransform: 'none',
+        color: '#64748b', // gray-500
+        fontWeight: 600,
+        fontSize: '1rem',
+        px: 3,
+        py: 1.5,
+        borderRadius: 2,
+        transition: 'background-color 0.3s ease',
+        '&:hover': {
+          backgroundColor: 'rgba(100, 116, 139, 0.1)', // subtle hover
+        },
+      }}
+    >
+      Cancel
+    </Button>
+
+    <Button
+      onClick={handleSubmit}
+      variant="contained"
+      disabled={!masterData.masterType || !masterData.defaultFields.companyName || loading}
+      sx={{
+        textTransform: 'none',
+        fontWeight: 700,
+        borderRadius: 3,
+        px: 4,
+        // background: 'linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%)',
+        // '&:hover': {
+        //   background: 'linear-gradient(90deg, #2563eb 0%, #2563eb 100%)',
+        // },
+        boxShadow: '0 4px 10px rgba(59,130,246,0.4)',
+        transition: 'background 0.3s ease, box-shadow 0.3s ease',
+      }}
+    >
+      {loading ? 'Creating...' : 'Create Master Type'}
+    </Button>
+  </DialogActions>
+</Dialog>
+
+
+
+      {/* Enhanced View Dialog */}
+     <Dialog 
+  open={viewDialog} 
+  onClose={() => setViewDialog(false)} 
+  maxWidth="md" 
+  fullWidth
+  PaperProps={{ 
+    sx: { 
+      borderRadius: 5,
+      background: 'linear-gradient(135deg, #fafbfc 0%, #f8fafd 50%, #f5f7fa 100%)',
+      boxShadow: '0 20px 60px rgba(23, 101, 216, 0.15)',
+      border: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`,
+      overflow: 'hidden',
+      position: 'relative',
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '4px',
+        background: 'linear-gradient(90deg, #1565C0 0%, #26A69A 50%, #FF7043 100%)',
+      }
+    } 
+  }}
+>
+  <DialogTitle sx={{ 
+    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 253, 0.95) 100%)',
+    backdropFilter: 'blur(10px)',
+    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+    color: theme.palette.text.primary,
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    py: 3,
+    px: 4,
+    position: 'relative'
+  }}>
+    <Avatar sx={{ 
+      background: 'linear-gradient(135deg, #1565C0 0%, #1976D2 100%)',
+      width: 40, 
+      height: 40,
+      boxShadow: '0 4px 12px rgba(21, 101, 192, 0.25)'
+    }}>
+      <Visibility fontSize="medium" />
+    </Avatar>
+    <Box>
+      <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
+        {selectedEntry?.defaultFields.companyName}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, mt: 0.5 }}>
+        Master Entry Details
+      </Typography>
+    </Box>
+    <IconButton
+      onClick={() => setViewDialog(false)}
+      sx={{
+        position: 'absolute',
+        right: 16,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        color: theme.palette.text.secondary,
+        '&:hover': {
+          background: alpha(theme.palette.error.main, 0.08),
+          color: theme.palette.error.main,
+        }
+      }}
+    >
+      <close />
+    </IconButton>
+  </DialogTitle>
+   
+  <DialogContent sx={{ 
+    pt: 4, 
+    pb: 3,
+    px: 4,
+    background: 'rgba(255, 255, 255, 0.8)',
+    backdropFilter: 'blur(10px)'
+  }}>
+    {selectedEntry && (
+      <Grid container spacing={4}>
+        {/* Basic Information Card */}
+        <Grid item xs={12}>
+          <Paper sx={{
+            p: 3,
+            borderRadius: 4,
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 253, 0.7) 100%)',
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`,
+            boxShadow: '0 2px 12px rgba(23, 101, 216, 0.06)'
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: theme.palette.primary.main, 
+              mb: 3,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Business fontSize="small" />
+              Basic Information
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <Box sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, #E3F2FD 0%, #F3E5F5 100%)',
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 16px rgba(21, 101, 192, 0.12)'
+                  }
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ 
+                    fontWeight: 700, 
+                    mb: 1,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem',
+                    letterSpacing: 0.5
+                  }}>
+                    Master Type
+                  </Typography>
+                  <Chip 
+                    label={selectedEntry.masterTypeName} 
+                    sx={{
+                      background: 'linear-gradient(135deg, #1565C0 0%, #1976D2 100%)',
+                      color: 'white',
+                      fontWeight: 700,
+                      borderRadius: 3,
+                      height: 32
+                    }}
+                  />
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Box sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, #F3E5F5 0%, #FCE4EC 100%)',
+                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 16px rgba(156, 39, 176, 0.12)'
+                  }
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ 
+                    fontWeight: 700, 
+                    mb: 1,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem',
+                    letterSpacing: 0.5
+                  }}>
+                    Address
+                  </Typography>
+                  <Typography variant="body1" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}>
+           
+                    {selectedEntry.defaultFields.address || 'Not provided'}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+
+        {/* Date Information Card */}
+        <Grid item xs={12}>
+          <Paper sx={{
+            p: 3,
+            borderRadius: 4,
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 248, 225, 0.7) 100%)',
+            border: `1px solid ${alpha(theme.palette.warning.main, 0.08)}`,
+            boxShadow: '0 2px 12px rgba(255, 152, 0, 0.06)'
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: theme.palette.warning.main, 
+              mb: 3,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <CalendarToday fontSize="small" />
+              Important Dates
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={4}>
+                <Box sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%)',
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+                  textAlign: 'center',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 16px rgba(255, 152, 0, 0.15)'
+                  }
+                }}>
+                  <CalendarToday color="warning" sx={{ mb: 1 }} />
+                  <Typography variant="body2" color="text.secondary" sx={{ 
+                    fontWeight: 700, 
+                    mb: 1,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem'
+                  }}>
+                    Billing Date
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: theme.palette.warning.dark }}>
+                    {formatDate(selectedEntry.defaultFields.billingDate)}
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} sm={4}>
+                <Box sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%)',
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                  textAlign: 'center',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 16px rgba(244, 67, 54, 0.15)'
+                  }
+                }}>
+                  <Event color="error" sx={{ mb: 1 }} />
+                  <Typography variant="body2" color="text.secondary" sx={{ 
+                    fontWeight: 700, 
+                    mb: 1,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem'
+                  }}>
+                    Due Date
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: theme.palette.error.dark }}>
+                    {formatDate(selectedEntry.defaultFields.dueDate)}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <Box sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%)',
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                  textAlign: 'center',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 16px rgba(76, 175, 80, 0.15)'
+                  }
+                }}>
+                 
+                  <Typography variant="body2" color="text.secondary" sx={{ 
+                    fontWeight: 700, 
+                    mb: 1,
+                    textTransform: 'uppercase',
+                    fontSize: '0.75rem'
+                  }}>
+                    Reminder
+                  </Typography>
+                  <Typography variant="body1" sx={{ 
+                    textTransform: 'capitalize', 
+                    fontWeight: 700,
+                    color: theme.palette.success.dark
+                  }}>
+                    {selectedEntry.defaultFields.reminder}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+
+        {/* Custom Fields Card */}
+        {selectedEntry.customFields && selectedEntry.customFields.length > 0 && (
+          <Grid item xs={12}>
+            <Paper sx={{
+              p: 3,
+              borderRadius: 4,
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(240, 248, 255, 0.7) 100%)',
+              border: `1px solid ${alpha(theme.palette.info.main, 0.08)}`,
+              boxShadow: '0 2px 12px rgba(33, 150, 243, 0.06)'
+            }}>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 700, 
+                color: theme.palette.info.main, 
+                mb: 3,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <Extension fontSize="small" />
+                Additional Information
+              </Typography>
+              <Grid container spacing={2}>
+                {selectedEntry.customFields.map((field, index) => (
+                  <Grid item xs={12} sm={6} key={index}>
+                    <Box sx={{
+                      p: 2.5,
+                      borderRadius: 3,
+                      background: 'linear-gradient(135deg, #E1F5FE 0%, #F3E5F5 100%)',
+                      border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 16px rgba(33, 150, 243, 0.12)'
+                      }
+                    }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ 
+                        fontWeight: 700, 
+                        mb: 1,
+                        textTransform: 'uppercase',
+                        fontSize: '0.75rem',
+                        letterSpacing: 0.5
+                      }}>
                         {field.name}
                       </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {Array.isArray(field.value) ? `${field.value.length} files` : field.value || 'Not provided'}
+                      <Typography variant="body1" sx={{ 
+                        fontWeight: 600,
+                        color: theme.palette.text.primary,
+                        wordBreak: 'break-word'
+                      }}>
+                        {Array.isArray(field.value) 
+                          ? (
+                            <Chip 
+                              label={`${field.value.length} files`}
+                              icon={<AttachFile />}
+                              size="small"
+                              color="info"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          ) 
+                          : field.value || (
+                            <Typography component="span" sx={{ 
+                              color: 'text.disabled', 
+                              fontStyle: 'italic' 
+                            }}>
+                              Not provided
+                            </Typography>
+                          )
+                        }
                       </Typography>
-                    </Grid>
-                  ))}
-                </>
-              )}
-            </Grid>
-          )}
-        </DialogContent>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          </Grid>
+        )}
+      </Grid>
+    )}
+  </DialogContent>
 
-        <DialogActions sx={{ 
-          p: 3, 
-          background: alpha(theme.palette.primary.main, 0.04), 
-          borderTop: `1px solid ${alpha(theme.palette.divider, 0.12)}` 
-        }}>
-          <Button 
-            onClick={() => setViewDialog(false)}
-            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600 }}
-          >
-            Close
-          </Button>
-          <Button 
-            variant="contained" 
-            startIcon={<Edit />}
-            onClick={() => {
-              setViewDialog(false);
-              if (selectedEntry) handleEdit(selectedEntry);
-            }}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 700,
-              borderRadius: 3,
-              background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.secondary.main} 100%)`,
-              '&:hover': {
-                background: `linear-gradient(135deg, ${theme.palette.warning.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
-              }
-            }}
-          >
-            Edit Entry
-          </Button>
-        </DialogActions>
-      </Dialog>
+  <DialogActions sx={{ 
+    p: 4, 
+    background: 'linear-gradient(135deg, rgba(248, 250, 253, 0.8) 0%, rgba(240, 248, 255, 0.6) 100%)',
+    backdropFilter: 'blur(10px)',
+    borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+    gap: 2
+  }}>
+    <Button 
+      onClick={() => setViewDialog(false)}
+      sx={{ 
+        textTransform: 'none', 
+        color: theme.palette.text.secondary, 
+        fontWeight: 600,
+        borderRadius: 3,
+        px: 3,
+        py: 1.2,
+        '&:hover': {
+          background: alpha(theme.palette.text.secondary, 0.08)
+        }
+      }}
+    >
+      Close
+    </Button>
+    <Button 
+      variant="contained" 
+      startIcon={<Edit />}
+      onClick={() => {
+        setViewDialog(false);
+        if (selectedEntry) handleEdit(selectedEntry);
+      }}
+      sx={{
+        textTransform: 'none',
+        fontWeight: 700,
+        borderRadius: 3,
+        px: 4,
+        py: 1.2,
+        background: 'linear-gradient(135deg, #FF7043 0%, #FF5722 50%, #E91E63 100%)',
+        boxShadow: '0 4px 16px rgba(255, 112, 67, 0.3)',
+        '&:hover': {
+          background: 'linear-gradient(135deg, #F4511E 0%, #D32F2F 50%, #C2185B 100%)',
+          boxShadow: '0 6px 20px rgba(255, 112, 67, 0.4)',
+          transform: 'translateY(-2px)'
+        },
+        transition: 'all 0.2s ease'
+      }}
+    >
+      Edit Entry
+    </Button>
+  </DialogActions>
+</Dialog>
     </Box>
   );
 };
