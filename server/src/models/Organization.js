@@ -18,7 +18,7 @@ const organizationSchema = new mongoose.Schema({
   },
   logo: {
     type: String, // URL to logo image
-  },
+  },  
   website: {
     type: String,
     trim: true,

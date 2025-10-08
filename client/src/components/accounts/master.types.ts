@@ -3,7 +3,7 @@ export interface CustomField {
   id: string | number;
   name: string;
   value: string | string[];
-  type: 'text' | 'number' | 'date' | 'email' | 'phone' | 'upload';
+  type: "text" | "number" | "date" | "email" | "phone" | "upload";
   required?: boolean;
 }
 
@@ -12,7 +12,7 @@ export interface DefaultFields {
   address: string;
   billingDate: string;
   dueDate: string;
-  reminder: 'weekly' | 'monthly' | 'quarterly' | 'half-yearly' | 'yearly';
+  reminder: "weekly" | "monthly" | "quarterly" | "half-yearly" | "yearly";
 }
 
 export interface MasterType {
@@ -26,6 +26,7 @@ export interface MasterType {
 }
 
 export interface MasterEntry {
+  createdBy: any;
   _id: string;
   masterTypeName: string;
   defaultFields: DefaultFields;

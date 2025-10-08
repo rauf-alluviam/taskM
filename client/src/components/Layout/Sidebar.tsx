@@ -35,6 +35,8 @@ interface NavigationItem {
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollapseToggle }) => {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const appVersion = import.meta.env.VITE_APP_VERSION;
+
 
   const isAdmin: boolean = user?.role === 'super_admin' || user?.role === 'org_admin';
   const hasOrganization: boolean = !!user?.organization;
@@ -132,6 +134,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, collapsed, onCollaps
           ))}
         </nav>
 
+{appVersion && (
+  <div className={`px-4 py-2 text-xs text-gray-500 dark:text-slate-400 ${collapsed ? 'text-center px-2' : ''}`}>
+    Version {appVersion}
+  </div>
+)}
         <div className={`border-t border-gray-200 dark:border-slate-700 p-4 ${collapsed ? 'p-2' : ''}`}>
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'}`}>
             <div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center flex-shrink-0">

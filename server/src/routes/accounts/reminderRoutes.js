@@ -1,9 +1,10 @@
-import express from 'express';
-import Account from '../models/Account.js';
-import User from '../models/User.js';
-import AccountHistory from '../models/accounts/AccountHistory.js';
-import auth from '../middleware/auth.js';
-import { accountEmailService } from '../services/accountEmailService.js';
+import express from "express";
+import AccountEntry from "../../models/accounts/AccountEntry.js";
+import User from "../../models/User.js";
+import AccountHistory from "../../models/accounts/AccountHistory.js";
+import cron from "node-cron";
+import { accountEmailService } from "../../services/accountEmailService.js";
+import { authenticate } from "../../middleware/auth.js";
 
 const router = express.Router();
 
@@ -12,199 +13,415 @@ const router = express.Router();
  */
 function calculateDaysUntilDue(dueDate) {
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+
   const diffTime = due.getTime() - today.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
 /**
- * GET /api/accounts/reminders
- * Get all account entries with upcoming due dates and send reminders
+ * Check if reminder should be sent based on frequency and days until due
  */
-router.get('/reminders', auth, async (req, res) => {
+function checkReminderFrequency(reminderFrequency, daysUntilDue) {
+  switch (reminderFrequency) {
+    case "weekly":
+      return daysUntilDue % 7 === 0 || daysUntilDue <= 5;
+    case "monthly":
+      return daysUntilDue % 30 === 0 || daysUntilDue <= 5;
+    case "quarterly":
+      return daysUntilDue % 90 === 0 || daysUntilDue <= 5;
+    case "half-yearly":
+      return daysUntilDue % 180 === 0 || daysUntilDue <= 5;
+    case "yearly":
+      return daysUntilDue % 365 === 0 || daysUntilDue <= 5;
+    default: // 'monthly' as default
+      return daysUntilDue <= 5;
+  }
+}
+
+/**
+ * Function to check and send due date reminders to entry creators
+ */
+const checkAndSendReminders = async () => {
+  try {
+    console.log("🔍 Starting automatic due date reminder check...");
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find all account entries that:
+    // 1. Have due dates in the next 5 days (including today + 5 days)
+    // 2. Don't have billing dates set
+    const fiveDaysFromNow = new Date();
+    fiveDaysFromNow.setDate(today.getDate() + 5);
+    fiveDaysFromNow.setHours(23, 59, 59, 999);
+
+    console.log(
+      `📅 Looking for entries due between: ${today.toDateString()} and ${fiveDaysFromNow.toDateString()}`
+    );
+
+    const entriesNeedingReminders = await AccountEntry.find({
+      "defaultFields.dueDate": {
+        $gte: today,
+        $lte: fiveDaysFromNow,
+      },
+      "defaultFields.billingDate": { $in: [null, ""] }, // No billing date set
+    })
+      .populate("createdBy", "name email")
+      .populate("masterTypeId");
+
+    console.log(
+      `📊 Found ${entriesNeedingReminders.length} entries with due dates in range`
+    );
+
+    if (entriesNeedingReminders.length === 0) {
+      console.log("✅ No entries need reminders at this time");
+      return { success: true, message: "No reminders needed" };
+    }
+
+    // Group entries by creator
+    const entriesByCreator = {};
+    entriesNeedingReminders.forEach((entry) => {
+      if (entry.createdBy && entry.createdBy.email) {
+        const creatorId = entry.createdBy._id.toString();
+        if (!entriesByCreator[creatorId]) {
+          entriesByCreator[creatorId] = {
+            user: entry.createdBy,
+            entries: [],
+          };
+        }
+
+        const daysUntilDue = calculateDaysUntilDue(entry.defaultFields.dueDate);
+
+        console.log(
+          `📅 Entry: ${entry.defaultFields.companyName}, Due: ${entry.defaultFields.dueDate}, Days until due: ${daysUntilDue}`
+        );
+
+        // Check if reminder should be sent based on reminder frequency
+        const shouldSendReminder = checkReminderFrequency(
+          entry.defaultFields.reminder,
+          daysUntilDue
+        );
+
+        if (shouldSendReminder) {
+          entriesByCreator[creatorId].entries.push({
+            ...entry.toObject(),
+            daysUntilDue,
+          });
+        }
+      }
+    });
+
+    const results = [];
+
+    // Send emails to each creator using accountEmailService
+    for (const creatorId in entriesByCreator) {
+      const creatorData = entriesByCreator[creatorId];
+
+      if (creatorData.entries.length > 0) {
+        try {
+          console.log(
+            `📧 Sending reminder to ${creatorData.user.email} for ${creatorData.entries.length} entries`
+          );
+
+          // Use accountEmailService instead of direct transporter
+          await accountEmailService.sendReminderEmail(
+            creatorData.user.email,
+            creatorData.user.name,
+            creatorData.entries
+          );
+
+          results.push({
+            success: true,
+            userEmail: creatorData.user.email,
+            userName: creatorData.user.name,
+            entriesCount: creatorData.entries.length,
+          });
+
+          // Record reminder history for each entry
+          const historyPromises = creatorData.entries.map((entry) => {
+            const history = new AccountHistory({
+              accountEntryId: entry._id,
+              userId: creatorId,
+              action: "reminder_sent",
+              details: {
+                daysUntilDue: entry.daysUntilDue,
+                emailSentTo: creatorData.user.email,
+                masterTypeName: entry.masterTypeName,
+                companyName: entry.defaultFields.companyName,
+                reminderFrequency: entry.defaultFields.reminder,
+              },
+            });
+            return history.save();
+          });
+
+          await Promise.all(historyPromises);
+
+          // Add delay between emails to avoid overwhelming the email service
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error(
+            `❌ Error sending email to ${creatorData.user.email}:`,
+            error.message
+          );
+          results.push({
+            success: false,
+            userEmail: creatorData.user.email,
+            userName: creatorData.user.name,
+            error: error.message,
+          });
+        }
+      }
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.filter((r) => !r.success).length;
+
+    console.log(
+      `✅ Reminder check completed: ${successCount} emails sent successfully, ${failureCount} failed`
+    );
+
+    return {
+      success: true,
+      totalEntriesChecked: entriesNeedingReminders.length,
+      emailsSent: successCount,
+      emailsFailed: failureCount,
+      results,
+    };
+  } catch (error) {
+    console.error("❌ Error in automatic reminder check:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Manual trigger endpoint (for testing)
+router.post("/trigger-reminders", async (req, res) => {
+  try {
+    console.log("🧪 Manual reminder trigger initiated");
+    const result = await checkAndSendReminders();
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in manual reminder trigger:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Test endpoint for specific user
+router.post("/test", authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Find accounts with due dates in the next 5 days
-    // Exclude accounts that have been paid (billing date set) within 5 days of due date
-    const fiveDaysFromNow = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-    const accounts = await Account.find({
-      'defaultFields.dueDate': {
-        $gte: new Date(),
-        $lte: fiveDaysFromNow
+    console.log(`🧪 Testing reminders for user: ${user.email}, ID: ${userId}`);
+
+    // Get user's entries that would trigger reminders
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const fiveDaysFromNow = new Date();
+    fiveDaysFromNow.setDate(today.getDate() + 5);
+    fiveDaysFromNow.setHours(23, 59, 59, 999);
+
+    console.log(
+      `📅 Looking for entries due between: ${today.toDateString()} and ${fiveDaysFromNow.toDateString()}`
+    );
+
+    const testEntries = await AccountEntry.find({
+      createdBy: userId,
+      "defaultFields.dueDate": {
+        $gte: today,
+        $lte: fiveDaysFromNow,
       },
-      userId: userId,
-      $or: [
-        { 'defaultFields.billingDate': { $exists: false } },
-        { 
-          'defaultFields.billingDate': { 
-            $lt: { 
-              $subtract: ['$defaultFields.dueDate', 5 * 24 * 60 * 60 * 1000] 
-            } 
-          } 
-        }
-      ]
-    }).populate('masterTypeId');
+      "defaultFields.billingDate": { $in: [null, ""] }, // No billing date
+    }).populate("masterTypeId");
 
-    if (accounts.length === 0) {
-      return res.json({ message: 'No upcoming due dates found' });
+    console.log(
+      `📊 Found ${testEntries.length} test entries for user ${user.email}`
+    );
+
+    if (testEntries.length === 0) {
+      // Let's debug what entries exist for this user
+      const allUserEntries = await AccountEntry.find({
+        createdBy: userId,
+      }).select(
+        "defaultFields.companyName defaultFields.dueDate defaultFields.billingDate masterTypeName"
+      );
+
+      console.log(
+        `🔍 All entries for user ${user.email}:`,
+        allUserEntries.map((entry) => ({
+          company: entry.defaultFields.companyName,
+          dueDate: entry.defaultFields.dueDate,
+          billingDate: entry.defaultFields.billingDate,
+          hasBilling: !!entry.defaultFields.billingDate,
+        }))
+      );
+
+      return res.json({
+        success: true,
+        message: "No test entries found for reminders",
+        note: "Create entries with due dates in the next 5 days and no billing date to test reminders",
+        userEntries: allUserEntries.map((entry) => ({
+          company: entry.defaultFields.companyName,
+          dueDate: entry.defaultFields.dueDate,
+          billingDate: entry.defaultFields.billingDate,
+          hasBilling: !!entry.defaultFields.billingDate,
+          daysUntilDue: calculateDaysUntilDue(entry.defaultFields.dueDate),
+        })),
+      });
     }
 
-    // Process accounts and add days until due
-    const processedEntries = accounts.map(account => ({
-      ...account.toObject(),
-      daysUntilDue: calculateDaysUntilDue(account.defaultFields.dueDate),
-      masterTypeName: account.masterTypeId.name
+    const processedEntries = testEntries.map((entry) => ({
+      ...entry.toObject(),
+      daysUntilDue: calculateDaysUntilDue(entry.defaultFields.dueDate),
     }));
 
-    // Send reminder email
+    console.log(
+      `📧 Sending test reminder for ${processedEntries.length} entries to ${user.email}`
+    );
+
+    // Send test email using accountEmailService
     await accountEmailService.sendReminderEmail(
       user.email,
       user.name,
       processedEntries
     );
 
-    // Record reminder history for each entry
-    const historyPromises = processedEntries.map(entry => {
-      const history = new AccountHistory({
-        accountEntryId: entry._id,
-        userId: userId,
-        action: 'reminder_sent',
-        details: {
-          daysUntilDue: entry.daysUntilDue,
-          emailSentTo: user.email
-        }
-      });
-      return history.save();
-    });
-
-    await Promise.all(historyPromises);
-
-    // Get history for each entry
-    const entriesWithHistory = await Promise.all(processedEntries.map(async (entry) => {
-      const history = await AccountHistory.find({ accountEntryId: entry._id })
-        .sort({ createdAt: -1 })
-        .limit(5); // Get last 5 history items
-      return {
-        ...entry,
-        history
-      };
-    }));
-
     res.json({
-      message: 'Reminder email sent successfully',
-      entries: entriesWithHistory
+      success: true,
+      message: "Test reminder sent successfully",
+      testEntries: processedEntries.length,
+      user: user.email,
+      entries: processedEntries.map((entry) => ({
+        company: entry.defaultFields.companyName,
+        dueDate: entry.defaultFields.dueDate,
+        daysUntilDue: entry.daysUntilDue,
+      })),
     });
   } catch (error) {
-    console.error('Error in reminder route:', error);
-    res.status(500).json({ message: 'Error processing reminders', error: error.message });
+    console.error("Error in test reminder:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error sending test reminder",
+      error: error.message,
+    });
   }
 });
 
-/**
- * POST /api/accounts
- * Create a new account entry and send notification
- */
-router.post('/', auth, async (req, res) => {
+// Get reminder status endpoint
+router.get("/reminder-status", async (req, res) => {
   try {
-    const userId = req.user.id;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    const users = await User.find({
+      status: "active",
+      organization: { $exists: true, $ne: null },
+    }).populate("organization");
 
-    const account = new Account({
-      ...req.body,
-      userId: userId
+    const organizations = await User.aggregate([
+      {
+        $match: {
+          status: "active",
+          organization: { $exists: true, $ne: null },
+        },
+      },
+      { $group: { _id: "$organization", userCount: { $sum: 1 } } },
+      {
+        $lookup: {
+          from: "organizations",
+          localField: "_id",
+          foreignField: "_id",
+          as: "orgDetails",
+        },
+      },
+    ]);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const fiveDaysFromNow = new Date();
+    fiveDaysFromNow.setDate(today.getDate() + 5);
+    fiveDaysFromNow.setHours(23, 59, 59, 999);
+
+    const upcomingEntries = await AccountEntry.find({
+      "defaultFields.dueDate": {
+        $gte: today,
+        $lte: fiveDaysFromNow,
+      },
+      "defaultFields.billingDate": { $in: [null, ""] },
     });
 
-    const savedAccount = await account.save();
-    
-    // Record creation history
-    const history = new AccountHistory({
-      accountEntryId: savedAccount._id,
-      userId: userId,
-      action: 'created',
-      details: {
-        masterTypeName: req.body.masterTypeName,
-        ...savedAccount.defaultFields
-      }
+    const totalEntries = await AccountEntry.countDocuments();
+
+    const overdueEntries = await AccountEntry.find({
+      "defaultFields.dueDate": {
+        $lt: today,
+      },
+      "defaultFields.billingDate": { $in: [null, ""] },
     });
-    await history.save();
-    
-    // Send account creation notification
-    if (savedAccount) {
-      await accountEmailService.sendAccountCreatedEmail(
-        user.email,
-        user.name,
-        {
-          ...savedAccount.defaultFields,
-          masterTypeName: req.body.masterTypeName
-        }
-      );
 
-      // Record notification history
-      const notificationHistory = new AccountHistory({
-        accountEntryId: savedAccount._id,
-        userId: userId,
-        action: 'reminder_sent',
-        details: {
-          type: 'creation_notification',
-          emailSentTo: user.email
-        }
-      });
-      await notificationHistory.save();
-    }
-
-    // Get the history for the new entry
-    const entryHistory = await AccountHistory.find({ accountEntryId: savedAccount._id })
-      .sort({ createdAt: -1 });
-
-    res.status(201).json({
-      ...savedAccount.toObject(),
-      history: entryHistory
+    res.status(200).json({
+      totalUsers: users.length,
+      totalOrganizations: organizations.length,
+      organizations: organizations.map((org) => ({
+        name: org.orgDetails[0]?.name || "Unknown",
+        userCount: org.userCount,
+      })),
+      totalEntries: totalEntries,
+      upcomingDueDates: upcomingEntries.length,
+      overdueEntries: overdueEntries.length,
+      dateRange: {
+        from: today.toDateString(),
+        to: fiveDaysFromNow.toDateString(),
+      },
+      nextReminderCheck: "9:00 AM daily IST",
+      systemStatus: "active",
+      currentTime: new Date().toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      }),
     });
   } catch (error) {
-    console.error('Error creating account:', error);
-    res.status(500).json({ message: 'Error creating account entry', error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
-/**
- * GET /api/accounts/:entryId/history
- * Get history for a specific account entry
- */
-router.get('/:entryId/history', auth, async (req, res) => {
-  try {
-    const { entryId } = req.params;
-    const userId = req.user.id;
-
-    // Verify the entry exists and belongs to the user
-    const entry = await Account.findOne({
-      _id: entryId,
-      userId: userId
-    });
-
-    if (!entry) {
-      return res.status(404).json({ message: 'Account entry not found' });
-    }
-
-    // Get entry history
-    const history = await AccountHistory.find({ accountEntryId: entryId })
-      .sort({ createdAt: -1 });
-
-    res.json({
-      entry,
-      history
-    });
-  } catch (error) {
-    console.error('Error fetching account history:', error);
-    res.status(500).json({ message: 'Error fetching account history', error: error.message });
+// // Automatic daily reminder system using cron
+cron.schedule(
+  "0 9 * * *",
+  async () => {
+    console.log(
+      "⏰ Scheduled reminder check triggered at:",
+      new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
+    );
+    await checkAndSendReminders();
+  },
+  {
+    timezone: "Asia/Kolkata",
   }
-});
+);
+
+// Optional: Test cron that runs every minute (for testing only - remove in production)
+// cron.schedule(
+//   "* * * * *",
+//   async () => {
+//     console.log(
+//       "🧪 Test reminder check at:",
+//       new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
+//     );
+//     await checkAndSendReminders();
+//   },
+//   {
+//     timezone: "Asia/Kolkata",
+//   }
+// );
+
+console.log(
+  "📧 Due Date Reminder System initialized - Daily checks at 9:00 AM IST"
+);
 
 export default router;

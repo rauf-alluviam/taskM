@@ -13,7 +13,7 @@ const accountHistorySchema = new mongoose.Schema({
   },
   action: {
     type: String,
-    enum: ['created', 'updated', 'billing_date_set', 'reminder_sent'],
+    enum: ['created', 'updated', 'deleted', 'billing_date_set', 'reminder_sent', 'creation_notification_sent'],
     required: true
   },
   details: {
@@ -27,5 +27,7 @@ const accountHistorySchema = new mongoose.Schema({
 
 // Index for faster queries
 accountHistorySchema.index({ accountEntryId: 1, createdAt: -1 });
+accountHistorySchema.index({ userId: 1 });
+accountHistorySchema.index({ action: 1 });
 
 export default mongoose.model('AccountHistory', accountHistorySchema);
